@@ -1,4 +1,4 @@
-VolleyOS is the offline-first operating system for volleyball. Eighteen modules that work in a gym with no signal, on a phone, tablet or laptop.
+VolleyOS is the offline-first operating system for volleyball. Twenty-four modules that work in a gym with no signal, on a phone, tablet or laptop.
 
 WHAT YOU GET
 • 5-Frame Lab: measure jump height and attack mechanics with physics, not guesswork.
@@ -19,6 +19,13 @@ WHAT YOU GET
 • Lineup Slip: FIVB I-VI sheet with pairs three positions apart and libero windows.
 • Integrity Seal: HMAC-SHA256 over canonical JSON to detect altered match sheets.
 • .volleyos Capsule: export and import boards, rosters and tournaments with a SHA-256 checksum.
+• Referee Console: FIVB 21 cards, automatic escalation, 8 s serve timer and whistle audio.
+• Substitution Tracker: six subs per set, position-bound pairs and exceptional injury.
+• Court Split: exact-cent pickup costs, deposits, refunds and a WhatsApp text.
+• Fan Companion: eight referee gestures explained and fan trivia with ranks.
+• Setter Signals: seven gestures, six plays and collision detection.
+• MVP Awards: MVP, Wall, Lock, Sniper, Builder and Ice on a sealed share card.
+• Live rooms: SQLite WAL persistence, admin-token updates and public polling.
 
 BUILT FOR REAL COURTS
 • 100% offline. No accounts, no ads, no telemetry.

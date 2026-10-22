@@ -2,9 +2,9 @@
 
 [English](README.md) | **Español** | [Português](README.pt.md)
 
-El sistema operativo del vóley: 18 módulos para jugadores, entrenadores,
-árbitros, organizadores y clubes. FOSS offline-first (listo para F-Droid) +
-Cloud Pro opcional.
+El sistema operativo del vóley: 24 módulos para jugadores, entrenadores,
+árbitros, tribuna, organizadores y clubes. FOSS offline-first (listo para
+F-Droid) + Cloud Pro opcional, con salas en vivo persistentes.
 
 - Backend: Python 3.13+ / FastAPI / Pydantic v2 / matemática solo con Decimal.
 - Frontend: Next.js App Router / TypeScript estricto / Tailwind / Zod.
@@ -53,13 +53,21 @@ docker compose up --build
 | 16 | Boleta FIVB I-VI con ventana de líbero | `lineup-slip` |
 | 17 | Sello de integridad HMAC-SHA256 | `integrity-seal` |
 | 18 | Cápsula portátil `.volleyos` | `capsule-io` |
+| 19 | Consola de árbitro + tarjetas FIVB 21 | `referee-console` |
+| 20 | Control de cambios y reingresos | `substitution-tracker` |
+| 21 | Vaquita de cancha al centavo | `court-split` |
+| 22 | Compañero de tribuna + trivia arbitral | `fan-companion` |
+| 23 | Señas del armador con colisiones | `setter-signals` |
+| 24 | Premios MVP, Muro, Candado y Sangre Fría | `mvp-awards` |
 
 ## Superficie de API
 
-- `GET /api/v1/health/deep` - salud de los 18 motores y versión.
-- `GET /api/v1/catalog/modules` - módulos, ejemplos y precios.
+- `GET /api/v1/health/deep` - salud de los 24 motores y versión.
+- `GET /api/v1/catalog/modules` - módulos, ejemplos, perfiles y precios.
 - `POST /api/v1/modules/{slug}/run` y `/demo` - ejecutar un motor.
 - `POST /api/v1/security/verify-seal` - verificar un acta firmada.
+- `POST /api/v1/live` -> `GET /api/v1/live/{room_id}` - crear y leer una sala
+  en vivo con SQLite; `PATCH` y `DELETE` exigen `X-Admin-Token`.
 - `POST /api/v1/jobs` -> `GET /jobs/{id}/preview` -> webhook firmado ->
   `GET /jobs/{id}/download?format=xlsx|csv` (402 hasta el pago).
 - `DELETE /api/v1/jobs/{id}` - destruye los datos y devuelve un recibo UTC firmado.
@@ -89,8 +97,9 @@ cd frontend && npm run typecheck && npm run test && npm run build
 
 ## Estado
 
-v2.0.0: 18 módulos, 18 pruebas de motores, UI y documentación trilingüe, E2E en
-vivo para módulos, seguridad, paywall y política de cabeceras.
+v3.0.0: 24 módulos, 289 pruebas backend, salas en vivo SQLite WAL, seis perfiles
+de rol, silbato de árbitro, alto contraste, UI y documentación trilingüe, y E2E
+en vivo para módulos, salas, seguridad, paywall y cabeceras.
 
 La exportación Cloud usa un webhook HMAC; conecta un proveedor de checkout antes
 de cobrar.

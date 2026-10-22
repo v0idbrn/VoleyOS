@@ -1,0 +1,6 @@
+v3.0.0
+• Seis módulos novos: Console de árbitro, Controle de substituições, Rateio de quadra, Companheiro de torcida, Sinais do levantador e Prêmios MVP.
+• Salas ao vivo persistentes com SQLite WAL, token de administração e leitura pública.
+• Seis perfis de papel: jogadores, treinadores, quadra, árbitros, torcida e torneios.
+• Apito de árbitro, alto contraste e visualizador de salas ao vivo trilíngue.
+• 24 módulos replicados offline em TypeScript com 42 testes frontend.

@@ -48,7 +48,7 @@ Contracts checked by the suite:
 
 - Zero `float` tokens under `backend/app/`.
 - Zero `: any` under `frontend/src/`.
-- Health and catalog report 18 modules.
+- Health and catalog report 24 modules.
 - Every response carries the privacy/security headers.
 - Every engine has a TS mirror in `frontend/src/lib/local-engines.ts`.
 

@@ -1,4 +1,4 @@
-# QA Report - VolleyOS Global v2.0.0
+# QA Report - VolleyOS Global v3.0.0
 
 Date: 2026-10-22
 Environment: Windows 11, Python 3.14.3 (backend venv), Node 24.15.0, npm 12.0.2,
@@ -8,32 +8,34 @@ Next.js 15.1.6, Docker 29.5.3 (daemon unavailable).
 
 | Gate | Command | Result |
 | --- | --- | --- |
-| Backend tests | `.venv\Scripts\python -m pytest` | 232 passed |
+| Backend tests | `.venv\Scripts\python -m pytest` | 289 passed |
 | Backend lint | `.venv\Scripts\python -m ruff check app tests` | 0 findings |
-| Backend types | `.venv\Scripts\python -m mypy --strict app` | 0 errors, 30 files |
+| Backend types | `.venv\Scripts\python -m mypy --strict app` | 0 errors, 37 files |
 | Frontend types | `npm run typecheck` | 0 errors |
-| Frontend tests | `npm run test` | 35 passed (7 files) |
-| Frontend build | `npm run build` | 158 static routes, 0 errors |
+| Frontend tests | `npm run test` | 42 passed (9 files) |
+| Frontend build | `npm run build` | 176 routes, 0 errors |
 | Contracts | `float` in `backend/app/` | 0 matches |
 | Contracts | `: any` in `frontend/src/` | 0 matches |
 
-## Live end-to-end (27/27)
+## Live end-to-end (32/32)
 
 `scripts/e2e_check.py` against `uvicorn` on :8000 and `next start` on :3000:
 
 - API root and privacy/security headers: no-store, nosniff, SAMEORIGIN,
   no-referrer, CSP and Permissions-Policy.
-- Deep health reports 18/18 engines and version 2.0.0.
-- Catalog reports 18 modules and 3 pricing tiers.
+- Deep health reports 24/24 engines and version 3.0.0.
+- Catalog reports 24 modules, 6 profiles and 3 pricing tiers.
 - Biomechanics demo returns 5 frame verdicts.
-- All 18 module demos return HTTP 200.
+- All 24 module demos return HTTP 200.
+- Live room lifecycle: create -> public read -> PATCH 403 without token ->
+  token update with seal change -> signed delete receipt.
 - Seal verification rejects an invalid HMAC seal.
 - A 256 KiB+ mutation is rejected with 413.
 - Job lifecycle: create -> preview locked -> download 402 -> bad HMAC 401 ->
   signed webhook 200 -> XLSX (PK zip, correct MIME) -> CSV -> delete receipt
   (64-char HMAC) -> 404 afterwards.
-- Web: ES/EN/PT homes, security headers, 18 rendered stations, scouting SEO page
-  with FAQPage JSON-LD, privacy page, overlay `noindex`, sitemap (151 URLs),
+- Web: ES/EN/PT homes, security headers, 24 rendered stations, scouting SEO page
+  with FAQPage JSON-LD, privacy page, overlay `noindex`, sitemap (169 URLs),
   robots with sitemap.
 
 ## Security shield
@@ -51,23 +53,25 @@ Next.js 15.1.6, Docker 29.5.3 (daemon unavailable).
 
 - Spanish, English and Portuguese UI, module metadata, SEO pages, legal pages,
   fastlane metadata and README suite.
-- Locale render tests cover all 18 stations in ES/EN/PT.
+- Locale render tests cover all 24 stations in ES/EN/PT.
 - FIVB terminology follows local usage (armador/setter/levantador,
   líbero/libero/líbero, punta/outside/ponteiro).
 
 ## Build output
 
-- 3 locale homes, 15 section indexes, 120 guide pages (40 entries x 3 locales),
-  12 legal pages, overlay, sitemap and robots = 158 static routes.
-- First Load JS: 105 kB shared, 134 kB home.
-- All routes prerendered; `next start` serves them without a database.
+- 3 locale homes, 15 section indexes, 138 guide pages (46 entries x 3 locales),
+  12 legal pages, overlay, sitemap and robots, plus a dynamic live-room route.
+- First Load JS: 105 kB shared, 145 kB home.
+- All static routes prerendered; live rooms hydrate from the API and degrade to
+  a trilingual offline message.
 
 ## Accessibility / UX
 
 - Semantic `main`, `header`, `nav`, `footer`, FAQ `details`, ARIA `tablist` for
   profile filters.
 - Skip link to stations, Ctrl+K module search, Escape clears the query,
-  visible focus rings, `aria-current` on language switchers.
+  visible focus rings, `aria-current` on language switchers, persistent role
+  selection, and an opt-in high-contrast class with stronger text/border colors.
 - Color palette keeps >= 4.5:1 for body text on obsidian; metrics use large bold
   type.
 - `prefers-reduced-motion` disables transitions and animations.
@@ -83,13 +87,15 @@ Next.js 15.1.6, Docker 29.5.3 (daemon unavailable).
 
 ## Known limits
 
-- Jobs are in-memory by design; they vanish on API restart (`store.py` note).
-- No authentication yet; add before multi-tenant paid traffic.
-- Frontend stations are fully local and do not call the API; Cloud export UI is
-  not wired to the HMAC job flow yet.
-- Pricing CTAs use `mailto:` until a Stripe checkout link is configured.
+- Jobs and live rooms persist in SQLite WAL; back up `VOLLEYOS_DB_PATH` before
+  deploys. Live rooms intentionally expose public reads and token-gated writes.
+- No user authentication yet; admin tokens are per-room and HMAC-derived.
+- Frontend engine stations remain fully local; only the live-room viewer calls
+  the API. Cloud export UI is not wired to the HMAC job flow yet.
+- Pricing CTAs open a local confirmation dialog and then `mailto:` until a
+  checkout provider is configured.
 - F-Droid APK wrapper is documented but not built; see
   `docs/FDROID_SUBMISSION_GUIDE.md`.
 - Docker images were not built in this environment (daemon down); run
   `docker compose build && docker compose up` before publishing.
-- SEO deliberately ships 40 curated entries instead of thin permutations.
+- SEO deliberately ships 46 curated entries instead of thin permutations.

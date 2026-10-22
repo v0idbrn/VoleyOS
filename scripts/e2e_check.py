@@ -66,11 +66,11 @@ def api_checks() -> None:
 
     status, _, body = call("GET", f"{API}/api/v1/health/deep")
     health = json.loads(body) if status == 200 else {}
-    check("api.health_deep", status == 200 and health.get("status") == "ok" and health.get("count") == 18)
+    check("api.health_deep", status == 200 and health.get("status") == "ok" and health.get("count") == 24)
 
     status, _, body = call("GET", f"{API}/api/v1/catalog/modules")
     catalog = json.loads(body) if status == 200 else {}
-    check("api.catalog", status == 200 and catalog.get("count") == 18 and len(catalog.get("pricing", [])) == 3)
+    check("api.catalog", status == 200 and catalog.get("count") == 24 and len(catalog.get("pricing", [])) == 3)
 
     status, _, body = call("POST", f"{API}/api/v1/modules/biomechanics/demo", {})
     demo = json.loads(body) if status == 200 else {}
@@ -83,9 +83,47 @@ def api_checks() -> None:
         "biomechanics", "rotation", "scouting", "scoreboard", "tournament", "pickup",
         "overlay", "var", "beach", "volleycard", "tempo", "acwr",
         "block-shadow", "seam-radar", "setter-iq", "lineup-slip", "integrity-seal", "capsule-io",
+        "referee-console", "substitution-tracker", "court-split", "fan-companion",
+        "setter-signals", "mvp-awards",
     ]
     demos = {slug: call("POST", f"{API}/api/v1/modules/{slug}/demo", {})[0] for slug in slugs}
-    check("api.demo_all_18", all(code == 200 for code in demos.values()), str(demos))
+    check("api.demo_all_24", all(code == 200 for code in demos.values()), str(demos))
+
+    status, _, body = call(
+        "POST",
+        f"{API}/api/v1/live",
+        {"module": "scoreboard", "title": "E2E Live", "state": {"score_a": 20, "score_b": 18}},
+    )
+    live = json.loads(body) if status == 200 else {}
+    room_id = str(live.get("room_id", ""))
+    token = str(live.get("admin_token", ""))
+    check("api.live_create", status == 200 and bool(room_id) and bool(token))
+
+    status, _, body = call("GET", f"{API}/api/v1/live/{room_id}")
+    public = json.loads(body) if status == 200 else {}
+    check("api.live_read", status == 200 and public.get("state", {}).get("score_a") == 20 and "admin_token" not in public)
+
+    status, _, _ = call("PATCH", f"{API}/api/v1/live/{room_id}", {"points": {"A": 21, "B": 18}})
+    check("api.live_forbidden", status == 403)
+
+    status, _, body = call(
+        "PATCH",
+        f"{API}/api/v1/live/{room_id}",
+        {"points": {"A": 21, "B": 18}, "rotation": 4},
+        headers={"X-Admin-Token": token},
+    )
+    updated = json.loads(body) if status == 200 else {}
+    check(
+        "api.live_update",
+        status == 200
+        and updated.get("state", {}).get("points", {}).get("A") == 21
+        and updated.get("state", {}).get("rotation") == 4
+        and updated.get("seal") != live.get("seal"),
+    )
+
+    status, _, body = call("DELETE", f"{API}/api/v1/live/{room_id}", headers={"X-Admin-Token": token})
+    receipt = json.loads(body) if status == 200 else {}
+    check("api.live_destroy", status == 200 and len(str(receipt.get("receipt_signature", ""))) == 64)
 
     status, _, body = call("POST", f"{API}/api/v1/modules/integrity-seal/demo", {})
     sealed = json.loads(body).get("result", {}) if status == 200 else {}
@@ -184,7 +222,7 @@ def web_checks() -> None:
     check("web.pt_home", status == 200 and b"Esta\xc3\xa7\xc3\xb5es" in body)
 
     status, _, body = call("GET", f"{WEB}/es/")
-    check("web.eighteen_modules", status == 200 and body.count(b'id="station-') >= 18)
+    check("web.twenty_four_modules", status == 200 and body.count(b'id="station-') >= 24)
 
     status, _, body = call("GET", f"{WEB}/es/legal/privacy/")
     check("web.legal", status == 200 and b"privacidad" in body.lower())
@@ -193,7 +231,7 @@ def web_checks() -> None:
     check("web.overlay_noindex", status == 200 and b"noindex" in body)
 
     status, _, body = call("GET", f"{WEB}/sitemap.xml")
-    check("web.sitemap", status == 200 and body.count(b"<url>") >= 150, f"{body.count(b'<url>')} urls")
+    check("web.sitemap", status == 200 and body.count(b"<url>") >= 165, f"{body.count(b'<url>')} urls")
 
     status, _, body = call("GET", f"{WEB}/robots.txt")
     check("web.robots", status == 200 and b"sitemap.xml" in body)

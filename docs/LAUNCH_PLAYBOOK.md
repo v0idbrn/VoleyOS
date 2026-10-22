@@ -1,4 +1,4 @@
-# Launch Playbook - VolleyOS Global v2.0.0
+# Launch Playbook - VolleyOS Global v3.0.0
 
 Everything below assumes the repository root and a clean `main` branch.
 
@@ -19,7 +19,7 @@ cd ..
 python scripts\e2e_check.py   # requires both servers running
 ```
 
-Expected: 232 backend tests, 35 frontend tests, 158 static routes, 27/27 E2E.
+Expected: 289 backend tests, 42 frontend tests, 176 routes, 32/32 E2E.
 Docker was not built on the dev machine (daemon stopped). Before publishing:
 
 ```bash

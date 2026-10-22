@@ -1,0 +1,6 @@
+v3.0.0
+• Six new modules: Referee Console, Substitution Tracker, Court Split, Fan Companion, Setter Signals and MVP Awards.
+• Persistent live rooms backed by SQLite WAL, with admin-token updates and public polling.
+• Six role profiles: players, coaches, court, referees, fans and tournaments.
+• Referee whistle audio, high-contrast mode and a trilingual live room viewer.
+• 24 modules mirrored offline in TypeScript with 42 frontend tests.

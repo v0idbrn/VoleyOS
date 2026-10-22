@@ -1,4 +1,4 @@
-VolleyOS es el sistema operativo offline-first del vóley. Dieciocho módulos que funcionan en un gimnasio sin señal, en celular, tablet o notebook.
+VolleyOS es el sistema operativo offline-first del vóley. Veinticuatro módulos que funcionan en un gimnasio sin señal, en celular, tablet o notebook.
 
 QUÉ INCLUYE
 • Laboratorio 5 Fotogramas: medí salto y mecánica de remate con física, no con intuición.
@@ -19,6 +19,13 @@ QUÉ INCLUYE
 • Boleta FIVB I-VI: pares a tres posiciones y ventanas exactas del líbero.
 • Sello de Integridad: HMAC-SHA256 sobre JSON canónico para detectar actas alteradas.
 • Cápsula .volleyos: exportá e importá pizarras, planteles y torneos con checksum SHA-256.
+• Consola de árbitro: tarjetas FIVB 21, escalado automático, 8 s de saque y silbato.
+• Control de cambios: seis por set, pares atados por posición y lesión excepcional.
+• Vaquita de cancha: costos al centavo, señas, devoluciones y texto de WhatsApp.
+• Compañero de tribuna: ocho gestos arbitrales y trivia con rangos.
+• Señas del armador: siete gestos, seis jugadas y detección de colisiones.
+• Premios MVP: MVP, Muro, Candado, Francotirador, Albañil y Sangre Fría sellados.
+• Salas en vivo: persistencia SQLite WAL, token de administración y lectura pública.
 
 HECHO PARA CANCHAS REALES
 • 100% offline. Sin cuentas, sin publicidad, sin telemetría.

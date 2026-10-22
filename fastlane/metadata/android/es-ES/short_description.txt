@@ -1,1 +1,1 @@
-12 módulos de vóley offline: scouting, rotaciones, VAR, playa y overlay OBS.
+24 módulos de vóley offline: scouting, arbitraje, tribuna, salas en vivo y OBS.

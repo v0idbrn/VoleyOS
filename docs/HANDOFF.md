@@ -125,11 +125,34 @@
 - Versions bumped to 2.0.0 in backend and frontend.
 - Tag `v2.0.0` and push to `main`.
 
-## Current state
-- 18 Decimal engines + TS mirrors, FastAPI API with security shield and HMAC
-  paywall, trilingual Command Center, 158 SSG routes, PWA/F-Droid metadata,
-  Docker/Render/CI and 27/27 live E2E.
-- Known limits: in-memory jobs, no auth, no live checkout provider, Cloud export
-  UI not wired to the job API, Docker images unbuilt locally.
+## Sprint 17 - SQLite WAL persistence and live rooms
+- `persistent_store.py`: SQLite WAL store at `VOLLEYOS_DB_PATH`
+  (default `./.tmp/volleyos.db`), connection-per-call, jobs and `live_rooms`.
+- HMAC job signatures, per-room admin tokens, seals, delete receipts.
+- API: `POST/GET /api/v1/live`, `PATCH/DELETE` gated by `X-Admin-Token`;
+  allowed modules are scoreboard, beach, referee-console and tournament.
+- Tests: WAL mode, persistence across connections, full live cycle, 404/403,
+  non-live modules rejected.
 
-Next: wire checkout + API export UI, then Redis/SQLite job store and auth.
+## Sprint 18 - engines 19-24
+- New Decimal engines: `referee_console` (FIVB 21 cards, escalation, 8 s/30 s
+  timers), `substitution_tracker` (six per set, position-bound pairs, injury),
+  `court_split` (exact-cent pickup, tournament profit), `fan_companion`
+  (8 gestures, 5 trivia questions), `setter_signals` (7 gestures, 6 plays),
+  `mvp_awards` (MVP/WALL/LOCK/SNIPER/BUILDER/ICE + sealed card).
+- Dispatcher, demos, catalog and health expanded to 24; profiles now include
+  referees and fans. Versions bumped to 3.0.0.
+- Six TypeScript mirrors, 42 frontend tests, 24 hub stations, 24 metadata
+  entries, six station UIs and 46 SEO entries (169 sitemap URLs).
+- UX: persisted role selection, high-contrast mode, referee whistle audio and a
+  trilingual `/[locale]/live/[roomId]` viewer with public polling.
+- E2E: live room lifecycle, 24 demos, 24 rendered stations, 169 sitemap URLs.
+
+## Current state
+- 24 Decimal engines + TS mirrors, FastAPI API with security shield, HMAC
+  paywall and SQLite WAL live rooms, trilingual Command Center, 176 routes,
+  PWA/F-Droid metadata, Docker/Render/CI and 32/32 live E2E.
+- Known limits: no user auth, no live checkout provider, Cloud export UI not
+  wired to the job API, Docker images unbuilt locally, live rooms poll every 5 s.
+
+Next: wire checkout + API export UI, then account auth and WebSocket live rooms.
