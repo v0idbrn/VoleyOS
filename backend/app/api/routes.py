@@ -13,11 +13,11 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from app.api.demo_data import DEMOS, MODULE_SLUGS
 from app.api.dispatch import MODULES, run_module
 from app.api.store import (
-    JOBS,
     Job,
     create_job,
     delete_job,
     get_job,
+    list_jobs,
     mark_paid,
     utc_now,
     verify_signature,
@@ -25,6 +25,14 @@ from app.api.store import (
 from app.security import sanitize_value
 from app.services.excel_exporter import export_csv, export_xlsx
 from app.services.integrity_seal import VerifySealRequest, verify_seal
+from app.services.persistent_store import (
+    create_live_room,
+    delete_live_room,
+    get_live_room,
+    room_payload,
+    update_live_room,
+    verify_admin_token,
+)
 
 router = APIRouter()
 
@@ -63,6 +71,24 @@ class JobCreate(BaseModel):
     kind: str = "report"
     summary: dict[str, Any] = Field(default_factory=dict)
     rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class LiveRoomCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    module: str
+    title: str = Field(min_length=1, max_length=80)
+    state: dict[str, Any] = Field(default_factory=dict)
+
+
+class LiveRoomUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    state: dict[str, Any] | None = None
+    points: dict[str, Any] | None = None
+    rotation: int | None = Field(default=None, ge=1, le=6)
+    cards: list[dict[str, Any]] | None = None
+    results: dict[str, Any] | None = None
 
 
 def _job_or_404(job_id: str) -> Job:
@@ -167,6 +193,71 @@ def security_verify_seal(request: VerifySealRequest) -> dict[str, Any]:
     return report.model_dump(mode="json")
 
 
+@router.post("/live")
+def create_live(request: LiveRoomCreate) -> dict[str, Any]:
+    try:
+        room, token = create_live_room(
+            request.module,
+            str(sanitize_value(request.title)),
+            sanitize_value(request.state),
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    payload = room_payload(room)
+    payload["admin_token"] = token
+    payload["admin_header"] = "X-Admin-Token"
+    return payload
+
+
+@router.get("/live/{room_id}")
+def read_live(room_id: str) -> dict[str, Any]:
+    room = get_live_room(room_id)
+    if room is None:
+        raise HTTPException(status_code=404, detail="live room not found")
+    return room_payload(room)
+
+
+@router.patch("/live/{room_id}")
+def update_live(
+    room_id: str,
+    request: LiveRoomUpdate,
+    x_admin_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    room = get_live_room(room_id)
+    if room is None:
+        raise HTTPException(status_code=404, detail="live room not found")
+    if not verify_admin_token(room_id, x_admin_token or ""):
+        raise HTTPException(status_code=403, detail="invalid admin token")
+    state = dict(request.state) if request.state is not None else dict(room.state)
+    if request.points is not None:
+        state["points"] = request.points
+    if request.rotation is not None:
+        state["rotation"] = request.rotation
+    if request.cards is not None:
+        state["cards"] = request.cards
+    if request.results is not None:
+        state["results"] = request.results
+    updated = update_live_room(room_id, sanitize_value(state))
+    if updated is None:
+        raise HTTPException(status_code=404, detail="live room not found")
+    return room_payload(updated)
+
+
+@router.delete("/live/{room_id}")
+def destroy_live(
+    room_id: str,
+    x_admin_token: str | None = Header(default=None),
+) -> dict[str, str]:
+    if get_live_room(room_id) is None:
+        raise HTTPException(status_code=404, detail="live room not found")
+    if not verify_admin_token(room_id, x_admin_token or ""):
+        raise HTTPException(status_code=403, detail="invalid admin token")
+    receipt = delete_live_room(room_id)
+    if receipt is None:
+        raise HTTPException(status_code=404, detail="live room not found")
+    return receipt
+
+
 @router.get("/jobs/{job_id}/preview")
 def preview(job_id: str) -> dict[str, Any]:
     job = _job_or_404(job_id)
@@ -267,9 +358,10 @@ def destroy(job_id: str) -> dict[str, str]:
 
 
 @router.get("/jobs")
-def list_jobs() -> dict[str, Any]:
+def jobs_index() -> dict[str, Any]:
+    jobs = list_jobs()
     return {
-        "count": len(JOBS),
+        "count": len(jobs),
         "jobs": [
             {
                 "job_id": job.job_id,
@@ -277,6 +369,6 @@ def list_jobs() -> dict[str, Any]:
                 "title": job.title,
                 "is_paid": job.is_paid,
             }
-            for job in JOBS.values()
+            for job in jobs
         ],
     }
