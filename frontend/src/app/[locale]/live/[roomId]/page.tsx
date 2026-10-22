@@ -3,8 +3,13 @@ import { notFound } from "next/navigation";
 
 import { LiveRoomView } from "@/components/LiveRoomView";
 import { isLocale } from "@/lib/i18n";
+import { LOCALES } from "@/lib/local-engines";
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-static";
+
+export function generateStaticParams(): Array<{ locale: string; roomId: string }> {
+  return LOCALES.flatMap((locale) => [{ locale, roomId: "local" }]);
+}
 
 export const metadata: Metadata = {
   title: "Live room",

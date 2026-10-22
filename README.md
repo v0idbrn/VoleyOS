@@ -2,10 +2,15 @@
 
 **English** | [Español](README.es.md) | [Português](README.pt.md)
 
-The volleyball operating system: 30 modules for players, coaches, referees,
-fans, organisers and clubs. Offline-first FOSS (F-Droid ready) + optional
-Cloud Pro, with persistent live rooms.
 
+## 📱 Download Android APK
+
+[![Download APK](https://img.shields.io/badge/APK-voleyos--universal.apk-FF3B5C?style=for-the-badge&logo=android)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
+
+Signed universal APK built by GitHub Actions on every `v*` tag. Android 7.0+ (minSdk 24), trilingual, offline-first, no accounts and no telemetry.
+
+
+The volleyball operating system: 36 modules for players, coaches, referees, fans, organisers and clubs. Offline-first FOSS (F-Droid ready) + optional Cloud Pro, with persistent live rooms.
 - Backend: Python 3.13+ / FastAPI / Pydantic v2 / Decimal-only maths.
 - Frontend: Next.js App Router / TypeScript strict / Tailwind / Zod.
 - Security: CSP, rate limiting, 256 KiB body cap, XSS and formula-injection
@@ -65,10 +70,16 @@ docker compose up --build
 | 28 | Roster pass + libero and captain checks | `roster-pass` |
 | 29 | Equipment inspector + net/ball tolerances | `equipment-inspector` |
 | 30 | SVG match poster 1080x1920 / 1080x1080 | `match-poster` |
+| 31 | Serve speed radar + receiver reaction | `serve-radar` |
+| 32 | 6x6 matchup matrix + best rotation | `matchup-matrix` |
+| 33 | Block-out lab + expected value | `blockout-lab` |
+| 34 | Practice planner + timed blocks | `practice-planner` |
+| 35 | Play-by-play narrator ES/EN/PT | `play-by-play` |
+| 36 | Player career passport + bottleneck | `player-career` |
 
 ## API surface
 
-- `GET /api/v1/health/deep` - 30-engine health and version.
+- `GET /api/v1/health/deep` - 36-engine health and version.
 - `GET /api/v1/catalog/modules` - modules, samples, profiles and pricing.
 - `POST /api/v1/modules/{slug}/run` and `/demo` - run an engine.
 - `POST /api/v1/security/verify-seal` - verify a signed match sheet.
@@ -103,7 +114,7 @@ cd frontend && npm run typecheck && npm run test && npm run build
 
 ## Status
 
-v4.0.0: 30 modules, 331 backend tests, 51 frontend tests, SQLite WAL live rooms,
+v5.0.0: 36 modules, 370 backend tests, 62 frontend tests, SQLite WAL live rooms,
 six role profiles, scoreboard undo/redo and keyboard hotkeys, timeout chalkboard,
 snake draft, equipment checks, SVG match posters, trilingual UI and docs, and
 live E2E for modules, live rooms, security, paywall and header policy.

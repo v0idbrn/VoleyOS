@@ -15,11 +15,11 @@ describe("command center", () => {
 
   it("renders all thirty stations and filters by profile", () => {
     render(<VolleyOSHub locale="es" />);
-    expect(screen.getAllByText(/^Módulo \d{2}$/)).toHaveLength(30);
+    expect(screen.getAllByText(/^Módulo #\d{2}$/)).toHaveLength(36);
     fireEvent.click(screen.getByRole("tab", { name: "Jugador" }));
-    const filtered = screen.getAllByText(/^Módulo \d{2}$/).length;
+    const filtered = screen.getAllByText(/^Módulo #\d{2}$/).length;
     expect(filtered).toBeGreaterThan(0);
-    expect(filtered).toBeLessThan(30);
+    expect(filtered).toBeLessThan(36);
   });
 
   it("searches instantly by name and opens filters with Ctrl+K", () => {
@@ -28,13 +28,13 @@ describe("command center", () => {
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     expect(document.activeElement).toBe(search);
     fireEvent.change(search, { target: { value: "serpiente" } });
-    expect(screen.getAllByText(/^Módulo \d{2}$/)).toHaveLength(1);
+    expect(screen.getAllByText(/^Módulo #\d{2}$/)).toHaveLength(1);
   });
 
   for (const locale of ["es", "en", "pt"] as const) {
     it(`renders all thirty stations in ${locale}`, () => {
       render(<VolleyOSHub locale={locale} />);
-      expect(screen.getAllByText(/^(Módulo|Module) \d{2}$/)).toHaveLength(30);
+      expect(screen.getAllByText(/^(Módulo|Module) #\d{2}$/)).toHaveLength(36);
     });
   }
 

@@ -1,5 +1,5 @@
 /**
- * Offline-first TypeScript mirror of the 30 VolleyOS Python engines.
+ * Offline-first TypeScript mirror of the 36 VolleyOS Python engines.
  * Runs in the browser with zero network and zero telemetry.
  */
 
@@ -901,8 +901,16 @@ export function jumpLoad(days: DailyJumps[], referenceDate?: string): AcwrReport
 
 /* ----------------------------------------------------------------- utils */
 
+export function round1(value: number): number {
+  return Math.round((value + Number.EPSILON) * 10) / 10;
+}
+
 export function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+export function round3(value: number): number {
+  return Math.round((value + Number.EPSILON) * 1000) / 1000;
 }
 
 export function formatPct(value: number): string {
@@ -3083,5 +3091,452 @@ export async function buildMatchPoster(input: {
     seal: seal.seal,
     sha256: seal.sha256,
     message: "Poster SVG generado con nombres escapados, sello HMAC y matriz de sala.",
+  };
+}
+
+/* --------------------------------------------------------------- module 31 */
+
+export type ServeClass =
+  | "FLOAT_TACTICAL"
+  | "HYBRID_FAST"
+  | "POWER_JUMP_SERVE"
+  | "WORLD_CLASS_BOMB";
+
+export interface ServeRadarReport {
+  horizontalDistanceM: number;
+  arcDistanceM: number;
+  averageSpeedMps: number;
+  initialSpeedKmh: number;
+  classification: ServeClass;
+  reactionMarginMs: number;
+  message: string;
+}
+
+export function serveRadar(input: {
+  originXm: number;
+  originYm: number;
+  targetXm: number;
+  targetYm: number;
+  flightTimeMs: number;
+}): ServeRadarReport {
+  if (input.flightTimeMs < 250 || input.flightTimeMs > 3000) throw new Error("flight time outside 250-3000 ms");
+  const dx = input.targetXm - input.originXm;
+  const dy = input.targetYm - input.originYm;
+  const horizontal = Math.sqrt(dx * dx + dy * dy);
+  const arc = Math.sqrt(horizontal * horizontal + 2.43 * 2.43);
+  const average = arc / (input.flightTimeMs / 1000);
+  const initial = average * 1.18 * 3.6;
+  const classification: ServeClass =
+    initial < 65
+      ? "FLOAT_TACTICAL"
+      : initial < 90
+        ? "HYBRID_FAST"
+        : initial < 115
+          ? "POWER_JUMP_SERVE"
+          : "WORLD_CLASS_BOMB";
+  const labels: Record<ServeClass, string> = {
+    FLOAT_TACTICAL: "flotado tactico",
+    HYBRID_FAST: "hibrido rapido",
+    POWER_JUMP_SERVE: "jump serve de poder",
+    WORLD_CLASS_BOMB: "bomba de clase mundial",
+  };
+  const reactionMarginMs = Math.max(0, input.flightTimeMs - 250);
+  return {
+    horizontalDistanceM: round2(horizontal),
+    arcDistanceM: round2(arc),
+    averageSpeedMps: round2(average),
+    initialSpeedKmh: round2(initial),
+    classification,
+    reactionMarginMs,
+    message: `Saque ${labels[classification]} a ${round2(initial)} km/h; margen ${reactionMarginMs} ms.`,
+  };
+}
+
+/* --------------------------------------------------------------- module 32 */
+
+export interface MatchupReport {
+  matrix: number[][];
+  bestStartingRotation: string;
+  opponentAlignment: string;
+  bestDifferential: number;
+  worstStartingRotation: string;
+  worstDifferential: number;
+  topAttackerIndex: number;
+  bestVsTopAttacker: string;
+  neutralizationMargin: number;
+  message: string;
+}
+
+export function matchupMatrix(input: {
+  opponentAttack: number[];
+  ownBlock: number[];
+}): MatchupReport {
+  if (input.opponentAttack.length !== 6 || input.ownBlock.length !== 6) throw new Error("six values required");
+  if ([...input.opponentAttack, ...input.ownBlock].some((value) => value < 0 || value > 100)) {
+    throw new Error("power values must be 0-100");
+  }
+  const matrix = Array.from({ length: 6 }, (_, own) =>
+    Array.from({ length: 6 }, (_, rival) => {
+      let total = 0;
+      for (let index = 0; index < 6; index += 1) {
+        total += (input.ownBlock[(own + index) % 6] ?? 0) - (input.opponentAttack[(rival + index) % 6] ?? 0);
+      }
+      return round2(total / 6);
+    }),
+  );
+  let bestOwn = 0;
+  let bestRival = 0;
+  let worstOwn = 0;
+  for (let own = 0; own < 6; own += 1) {
+    for (let rival = 0; rival < 6; rival += 1) {
+      if ((matrix[own]?.[rival] ?? 0) > (matrix[bestOwn]?.[bestRival] ?? 0)) {
+        bestOwn = own;
+        bestRival = rival;
+      }
+    }
+    if (Math.min(...(matrix[own] ?? [])) < Math.min(...(matrix[worstOwn] ?? []))) worstOwn = own;
+  }
+  const topAttackerIndex = input.opponentAttack.indexOf(Math.max(...input.opponentAttack));
+  let bestVsTop = 0;
+  for (let own = 1; own < 6; own += 1) {
+    if ((input.ownBlock[(own + topAttackerIndex) % 6] ?? 0) > (input.ownBlock[(bestVsTop + topAttackerIndex) % 6] ?? 0)) {
+      bestVsTop = own;
+    }
+  }
+  const margin = (input.ownBlock[(bestVsTop + topAttackerIndex) % 6] ?? 0) - (input.opponentAttack[topAttackerIndex] ?? 0);
+  return {
+    matrix,
+    bestStartingRotation: `R${bestOwn + 1}`,
+    opponentAlignment: `R${bestRival + 1}`,
+    bestDifferential: matrix[bestOwn]?.[bestRival] ?? 0,
+    worstStartingRotation: `R${worstOwn + 1}`,
+    worstDifferential: Math.min(...(matrix[worstOwn] ?? [])),
+    topAttackerIndex,
+    bestVsTopAttacker: `R${bestVsTop + 1}`,
+    neutralizationMargin: round2(margin),
+    message: `Inicia en R${bestOwn + 1}; evita R${worstOwn + 1}. Bloqueo top: R${bestVsTop + 1}.`,
+  };
+}
+
+/* --------------------------------------------------------------- module 33 */
+
+export type BlockoutDecision =
+  | "HIGH_OUTSIDE_HAND_WIPE"
+  | "SEAM_SPLIT"
+  | "SOFT_RECYCLE_OFF_HANDS"
+  | "CROSS_COURT_ROLL_SHOT";
+
+export interface BlockoutOption {
+  decision: BlockoutDecision;
+  probabilityPct: number;
+  ev: number;
+  note: string;
+}
+
+export interface BlockoutReport {
+  zone: "zone_4" | "zone_2";
+  setDistance: "tight_0_3m" | "normal_1_0m" | "off_net_2_5m";
+  blockClosure: "double_closed" | "seam_open" | "late_outside_hand";
+  options: BlockoutOption[];
+  recommended: BlockoutDecision;
+  wristAngleDeg: number;
+  message: string;
+}
+
+const BLOCKOUT_BASE: Record<BlockoutDecision, number> = {
+  HIGH_OUTSIDE_HAND_WIPE: 52,
+  SEAM_SPLIT: 45,
+  SOFT_RECYCLE_OFF_HANDS: 62,
+  CROSS_COURT_ROLL_SHOT: 48,
+};
+const BLOCKOUT_VALUE: Record<BlockoutDecision, number> = {
+  HIGH_OUTSIDE_HAND_WIPE: 1,
+  SEAM_SPLIT: 1.15,
+  SOFT_RECYCLE_OFF_HANDS: 0.95,
+  CROSS_COURT_ROLL_SHOT: 0.9,
+};
+const BLOCKOUT_ZONE: Record<"zone_4" | "zone_2", Record<BlockoutDecision, number>> = {
+  zone_4: { HIGH_OUTSIDE_HAND_WIPE: 8, SEAM_SPLIT: -4, SOFT_RECYCLE_OFF_HANDS: 2, CROSS_COURT_ROLL_SHOT: 4 },
+  zone_2: { HIGH_OUTSIDE_HAND_WIPE: -6, SEAM_SPLIT: 6, SOFT_RECYCLE_OFF_HANDS: 0, CROSS_COURT_ROLL_SHOT: -2 },
+};
+const BLOCKOUT_DISTANCE: Record<"tight_0_3m" | "normal_1_0m" | "off_net_2_5m", Record<BlockoutDecision, number>> = {
+  tight_0_3m: { HIGH_OUTSIDE_HAND_WIPE: -8, SEAM_SPLIT: -10, SOFT_RECYCLE_OFF_HANDS: 12, CROSS_COURT_ROLL_SHOT: -6 },
+  normal_1_0m: { HIGH_OUTSIDE_HAND_WIPE: 2, SEAM_SPLIT: 2, SOFT_RECYCLE_OFF_HANDS: 2, CROSS_COURT_ROLL_SHOT: 2 },
+  off_net_2_5m: { HIGH_OUTSIDE_HAND_WIPE: 6, SEAM_SPLIT: 8, SOFT_RECYCLE_OFF_HANDS: -8, CROSS_COURT_ROLL_SHOT: 10 },
+};
+const BLOCKOUT_CLOSURE: Record<"double_closed" | "seam_open" | "late_outside_hand", Record<BlockoutDecision, number>> = {
+  double_closed: { HIGH_OUTSIDE_HAND_WIPE: 12, SEAM_SPLIT: -18, SOFT_RECYCLE_OFF_HANDS: 8, CROSS_COURT_ROLL_SHOT: -10 },
+  seam_open: { HIGH_OUTSIDE_HAND_WIPE: -6, SEAM_SPLIT: 20, SOFT_RECYCLE_OFF_HANDS: 4, CROSS_COURT_ROLL_SHOT: 6 },
+  late_outside_hand: { HIGH_OUTSIDE_HAND_WIPE: 16, SEAM_SPLIT: 4, SOFT_RECYCLE_OFF_HANDS: -4, CROSS_COURT_ROLL_SHOT: -8 },
+};
+const BLOCKOUT_WRIST: Record<BlockoutDecision, number> = {
+  HIGH_OUTSIDE_HAND_WIPE: 35,
+  SEAM_SPLIT: 10,
+  SOFT_RECYCLE_OFF_HANDS: -20,
+  CROSS_COURT_ROLL_SHOT: -35,
+};
+
+export function evaluateBlockout(input: {
+  zone: "zone_4" | "zone_2";
+  setDistance: "tight_0_3m" | "normal_1_0m" | "off_net_2_5m";
+  blockClosure: "double_closed" | "seam_open" | "late_outside_hand";
+  attackerReachCm: number;
+  blockReachCm: number;
+}): BlockoutReport {
+  const reachDelta = (input.attackerReachCm - input.blockReachCm) / 10;
+  const decisions = Object.keys(BLOCKOUT_BASE) as BlockoutDecision[];
+  const options = decisions.map((decision) => {
+    let probability =
+      BLOCKOUT_BASE[decision] + BLOCKOUT_ZONE[input.zone][decision] +
+      BLOCKOUT_DISTANCE[input.setDistance][decision] + BLOCKOUT_CLOSURE[input.blockClosure][decision];
+    if (decision === "HIGH_OUTSIDE_HAND_WIPE" || decision === "SEAM_SPLIT") probability += reachDelta;
+    else if (decision === "CROSS_COURT_ROLL_SHOT") probability += reachDelta / 4;
+    else probability -= reachDelta / 2;
+    probability = Math.max(5, Math.min(95, probability));
+    const ev = (probability / 100) * BLOCKOUT_VALUE[decision];
+    return {
+      decision,
+      probabilityPct: round1(probability),
+      ev: round3(ev),
+      note: `${round1(probability)}% de exito; EV ${round3(ev)}.`,
+    };
+  });
+  const recommended = options.reduce((best, option) => (option.ev > best.ev ? option : best));
+  let angle = BLOCKOUT_WRIST[recommended.decision];
+  if (input.zone === "zone_2") angle = -angle;
+  if (input.setDistance === "tight_0_3m") angle += 5;
+  else if (input.setDistance === "off_net_2_5m") angle -= 5;
+  return {
+    zone: input.zone,
+    setDistance: input.setDistance,
+    blockClosure: input.blockClosure,
+    options,
+    recommended: recommended.decision,
+    wristAngleDeg: round1(angle),
+    message: `${recommended.decision} con EV ${recommended.ev}; muneca ${round1(angle)} grados.`,
+  };
+}
+
+/* --------------------------------------------------------------- module 34 */
+
+export type PracticeFocus = "k1_reception" | "block_defense_transition" | "serve_pressure" | "setter_tempo";
+
+export interface PracticeBlock {
+  label: string;
+  startMin: number;
+  endMin: number;
+  minutes: number;
+  groups: number[];
+  objective: string;
+  drill: string;
+  scoringTarget: string;
+}
+
+export interface PracticeReport {
+  players: number;
+  durationMin: number;
+  focus: PracticeFocus;
+  groups: number[];
+  activeCourts: number;
+  blocks: PracticeBlock[];
+  message: string;
+}
+
+const PRACTICE_TEMPLATES: Record<60 | 90 | 120, Array<[string, number]>> = {
+  60: [["Activacion", 10], ["Tecnica", 15], ["Tactica", 15], ["Juego", 15], ["Cierre", 5]],
+  90: [["Activacion", 12], ["Tecnica", 23], ["Tactica", 25], ["Juego", 25], ["Cierre", 5]],
+  120: [["Activacion", 15], ["Tecnica", 30], ["Tactica", 35], ["Juego", 35], ["Cierre", 5]],
+};
+const PRACTICE_FOCUS: Record<PracticeFocus, [string, string, string]> = {
+  k1_reception: ["Estabilizar K1", "Servicio dirigido a zonas 1/5", "3 recepciones positivas"],
+  block_defense_transition: ["Cerrar bloqueo y reciclar", "Bloqueo de dos y cobertura", "2 bloqueos-untos"],
+  serve_pressure: ["Presionar saque bajo fatiga", "Series cortas y profundas", "70% dentro"],
+  setter_tempo: ["Acelerar decision del armador", "Quick-shoot-pipe", "5 ataques en tempo"],
+};
+
+export function planPractice(input: {
+  players: number;
+  durationMin: 60 | 90 | 120;
+  focus: PracticeFocus;
+}): PracticeReport {
+  if (input.players < 4 || input.players > 24) throw new Error("players outside 4-24");
+  const courts = Math.ceil(input.players / 6);
+  const base = Math.floor(input.players / courts);
+  const remainder = input.players % courts;
+  const groups = [
+    ...Array.from({ length: remainder }, () => base + 1),
+    ...Array.from({ length: courts - remainder }, () => base),
+  ];
+  const [objective, drill, scoringTarget] = PRACTICE_FOCUS[input.focus];
+  let start = 0;
+  const blocks = (PRACTICE_TEMPLATES[input.durationMin] ?? []).map(([label, minutes]) => {
+    const block = { label, startMin: start, endMin: start + minutes, minutes, groups, objective, drill, scoringTarget };
+    start += minutes;
+    return block;
+  });
+  return {
+    players: input.players,
+    durationMin: input.durationMin,
+    focus: input.focus,
+    groups,
+    activeCourts: groups.length,
+    blocks,
+    message: `Plan de ${input.durationMin} min para ${input.players} jugadores en ${groups.length} grupos.`,
+  };
+}
+
+/* --------------------------------------------------------------- module 35 */
+
+export type MatchEventKind = "point" | "timeout" | "substitution" | "card" | "set_end";
+
+export interface MatchEvent {
+  kind: MatchEventKind;
+  team: "home" | "away";
+  player?: string;
+  scoreHome: number;
+  scoreAway: number;
+  setNumber: number;
+}
+
+export interface FeedEntry {
+  index: number;
+  kind: MatchEventKind;
+  team: "home" | "away";
+  score: string;
+  headline: string;
+  commentary: string;
+  clutch: boolean;
+  leadChange: boolean;
+}
+
+export interface PlayByPlayReport {
+  feed: FeedEntry[];
+  clutchPoints: number;
+  leadChanges: number;
+  finalScore: string;
+  summary: { es: string; en: string; pt: string };
+}
+
+export function buildPlayByPlay(input: {
+  homeTeam: string;
+  awayTeam: string;
+  events: MatchEvent[];
+}): PlayByPlayReport {
+  if (input.events.length === 0) throw new Error("events required");
+  let lastLeader: "home" | "away" | null = null;
+  let clutchPoints = 0;
+  let leadChanges = 0;
+  const feed = input.events.map((event, index) => {
+    const teamName = event.team === "home" ? input.homeTeam : input.awayTeam;
+    const clutch = event.kind === "point" && event.scoreHome >= 20 && event.scoreAway >= 20;
+    if (clutch) clutchPoints += 1;
+    const leader = event.scoreHome > event.scoreAway ? "home" : event.scoreAway > event.scoreHome ? "away" : null;
+    const leadChange = leader !== null && lastLeader !== null && leader !== lastLeader;
+    if (leadChange) leadChanges += 1;
+    if (leader !== null) lastLeader = leader;
+    const score = `${event.scoreHome}-${event.scoreAway}`;
+    const actor = event.player ? ` ${event.player}` : "";
+    const headline =
+      event.kind === "point" ? (clutch ? "PUNTO CLUTCH" : `Punto para ${teamName}`) :
+      event.kind === "timeout" ? `Tiempo muerto de ${teamName}` :
+      event.kind === "substitution" ? `Cambio en ${teamName}` :
+      event.kind === "card" ? `Tarjeta para ${teamName}` : `Fin del set ${event.setNumber}`;
+    const commentary =
+      event.kind === "point" ? `${clutch ? "Punto clutch" : "Punto"} de${actor} (${teamName}). ${score}.` :
+      event.kind === "timeout" ? `${teamName} pide tiempo muerto con ${score}.` :
+      event.kind === "substitution" ? `${teamName} mueve el banco: entra${actor}. ${score}.` :
+      event.kind === "card" ? `Tarjeta para${actor}. ${score}.` : `Cierra el set ${event.setNumber} con ${score}.`;
+    return { index: index + 1, kind: event.kind, team: event.team, score, headline, commentary, clutch, leadChange };
+  });
+  const last = input.events[input.events.length - 1];
+  if (!last) throw new Error("events required");
+  const finalScore = `${last.scoreHome}-${last.scoreAway}`;
+  return {
+    feed,
+    clutchPoints,
+    leadChanges,
+    finalScore,
+    summary: {
+      es: `${input.homeTeam} ${finalScore} ${input.awayTeam}. ${clutchPoints} clutch y ${leadChanges} cambios.`,
+      en: `${input.homeTeam} ${finalScore} ${input.awayTeam}. ${clutchPoints} clutch points and ${leadChanges} lead changes.`,
+      pt: `${input.homeTeam} ${finalScore} ${input.awayTeam}. ${clutchPoints} clutch e ${leadChanges} viradas.`,
+    },
+  };
+}
+
+/* --------------------------------------------------------------- module 36 */
+
+export interface CareerMeasurement {
+  period: string;
+  verticalJumpCm: number;
+  attackReachCm: number;
+  serveSpeedKmh: number;
+  attackEfficiencyPct: number;
+  receptionPct: number;
+}
+
+export interface CareerReport {
+  player: string;
+  firstPeriod: string;
+  lastPeriod: string;
+  deltas: {
+    jumpCm: number;
+    reachCm: number;
+    serveKmh: number;
+    attackPct: number;
+    receptionPct: number;
+  };
+  evolutionIndex: number;
+  category: "DEVELOPMENT" | "COMPETITIVE" | "ELITE" | "WORLD_CLASS";
+  nextCategory: string;
+  gapToNext: number;
+  bottleneck: "jump" | "reach" | "serve" | "attack" | "reception";
+  message: string;
+}
+
+export function buildCareerReport(input: {
+  player: string;
+  measurements: CareerMeasurement[];
+}): CareerReport {
+  if (input.measurements.length < 2) throw new Error("two measurements required");
+  const first = input.measurements[0];
+  const last = input.measurements[input.measurements.length - 1];
+  if (!first || !last) throw new Error("two measurements required");
+  const deltas = {
+    jumpCm: round1(last.verticalJumpCm - first.verticalJumpCm),
+    reachCm: round1(last.attackReachCm - first.attackReachCm),
+    serveKmh: round1(last.serveSpeedKmh - first.serveSpeedKmh),
+    attackPct: round1(last.attackEfficiencyPct - first.attackEfficiencyPct),
+    receptionPct: round1(last.receptionPct - first.receptionPct),
+  };
+  const clamp = (value: number) => Math.max(0, Math.min(100, value));
+  const scores = {
+    jump: clamp((last.verticalJumpCm / 80) * 100),
+    reach: clamp(((last.attackReachCm - 250) / 100) * 100),
+    serve: clamp((last.serveSpeedKmh / 120) * 100),
+    attack: clamp(last.attackEfficiencyPct),
+    reception: clamp(last.receptionPct),
+  };
+  const absolute = Object.values(scores).reduce((total, value) => total + value, 0) / 5;
+  const progress = clamp(50 + deltas.jumpCm * 2 + deltas.reachCm + deltas.serveKmh + deltas.attackPct * 1.5 + deltas.receptionPct);
+  const evolutionIndex = round1(clamp(absolute * 0.7 + progress * 0.3));
+  const category =
+    evolutionIndex < 40 ? "DEVELOPMENT" :
+    evolutionIndex < 60 ? "COMPETITIVE" :
+    evolutionIndex < 80 ? "ELITE" : "WORLD_CLASS";
+  const nextCategory = category === "WORLD_CLASS" ? "WORLD_CLASS" : category === "ELITE" ? "WORLD_CLASS" : category === "COMPETITIVE" ? "ELITE" : "COMPETITIVE";
+  const gap = evolutionIndex < 40 ? 40 - evolutionIndex : evolutionIndex < 60 ? 60 - evolutionIndex : evolutionIndex < 80 ? 80 - evolutionIndex : 0;
+  const bottleneck = (Object.keys(scores) as Array<keyof typeof scores>).reduce((lowest, key) => (scores[key] < scores[lowest] ? key : lowest));
+  return {
+    player: input.player,
+    firstPeriod: first.period,
+    lastPeriod: last.period,
+    deltas,
+    evolutionIndex,
+    category,
+    nextCategory,
+    gapToNext: round1(gap),
+    bottleneck,
+    message: `${input.player}: indice ${evolutionIndex}/100. Cuello: ${bottleneck}.`,
   };
 }

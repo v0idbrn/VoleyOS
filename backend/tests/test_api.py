@@ -60,11 +60,11 @@ def test_cors_wildcard() -> None:
     assert response.headers.get("access-control-allow-credentials") is None
 
 
-def test_catalog_has_thirty_modules() -> None:
+def test_catalog_has_thirty_six_modules() -> None:
     response = client.get("/api/v1/catalog/modules")
     body = response.json()
     assert response.status_code == 200
-    assert body["count"] == 30
+    assert body["count"] == 36
     assert {module["slug"] for module in body["modules"]} == set(MODULE_SLUGS)
     assert len(body["pricing"]) == 3
 
@@ -135,7 +135,7 @@ def test_pickup_demo_teams_have_setters() -> None:
 def test_health_deep_all_engines_ok() -> None:
     body = client.get("/api/v1/health/deep").json()
     assert body["status"] == "ok"
-    assert body["count"] == 30
+    assert body["count"] == 36
     assert all(engine["status"] == "ok" for engine in body["engines"])
 
 

@@ -1,0 +1,4 @@
+- Seis modulos nuevos: radar de saque, matriz de matchup, block-out, planificador de practicas, narrador y pasaporte de progreso.
+- UI movil world-class: telemetria, dock de perfiles, vista bento/lista, wake lock, voz y hapticas.
+- APK universal firmado construido con GitHub Actions.
+- 36 modulos, 62 pruebas frontend y mas de 360 pruebas backend.

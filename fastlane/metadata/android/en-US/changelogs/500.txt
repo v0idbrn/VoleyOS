@@ -1,0 +1,4 @@
+- Six new modules: serve radar, matchup matrix, block-out lab, practice planner, narrator and career passport.
+- World-class mobile UI: telemetry bar, profile dock, bento/list view, wake lock, voice and haptics.
+- Signed universal APK built by GitHub Actions.
+- 36 modules, 62 frontend tests and 360+ backend tests.

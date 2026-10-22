@@ -4,6 +4,8 @@ import { LEGAL_DOCS } from "@/lib/legal";
 import { LOCALES } from "@/lib/local-engines";
 import { SEO_ITEMS, SEO_SECTIONS } from "@/lib/seo";
 
+export const dynamic = "force-static";
+
 const BASE = "https://volleyos.app";
 const LAST_MODIFIED = new Date("2026-10-22T00:00:00.000Z");
 

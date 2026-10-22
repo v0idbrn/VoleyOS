@@ -164,11 +164,47 @@
   toggle persisted locally.
 - E2E: 30 demos, 30 rendered stations, live room lifecycle and 32/32 checks.
 
+## Sprint 31 - engines 31-36
+- New Decimal engines: `serve_radar`, `matchup_matrix`, `blockout_lab`,
+  `practice_planner`, `play_by_play`, `player_career`.
+- Dispatcher, demos, catalog and health expanded to 36; six profiles now map to
+  six modules each. Versions bumped to 5.0.0.
+- Six TypeScript mirrors with `round1`/`round3` helpers and 7 new tests.
+
+## Sprint 32 - world-class mobile UX
+- `court-ux.ts`: Wake Lock API, haptics and Spanish TTS announcer.
+- Hub telemetry bar (36/36 engines, wake lock, narrator, contrast, ES/EN/PT),
+  bento/list toggle, fixed six-profile dock and `#NN` station badges.
+- High-contrast mode, reduced motion, safe-area padding and mobile toasts.
+
+## Sprint 33 - native APK
+- `android/` WebView shell (`WebViewAssetLoader`, minSdk 24, target 35) serving
+  the static export from `frontend/out`; core use is fully offline.
+- `build_apk.sh` / `build_apk.bat`; signed universal APK artifact.
+
+## Sprint 34 - APK CI
+- `.github/workflows/android-apk.yml`: Node 20, JDK 21, Android SDK, Gradle
+  8.10.2, static build, keystore generation, signed release APK and tag upload.
+
+## Sprint 35 - SEO and docs
+- SEO facts for the six new modules; 58 curated entries (205 sitemap URLs).
+- README suite (`README.md`, `README.en.md`, `README.es.md`, `README.pt.md`)
+  with APK download, 36-module profile tables and v5 test counts.
+- Fastlane `changelogs/500.txt` and 36-module descriptions in three locales.
+
+## Sprint 36 - release v5.0.0
+- `docs/openapi.json` regenerated at 5.0.0.
+- Gates: 370 backend tests, 62 frontend tests (12 files), ruff/mypy/tsc clean,
+  215 static pages and 32/32 live E2E.
+
 ## Current state
-- 30 Decimal engines + TS mirrors, FastAPI API with security shield, HMAC
-  paywall and SQLite WAL live rooms, trilingual Command Center, 194 static
+- 36 Decimal engines + TS mirrors, FastAPI API with security shield, HMAC
+  paywall and SQLite WAL live rooms, trilingual Command Center, 215 static
   pages, PWA/F-Droid metadata, Docker/Render/CI and 32/32 live E2E.
+- Android APK is built and signed in GitHub Actions; local builds need a JDK.
 - Known limits: no user auth, no live checkout provider, Cloud export UI not
   wired to the job API, Docker images unbuilt locally, live rooms poll every 5 s.
+  Static export only includes the `local` live-room demo; arbitrary room IDs
+  require the cloud server build.
 
 Next: wire checkout + API export UI, then account auth and WebSocket live rooms.

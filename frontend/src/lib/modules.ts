@@ -370,6 +370,78 @@ export const MODULES: ModuleMeta[] = [
       pt: "Story 9:16 e feed 1:1 com sets, MVP, selo e código de sala.",
     },
   },
+  {
+    slug: "serve-radar",
+    number: 31,
+    icon: "R",
+    profiles: ["players"],
+    name: { es: "Radar Balistico de Saque", en: "Serve Speed Radar", pt: "Radar Balistico de Saque" },
+    tagline: {
+      es: "Velocidad inicial, clase de saque y margen de reaccion del receptor.",
+      en: "Initial speed, serve class and the receiver's reaction margin.",
+      pt: "Velocidade inicial, classe do saque e margem de reacao do receptor.",
+    },
+  },
+  {
+    slug: "matchup-matrix",
+    number: 32,
+    icon: "M",
+    profiles: ["coaches"],
+    name: { es: "Matriz de Matchup 6x6", en: "6x6 Matchup Matrix", pt: "Matriz de Matchup 6x6" },
+    tagline: {
+      es: "Treinta y seis cruces de rotacion para elegir el mejor inicio.",
+      en: "Thirty-six rotation pairings to pick the best start.",
+      pt: "Trinta e seis cruzamentos de rotacao para escolher o melhor inicio.",
+    },
+  },
+  {
+    slug: "blockout-lab",
+    number: 33,
+    icon: "B",
+    profiles: ["court"],
+    name: { es: "Laboratorio de Block-Out", en: "Block-Out Lab", pt: "Laboratorio de Block-Out" },
+    tagline: {
+      es: "Mano afuera, costura y reciclaje con valor esperado y muneca.",
+      en: "Hand wipe, seam and recycle with expected value and wrist angle.",
+      pt: "Mao fora, costura e reciclagem com valor esperado e punho.",
+    },
+  },
+  {
+    slug: "practice-planner",
+    number: 34,
+    icon: "P",
+    profiles: ["tournaments"],
+    name: { es: "Planificador de Practicas", en: "Practice Planner", pt: "Planejador de Treinos" },
+    tagline: {
+      es: "Bloques cronometrados y grupos parejos para 4 a 24 jugadores.",
+      en: "Timed blocks and even groups for 4 to 24 players.",
+      pt: "Blocos cronometrados e grupos parelhos para 4 a 24 jogadores.",
+    },
+  },
+  {
+    slug: "play-by-play",
+    number: 35,
+    icon: "F",
+    profiles: ["fans"],
+    name: { es: "Narrador Play-by-Play", en: "Play-by-Play Narrator", pt: "Narrador Play-by-Play" },
+    tagline: {
+      es: "Feed de transmision, puntos clutch y resumen en tres idiomas.",
+      en: "Broadcast feed, clutch points and a three-language recap.",
+      pt: "Feed de transmissao, pontos clutch e resumo em tres idiomas.",
+    },
+  },
+  {
+    slug: "player-career",
+    number: 36,
+    icon: "C",
+    profiles: ["referees"],
+    name: { es: "Pasaporte de Progreso", en: "Player Career Passport", pt: "Passaporte de Progresso" },
+    tagline: {
+      es: "Deltas atleticos, indice 0-100 y cuello de botella del jugador.",
+      en: "Athletic deltas, a 0-100 index and the player's bottleneck.",
+      pt: "Deltas atleticos, indice 0-100 e gargalo do jogador.",
+    },
+  },
 ];
 
 export const MODULE_BY_SLUG = new Map(MODULES.map((module) => [module.slug, module]));

@@ -52,6 +52,12 @@ import {
   validateOverlap,
   verifySeal,
   verticalJumpCm,
+  buildCareerReport,
+  buildPlayByPlay,
+  evaluateBlockout,
+  matchupMatrix,
+  planPractice,
+  serveRadar,
   type AttackZone,
   type Axis,
   type BlockScheme,
@@ -78,6 +84,8 @@ import {
   type SubEvent,
   type TempoCode,
   type ZonePoint,
+  type BlockoutDecision,
+  type PracticeFocus,
 } from "@/lib/local-engines";
 import {
   PICKUP_SAMPLE,
@@ -124,7 +132,7 @@ function StationShell({
       <header className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-crimson">
-            {t(locale, "Módulo", "Module", "Módulo")} {meta.number.toString().padStart(2, "0")}
+            {t(locale, "Módulo", "Module", "Módulo")} #{meta.number.toString().padStart(2, "0")}
           </p>
           <h3 className="mt-1 text-lg font-bold leading-tight text-white">
             <span aria-hidden className="mr-2">{meta.icon}</span>
@@ -1919,6 +1927,237 @@ export function MatchPosterStation({ meta, locale, onSave }: StationProps) {
   );
 }
 
+/* 31 -------------------------------------------------------------------- */
+
+export function ServeRadarStation({ meta, locale, onSave }: StationProps) {
+  const [targetX, setTargetX] = useState(7.5);
+  const [targetY, setTargetY] = useState(6.5);
+  const [flight, setFlight] = useState(700);
+  const report = useMemo(
+    () => serveRadar({ originXm: 0, originYm: 0, targetXm: targetX, targetYm: targetY, flightTimeMs: flight }),
+    [flight, targetX, targetY],
+  );
+  return (
+    <StationShell meta={meta} locale={locale} rows={1} onSave={onSave} onExample={() => { setTargetX(9); setTargetY(7); setFlight(400); }}>
+      <div className="grid grid-cols-3 gap-2">
+        <Metric label="km/h" value={report.initialSpeedKmh.toString()} tone="text-volt" />
+        <Metric label={t(locale, "Margen", "Margin", "Margem")} value={`${report.reactionMarginMs} ms`} tone="text-emerald" />
+        <Metric label={t(locale, "Distancia", "Distance", "Distancia")} value={`${report.arcDistanceM} m`} />
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <label className="text-xs">
+          <span className={LABEL}>X</span>
+          <input className={INPUT} type="number" step="0.5" value={targetX} onChange={(event) => setTargetX(Number(event.target.value))} />
+        </label>
+        <label className="text-xs">
+          <span className={LABEL}>Y</span>
+          <input className={INPUT} type="number" step="0.5" value={targetY} onChange={(event) => setTargetY(Number(event.target.value))} />
+        </label>
+        <label className="text-xs">
+          <span className={LABEL}>ms</span>
+          <input className={INPUT} type="number" min={250} max={3000} step="50" value={flight} onChange={(event) => setFlight(Number(event.target.value))} />
+        </label>
+      </div>
+      <p className="mt-2 rounded-lg bg-white/5 px-2 py-1 text-xs font-bold text-volt">{report.classification.replaceAll("_", " ")}</p>
+      <p className="mt-1 text-[10px] text-white/60">{report.message}</p>
+    </StationShell>
+  );
+}
+
+/* 32 -------------------------------------------------------------------- */
+
+const MATCHUP_ATTACK = [90, 72, 64, 58, 46, 38];
+const MATCHUP_BLOCK = [52, 58, 64, 70, 76, 82];
+
+export function MatchupMatrixStation({ meta, locale, onSave }: StationProps) {
+  const report = useMemo(() => matchupMatrix({ opponentAttack: MATCHUP_ATTACK, ownBlock: MATCHUP_BLOCK }), []);
+  return (
+    <StationShell meta={meta} locale={locale} rows={6} onSave={onSave} onExample={() => undefined}>
+      <div className="grid grid-cols-3 gap-2">
+        <Metric label={t(locale, "Mejor inicio", "Best start", "Melhor inicio")} value={report.bestStartingRotation} tone="text-emerald" />
+        <Metric label={t(locale, "Evitar", "Avoid", "Evitar")} value={report.worstStartingRotation} tone="text-crimson" />
+        <Metric label="Top rival" value={`R${report.topAttackerIndex + 1}`} tone="text-volt" />
+      </div>
+      <div className="mt-3 grid grid-cols-6 gap-1">
+        {report.matrix.flatMap((row, own) =>
+          row.map((value, rival) => (
+            <span
+              key={`${own}-${rival}`}
+              className={`rounded px-1 py-1 text-center text-[9px] font-bold tabular-nums ${value >= 0 ? "bg-emerald/15 text-emerald" : "bg-crimson/15 text-crimson"}`}
+            >
+              {value.toFixed(0)}
+            </span>
+          )),
+        )}
+      </div>
+      <p className="mt-2 text-[10px] text-white/60">{report.message}</p>
+    </StationShell>
+  );
+}
+
+/* 33 -------------------------------------------------------------------- */
+
+const BLOCKOUT_DECISION_LABELS: Record<BlockoutDecision, string> = {
+  HIGH_OUTSIDE_HAND_WIPE: "Mano afuera",
+  SEAM_SPLIT: "Costura",
+  SOFT_RECYCLE_OFF_HANDS: "Reciclaje",
+  CROSS_COURT_ROLL_SHOT: "Roll shot",
+};
+
+export function BlockoutLabStation({ meta, locale, onSave }: StationProps) {
+  const [zone, setZone] = useState<"zone_4" | "zone_2">("zone_4");
+  const [distance, setDistance] = useState<"tight_0_3m" | "normal_1_0m" | "off_net_2_5m">("tight_0_3m");
+  const [closure, setClosure] = useState<"double_closed" | "seam_open" | "late_outside_hand">("double_closed");
+  const report = useMemo(
+    () => evaluateBlockout({ zone, setDistance: distance, blockClosure: closure, attackerReachCm: 342, blockReachCm: 326 }),
+    [closure, distance, zone],
+  );
+  return (
+    <StationShell meta={meta} locale={locale} rows={4} onSave={onSave} onExample={() => { setZone("zone_2"); setDistance("off_net_2_5m"); setClosure("seam_open"); }}>
+      <div className="grid grid-cols-3 gap-2 text-[10px]">
+        <select className={INPUT} value={zone} onChange={(event) => setZone(event.target.value as "zone_4" | "zone_2")} aria-label="Zona">
+          <option value="zone_4">Zona 4</option>
+          <option value="zone_2">Zona 2</option>
+        </select>
+        <select className={INPUT} value={distance} onChange={(event) => setDistance(event.target.value as "tight_0_3m" | "normal_1_0m" | "off_net_2_5m")} aria-label="Distancia">
+          <option value="tight_0_3m">Apretado</option>
+          <option value="normal_1_0m">Normal</option>
+          <option value="off_net_2_5m">Lejos</option>
+        </select>
+        <select className={INPUT} value={closure} onChange={(event) => setClosure(event.target.value as "double_closed" | "seam_open" | "late_outside_hand")} aria-label="Bloqueo">
+          <option value="double_closed">Cerrado</option>
+          <option value="seam_open">Costura</option>
+          <option value="late_outside_hand">Mano tarde</option>
+        </select>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Metric label={t(locale, "Recomendado", "Recommended", "Recomendado")} value={BLOCKOUT_DECISION_LABELS[report.recommended]} tone="text-emerald" />
+        <Metric label={t(locale, "Muneca", "Wrist", "Punho")} value={`${report.wristAngleDeg} deg`} tone="text-volt" />
+      </div>
+      <ul className="mt-3 space-y-1">
+        {report.options.map((option) => (
+          <li key={option.decision} className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-[11px] ${option.decision === report.recommended ? "bg-emerald/15 text-emerald" : "bg-white/5 text-white/70"}`}>
+            <span>{BLOCKOUT_DECISION_LABELS[option.decision]}</span>
+            <span className="tabular-nums">{option.probabilityPct}% | EV {option.ev}</span>
+          </li>
+        ))}
+      </ul>
+    </StationShell>
+  );
+}
+
+/* 34 -------------------------------------------------------------------- */
+
+export function PracticePlannerStation({ meta, locale, onSave }: StationProps) {
+  const [players, setPlayers] = useState(9);
+  const [duration, setDuration] = useState<60 | 90 | 120>(90);
+  const [focus, setFocus] = useState<PracticeFocus>("k1_reception");
+  const report = useMemo(() => planPractice({ players, durationMin: duration, focus }), [duration, focus, players]);
+  return (
+    <StationShell meta={meta} locale={locale} rows={report.blocks.length} onSave={onSave} onExample={() => { setPlayers(12); setDuration(120); setFocus("serve_pressure"); }}>
+      <div className="grid grid-cols-3 gap-2">
+        <label className="text-xs">
+          <span className={LABEL}>{t(locale, "Jugadores", "Players", "Jogadores")}</span>
+          <input className={INPUT} type="number" min={4} max={24} value={players} onChange={(event) => setPlayers(Number(event.target.value))} />
+        </label>
+        <select className={INPUT} value={duration} onChange={(event) => setDuration(Number(event.target.value) as 60 | 90 | 120)} aria-label="Duracion">
+          <option value={60}>60 min</option>
+          <option value={90}>90 min</option>
+          <option value={120}>120 min</option>
+        </select>
+        <select className={INPUT} value={focus} onChange={(event) => setFocus(event.target.value as PracticeFocus)} aria-label="Foco">
+          <option value="k1_reception">K1</option>
+          <option value="block_defense_transition">Bloqueo</option>
+          <option value="serve_pressure">Saque</option>
+          <option value="setter_tempo">Tempo</option>
+        </select>
+      </div>
+      <ul className="mt-3 space-y-1">
+        {report.blocks.map((block) => (
+          <li key={block.label} className="flex items-center justify-between gap-2 rounded-lg bg-white/5 px-2 py-1 text-[11px]">
+            <span className="font-bold text-white/80">{block.label}</span>
+            <span className="text-white/50">{block.startMin}-{block.endMin} min</span>
+            <span className="text-volt">{block.scoringTarget}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1 text-[10px] text-white/60">{report.message}</p>
+    </StationShell>
+  );
+}
+
+/* 35 -------------------------------------------------------------------- */
+
+export function PlayByPlayStation({ meta, locale, onSave }: StationProps) {
+  const report = useMemo(
+    () =>
+      buildPlayByPlay({
+        homeTeam: "Tiburones",
+        awayTeam: "Condores",
+        events: [
+          { kind: "point", team: "home", player: "Valentina", scoreHome: 1, scoreAway: 0, setNumber: 1 },
+          { kind: "point", team: "away", scoreHome: 1, scoreAway: 2, setNumber: 1 },
+          { kind: "point", team: "home", scoreHome: 3, scoreAway: 2, setNumber: 1 },
+          { kind: "timeout", team: "away", scoreHome: 20, scoreAway: 20, setNumber: 3 },
+          { kind: "point", team: "home", player: "Renata", scoreHome: 21, scoreAway: 20, setNumber: 3 },
+          { kind: "card", team: "away", scoreHome: 21, scoreAway: 20, setNumber: 3 },
+        ],
+      }),
+    [],
+  );
+  return (
+    <StationShell meta={meta} locale={locale} rows={report.feed.length} onSave={onSave} onExample={() => undefined}>
+      <div className="grid grid-cols-3 gap-2">
+        <Metric label={t(locale, "Clutch", "Clutch", "Clutch")} value={String(report.clutchPoints)} tone="text-volt" />
+        <Metric label={t(locale, "Cambios", "Lead changes", "Viradas")} value={String(report.leadChanges)} tone="text-emerald" />
+        <Metric label={t(locale, "Final", "Final", "Final")} value={report.finalScore} />
+      </div>
+      <ul className="mt-3 max-h-56 space-y-1 overflow-auto">
+        {report.feed.map((entry) => (
+          <li key={entry.index} className={`rounded-lg px-2 py-1 text-[11px] ${entry.clutch ? "bg-crimson/20 text-white" : "bg-white/5 text-white/75"}`}>
+            <span className="font-bold text-volt">{entry.score}</span> {entry.commentary}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-[10px] text-white/55">{report.summary[locale]}</p>
+    </StationShell>
+  );
+}
+
+/* 36 -------------------------------------------------------------------- */
+
+export function PlayerCareerStation({ meta, locale, onSave }: StationProps) {
+  const report = useMemo(
+    () =>
+      buildCareerReport({
+        player: "Valentina",
+        measurements: [
+          { period: "2026-01", verticalJumpCm: 52, attackReachCm: 305, serveSpeedKmh: 78, attackEfficiencyPct: 38, receptionPct: 52 },
+          { period: "2026-06", verticalJumpCm: 61, attackReachCm: 318, serveSpeedKmh: 92, attackEfficiencyPct: 47, receptionPct: 61 },
+        ],
+      }),
+    [],
+  );
+  return (
+    <StationShell meta={meta} locale={locale} rows={2} onSave={onSave} onExample={() => undefined}>
+      <div className="grid grid-cols-3 gap-2">
+        <Metric label="Index" value={`${report.evolutionIndex}/100`} tone="text-volt" />
+        <Metric label={t(locale, "Categoria", "Category", "Categoria")} value={report.category.replaceAll("_", " ")} tone="text-emerald" />
+        <Metric label={t(locale, "Cuello", "Bottleneck", "Gargalo")} value={report.bottleneck} tone="text-crimson" />
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-1 text-[11px]">
+        {Object.entries(report.deltas).map(([key, value]) => (
+          <span key={key} className="flex justify-between rounded bg-white/5 px-2 py-1">
+            <span className="text-white/55">{key}</span>
+            <span className={value >= 0 ? "text-emerald" : "text-crimson"}>{value > 0 ? "+" : ""}{value}</span>
+          </span>
+        ))}
+      </div>
+      <p className="mt-2 text-[10px] text-white/60">{report.message} {t(locale, "Faltan", "Next gap", "Proximo gap")}: {report.gapToNext}.</p>
+    </StationShell>
+  );
+}
+
 export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   biomechanics: BiomechanicsStation,
   rotation: RotationStation,
@@ -1950,4 +2189,10 @@ export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   "roster-pass": RosterPassStation,
   "equipment-inspector": EquipmentInspectorStation,
   "match-poster": MatchPosterStation,
+  "serve-radar": ServeRadarStation,
+  "matchup-matrix": MatchupMatrixStation,
+  "blockout-lab": BlockoutLabStation,
+  "practice-planner": PracticePlannerStation,
+  "play-by-play": PlayByPlayStation,
+  "player-career": PlayerCareerStation,
 };

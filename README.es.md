@@ -2,10 +2,15 @@
 
 [English](README.md) | **Español** | [Português](README.pt.md)
 
-El sistema operativo del vóley: 30 módulos para jugadores, entrenadores,
-árbitros, tribuna, organizadores y clubes. FOSS offline-first (listo para
-F-Droid) + Cloud Pro opcional, con salas en vivo persistentes.
 
+## 📱 Descargar APK para Android
+
+[![Download APK](https://img.shields.io/badge/APK-voleyos--universal.apk-FF3B5C?style=for-the-badge&logo=android)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
+
+APK universal firmada por GitHub Actions en cada tag `v*`. Android 7.0+ (minSdk 24), trilingue, offline-first, sin cuentas ni telemetria.
+
+
+El sistema operativo del voley: 36 modulos para jugadores, entrenadores, arbitros, tribuna, organizadores y clubes. FOSS offline-first (listo para F-Droid) + Cloud Pro opcional, con salas en vivo persistentes.
 - Backend: Python 3.13+ / FastAPI / Pydantic v2 / matemática solo con Decimal.
 - Frontend: Next.js App Router / TypeScript estricto / Tailwind / Zod.
 - Seguridad: CSP, límite de peticiones, tope de 256 KiB, saneamiento XSS e
@@ -65,10 +70,16 @@ docker compose up --build
 | 28 | Pase de plantilla + control de líbero y capitán | `roster-pass` |
 | 29 | Inspector de equipo + tolerancias de red y balón | `equipment-inspector` |
 | 30 | Póster SVG 1080x1920 / 1080x1080 | `match-poster` |
+| 31 | Serve speed radar + receiver reaction | `serve-radar` |
+| 32 | 6x6 matchup matrix + best rotation | `matchup-matrix` |
+| 33 | Block-out lab + expected value | `blockout-lab` |
+| 34 | Practice planner + timed blocks | `practice-planner` |
+| 35 | Play-by-play narrator ES/EN/PT | `play-by-play` |
+| 36 | Player career passport + bottleneck | `player-career` |
 
 ## Superficie de API
 
-- `GET /api/v1/health/deep` - salud de los 30 motores y versión.
+- `GET /api/v1/health/deep` - salud de los 36 motores y versión.
 - `GET /api/v1/catalog/modules` - módulos, ejemplos, perfiles y precios.
 - `POST /api/v1/modules/{slug}/run` y `/demo` - ejecutar un motor.
 - `POST /api/v1/security/verify-seal` - verificar un acta firmada.
@@ -103,7 +114,7 @@ cd frontend && npm run typecheck && npm run test && npm run build
 
 ## Estado
 
-v4.0.0: 30 módulos, 331 pruebas backend, 51 pruebas frontend, salas en vivo
+v5.0.0: 36 módulos, 370 pruebas backend, 62 pruebas frontend, salas en vivo
 SQLite WAL, seis perfiles de rol, deshacer/rehacer y atajos en el marcador,
 pizarra de tiempo muerto, draft serpentina, control de equipamiento, pósters SVG,
 UI y documentación trilingüe, y E2E en vivo para módulos, salas, seguridad,

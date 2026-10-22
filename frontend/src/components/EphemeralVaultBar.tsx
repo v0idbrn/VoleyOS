@@ -39,7 +39,7 @@ export function EphemeralVaultBar({ locale }: { locale: Locale }) {
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-obsidian/95 px-3 py-2 backdrop-blur">
+    <div className="fixed inset-x-0 bottom-14 z-40 border-t border-white/10 bg-obsidian/95 px-3 py-2 backdrop-blur">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
         <span className="font-bold uppercase tracking-[0.18em] text-volt">{COPY[locale].vault}</span>
         <span className="text-white/60">

@@ -2,10 +2,15 @@
 
 [English](README.md) | [Español](README.es.md) | **Português**
 
-O sistema operacional do vôlei: 30 módulos para jogadores, treinadores,
-árbitros, torcida, organizadores e clubes. FOSS offline-first (pronto para
-F-Droid) + Cloud Pro opcional, com salas ao vivo persistentes.
 
+## 📱 Baixar APK para Android
+
+[![Download APK](https://img.shields.io/badge/APK-voleyos--universal.apk-FF3B5C?style=for-the-badge&logo=android)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
+
+APK universal assinado pelo GitHub Actions em cada tag `v*`. Android 7.0+ (minSdk 24), trilingue, offline-first, sem contas e sem telemetria.
+
+
+O sistema operacional do volei: 36 modulos para jogadores, treinadores, arbitros, torcida, organizadores e clubes. FOSS offline-first (pronto para F-Droid) + Cloud Pro opcional, com salas ao vivo persistentes.
 - Backend: Python 3.13+ / FastAPI / Pydantic v2 / matemática apenas com Decimal.
 - Frontend: Next.js App Router / TypeScript estrito / Tailwind / Zod.
 - Segurança: CSP, limite de requisições, teto de 256 KiB, saneamento de XSS e
@@ -65,10 +70,16 @@ docker compose up --build
 | 28 | Passe de elenco + checagem de líbero e capitão | `roster-pass` |
 | 29 | Inspetor de equipamento + tolerâncias de rede e bola | `equipment-inspector` |
 | 30 | Pôster SVG 1080x1920 / 1080x1080 | `match-poster` |
+| 31 | Serve speed radar + receiver reaction | `serve-radar` |
+| 32 | 6x6 matchup matrix + best rotation | `matchup-matrix` |
+| 33 | Block-out lab + expected value | `blockout-lab` |
+| 34 | Practice planner + timed blocks | `practice-planner` |
+| 35 | Play-by-play narrator ES/EN/PT | `play-by-play` |
+| 36 | Player career passport + bottleneck | `player-career` |
 
 ## Superfície da API
 
-- `GET /api/v1/health/deep` - saúde dos 30 motores e versão.
+- `GET /api/v1/health/deep` - saúde dos 36 motores e versão.
 - `GET /api/v1/catalog/modules` - módulos, exemplos, perfis e preços.
 - `POST /api/v1/modules/{slug}/run` e `/demo` - executar um motor.
 - `POST /api/v1/security/verify-seal` - verificar uma súmula assinada.
@@ -103,7 +114,7 @@ cd frontend && npm run typecheck && npm run test && npm run build
 
 ## Estado
 
-v4.0.0: 30 módulos, 331 testes backend, 51 testes frontend, salas ao vivo
+v5.0.0: 36 módulos, 370 testes backend, 62 testes frontend, salas ao vivo
 SQLite WAL, seis perfis de papel, desfazer/refazer e atalhos no placar, quadro de
 tempo técnico, draft serpentino, inspeção de equipamento, pôsteres SVG, UI e
 documentação trilíngues, e E2E ao vivo para módulos, salas, segurança, paywall e

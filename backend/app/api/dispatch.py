@@ -1,4 +1,4 @@
-"""Single dispatcher for the 30 engines, shared by API, demo and health probe."""
+"""Single dispatcher for the 36 engines, shared by API, demo and health probe."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from app.services.beach_engine import BeachState, new_beach_match
 from app.services.beach_engine import award_point as beach_point
 from app.services.biomechanics import PoseSequence, analyze_sequence
 from app.services.block_shadow import BlockShadowRequest, compute_block_shadow
+from app.services.blockout_lab import BlockoutRequest, evaluate_blockout
 from app.services.capsule_io import CapsuleRequest, run_capsule
 from app.services.captain_draft import DraftRequest, snake_draft
 from app.services.court_split import CourtSplitRequest, split_costs
@@ -27,6 +28,7 @@ from app.services.integrity_seal import (
 from app.services.jump_load_monitor import DailyJump, jump_load
 from app.services.lineup_slip import LineupSlipRequest, build_lineup_slip
 from app.services.match_poster import MatchPosterRequest, build_match_poster
+from app.services.matchup_matrix import MatchupRequest, build_matchup_matrix
 from app.services.momentum_coach import MomentumRequest, analyze_momentum
 from app.services.mvp_awards import MvpRequest, award_mvp
 from app.services.obs_overlay import build_overlay
@@ -36,7 +38,10 @@ from app.services.pickup_balancer import (
     new_king_of_court,
     next_challenger,
 )
+from app.services.play_by_play import PlayByPlayRequest, build_play_by_play
+from app.services.player_career import CareerRequest, build_career_report
 from app.services.pocket_var import analyze_play, toss_coin, whistle
+from app.services.practice_planner import PracticeRequest, plan_practice
 from app.services.referee_console import RefereeRequest, referee_report
 from app.services.roster_pass import RosterRequest, build_roster_pass
 from app.services.rotation_validator import (
@@ -62,6 +67,7 @@ from app.services.scouting_engine import (
     scouting_report,
 )
 from app.services.seam_radar import SeamRadarRequest, compute_seam
+from app.services.serve_radar import ServeRadarRequest, analyze_serve
 from app.services.setter_iq import SetterIQRequest, compute_setter_iq
 from app.services.setter_signals import SetterSignalRequest, build_signal_sheet
 from app.services.substitution_tracker import SubstitutionRequest, track_substitutions
@@ -328,7 +334,55 @@ MODULES: tuple[ModuleInfo, ...] = (
         name_en="SVG Match Poster",
         profile="fans",
         profiles=["fans"],
-        description="Story 9:16 y feed 1:1 con sets, MVP, sello HMAC y código de sala.",
+        description="Story 9:16 y feed 1:1 con sets, MVP, sello HMAC y c��digo de sala.",
+    ),
+    ModuleInfo(
+        slug="serve-radar",
+        name="Radar Balístico de Saque",
+        name_en="Serve Speed Radar",
+        profile="players",
+        profiles=["players"],
+        description="Velocidad inicial, clasificación del saque y margen de reacción.",
+    ),
+    ModuleInfo(
+        slug="matchup-matrix",
+        name="Matriz de Matchup 6x6",
+        name_en="6x6 Matchup Matrix",
+        profile="coaches",
+        profiles=["coaches"],
+        description="Treinta y seis inicios de set: mejor rotación y peor evitación.",
+    ),
+    ModuleInfo(
+        slug="blockout-lab",
+        name="Laboratorio de Block-Out",
+        name_en="Block-Out Lab",
+        profile="court",
+        profiles=["court"],
+        description="Mano afuera, costura, reciclaje y roll shot con valor esperado.",
+    ),
+    ModuleInfo(
+        slug="practice-planner",
+        name="Planificador de Entrenamientos",
+        name_en="Practice Planner",
+        profile="tournaments",
+        profiles=["tournaments"],
+        description="Bloques cronometrados para 4-24 jugadores sin gente mirando.",
+    ),
+    ModuleInfo(
+        slug="play-by-play",
+        name="Narrador Play-by-Play",
+        name_en="Play-by-Play Narrator",
+        profile="fans",
+        profiles=["fans"],
+        description="Feed broadcast, puntos clutch, cambios de liderazgo y resumen ES/EN/PT.",
+    ),
+    ModuleInfo(
+        slug="player-career",
+        name="Pasaporte de Progreso",
+        name_en="Player Career Passport",
+        profile="referees",
+        profiles=["referees"],
+        description="Deltas atléticos, índice de evolución 0-100 y cuello de botella.",
     ),
 )
 
@@ -622,6 +676,30 @@ def _run_match_poster(payload: dict[str, Any]) -> dict[str, Any]:
     return _dump(build_match_poster(MatchPosterRequest.model_validate(payload)))
 
 
+def _run_serve_radar(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(analyze_serve(ServeRadarRequest.model_validate(payload)))
+
+
+def _run_matchup_matrix(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_matchup_matrix(MatchupRequest.model_validate(payload)))
+
+
+def _run_blockout_lab(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(evaluate_blockout(BlockoutRequest.model_validate(payload)))
+
+
+def _run_practice_planner(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(plan_practice(PracticeRequest.model_validate(payload)))
+
+
+def _run_play_by_play(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_play_by_play(PlayByPlayRequest.model_validate(payload)))
+
+
+def _run_player_career(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_career_report(CareerRequest.model_validate(payload)))
+
+
 RUNNERS = {
     "biomechanics": _run_biomechanics,
     "rotation": _run_rotation,
@@ -653,6 +731,12 @@ RUNNERS = {
     "roster-pass": _run_roster_pass,
     "equipment-inspector": _run_equipment_inspector,
     "match-poster": _run_match_poster,
+    "serve-radar": _run_serve_radar,
+    "matchup-matrix": _run_matchup_matrix,
+    "blockout-lab": _run_blockout_lab,
+    "practice-planner": _run_practice_planner,
+    "play-by-play": _run_play_by_play,
+    "player-career": _run_player_career,
 }
 
 

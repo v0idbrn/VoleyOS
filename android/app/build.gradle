@@ -1,0 +1,46 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "org.voleyos.global"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "org.voleyos.global"
+        minSdk 24
+        targetSdk 35
+        versionCode 500
+        versionName "5.0.0"
+    }
+
+    def keystorePath = System.getenv("VOLEYOS_KEYSTORE")
+    if (keystorePath) {
+        signingConfigs {
+            release {
+                storeFile file(keystorePath)
+                storePassword System.getenv("VOLEYOS_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("VOLEYOS_KEY_ALIAS")
+                keyPassword System.getenv("VOLEYOS_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (keystorePath) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation "androidx.webkit:webkit:1.12.1"
+}

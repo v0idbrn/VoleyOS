@@ -1,4 +1,4 @@
-# QA Report - VolleyOS Global v4.0.0
+# QA Report - VolleyOS Global v5.0.0
 
 Date: 2026-10-22
 Environment: Windows 11, Python 3.14.3 (backend venv), Node 24.15.0, npm 12.0.2,
@@ -8,12 +8,12 @@ Next.js 15.1.6, Docker 29.5.3 (daemon unavailable).
 
 | Gate | Command | Result |
 | --- | --- | --- |
-| Backend tests | `.venv\Scripts\python -m pytest` | 331 passed |
+| Backend tests | `.venv\Scripts\python -m pytest` | 370 passed |
 | Backend lint | `.venv\Scripts\python -m ruff check app tests` | 0 findings |
-| Backend types | `.venv\Scripts\python -m mypy --strict app` | 0 errors, 43 files |
+| Backend types | `.venv\Scripts\python -m mypy --strict app` | 0 errors, 49 files |
 | Frontend types | `npm run typecheck` | 0 errors |
-| Frontend tests | `npm run test` | 51 passed (10 files) |
-| Frontend build | `npm run build` | 194 static pages, 0 errors |
+| Frontend tests | `npm run test` | 62 passed (12 files) |
+| Frontend build | `npm run build` | 215 static pages, 0 errors |
 | Contracts | `float` in `backend/app/` | 0 matches |
 | Contracts | `: any` in `frontend/src/` | 0 matches |
 
@@ -23,10 +23,10 @@ Next.js 15.1.6, Docker 29.5.3 (daemon unavailable).
 
 - API root and privacy/security headers: no-store, nosniff, SAMEORIGIN,
   no-referrer, CSP and Permissions-Policy.
-- Deep health reports 30/30 engines and version 4.0.0.
-- Catalog reports 30 modules, 6 profiles and 3 pricing tiers.
+- Deep health reports 36/36 engines and version 5.0.0.
+- Catalog reports 36 modules, 6 profiles and 3 pricing tiers.
 - Biomechanics demo returns 5 frame verdicts.
-- All 30 module demos return HTTP 200.
+- All 36 module demos return HTTP 200.
 - Live room lifecycle: create -> public read -> PATCH 403 without token ->
   token update with seal change -> signed delete receipt.
 - Seal verification rejects an invalid HMAC seal.
@@ -34,8 +34,8 @@ Next.js 15.1.6, Docker 29.5.3 (daemon unavailable).
 - Job lifecycle: create -> preview locked -> download 402 -> bad HMAC 401 ->
   signed webhook 200 -> XLSX (PK zip, correct MIME) -> CSV -> delete receipt
   (64-char HMAC) -> 404 afterwards.
-- Web: ES/EN/PT homes, security headers, 30 rendered stations, scouting SEO page
-  with FAQPage JSON-LD, privacy page, overlay `noindex`, sitemap (187 URLs),
+- Web: ES/EN/PT homes, security headers, 36 rendered stations, scouting SEO page
+  with FAQPage JSON-LD, privacy page, overlay `noindex`, sitemap (205 URLs),
   robots with sitemap.
 
 ## Security shield
@@ -53,15 +53,15 @@ Next.js 15.1.6, Docker 29.5.3 (daemon unavailable).
 
 - Spanish, English and Portuguese UI, module metadata, SEO pages, legal pages,
   fastlane metadata and README suite.
-- Locale render tests cover all 30 stations in ES/EN/PT.
+- Locale render tests cover all 36 stations in ES/EN/PT.
 - FIVB terminology follows local usage (armador/setter/levantador,
   líbero/libero/líbero, punta/outside/ponteiro).
 
 ## Build output
 
-- 3 locale homes, 15 section indexes, 156 guide pages (52 entries x 3 locales),
-  12 legal pages, overlay, sitemap and robots, plus a dynamic live-room route.
-- First Load JS: 105 kB shared, 153 kB home.
+- 3 locale homes, 15 section indexes, 174 guide pages (58 entries x 3 locales),
+  12 legal pages, overlay, sitemap, robots and three static local live-room pages (ES/EN/PT).
+- First Load JS: 105 kB shared, 159 kB home.
 - All static routes prerendered; live rooms hydrate from the API and degrade to
   a trilingual offline message.
 

@@ -1,4 +1,4 @@
-# Launch Playbook - VolleyOS Global v4.0.0
+# Launch Playbook - VolleyOS Global v5.0.0
 
 Everything below assumes the repository root and a clean `main` branch.
 
@@ -19,7 +19,7 @@ cd ..
 python scripts\e2e_check.py   # requires both servers running
 ```
 
-Expected: 331 backend tests, 51 frontend tests, 194 static pages, 32/32 E2E.
+Expected: 370 backend tests, 62 frontend tests, 215 static pages, 32/32 E2E.
 Docker was not built on the dev machine (daemon stopped). Before publishing:
 
 ```bash
@@ -57,7 +57,7 @@ Docker: `docker build -f frontend/Dockerfile -t volleyos-web . && docker run -p 
 
 F-Droid build: `NEXT_PUBLIC_BUILD_TARGET=fdroid` hides Cloud Pro and produces the
 offline-only bundle. The Android wrapper and store submission are described in
-`docs/FDROID_SUBMISSION_GUIDE.md`; no APK is built in this repo yet.
+`docs/FDROID_SUBMISSION_GUIDE.md`. GitHub Actions builds and signs `voleyos-universal.apk` on every `v*` tag and attaches it to the release.
 
 ## 4. Domain and HTTPS
 
@@ -107,7 +107,7 @@ The API exposes an HMAC webhook, not a checkout provider integration.
 - [ ] Stripe test payment unlocks a real download end to end.
 - [ ] F-Droid metadata and `.fdroid.yml` reviewed by a maintainer.
 - [ ] README, HANDOFF and QA_REPORT reflect the shipped commit.
-- [ ] Tag `v1.0.0` and attach release notes.
+- [ ] Tag `v5.0.0` and verify the Android APK workflow attaches `voleyos-universal.apk`.
 
 ## 8. Rollback
 

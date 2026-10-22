@@ -40,6 +40,12 @@ MODULE_SLUGS = (
     "roster-pass",
     "equipment-inspector",
     "match-poster",
+    "serve-radar",
+    "matchup-matrix",
+    "blockout-lab",
+    "practice-planner",
+    "play-by-play",
+    "player-career",
 )
 
 
@@ -749,6 +755,117 @@ def match_poster_demo() -> dict[str, Any]:
     }
 
 
+def serve_radar_demo() -> dict[str, Any]:
+    return {
+        "origin_x_m": "0",
+        "origin_y_m": "0",
+        "target_x_m": "7.5",
+        "target_y_m": "6.5",
+        "flight_time_ms": 700,
+    }
+
+
+def matchup_matrix_demo() -> dict[str, Any]:
+    return {
+        "opponent_attack": ["90", "72", "64", "58", "46", "38"],
+        "own_block": ["52", "58", "64", "70", "76", "82"],
+    }
+
+
+def blockout_lab_demo() -> dict[str, Any]:
+    return {
+        "zone": "zone_4",
+        "set_distance": "tight_0_3m",
+        "block_closure": "double_closed",
+        "attacker_reach_cm": "342",
+        "block_reach_cm": "326",
+    }
+
+
+def practice_planner_demo() -> dict[str, Any]:
+    return {"players": 9, "duration_min": 90, "focus": "k1_reception"}
+
+
+def play_by_play_demo() -> dict[str, Any]:
+    return {
+        "home_team": "Tiburones",
+        "away_team": "Condores",
+        "events": [
+            {
+                "kind": "point",
+                "team": "home",
+                "player": "Valentina",
+                "score_home": 1,
+                "score_away": 0,
+                "set_number": 1,
+            },
+            {
+                "kind": "point",
+                "team": "away",
+                "player": "Carla",
+                "score_home": 1,
+                "score_away": 2,
+                "set_number": 1,
+            },
+            {
+                "kind": "point",
+                "team": "home",
+                "player": "Sofia",
+                "score_home": 3,
+                "score_away": 2,
+                "set_number": 1,
+            },
+            {
+                "kind": "timeout",
+                "team": "away",
+                "score_home": 20,
+                "score_away": 20,
+                "set_number": 3,
+            },
+            {
+                "kind": "point",
+                "team": "home",
+                "player": "Renata",
+                "score_home": 21,
+                "score_away": 21,
+                "set_number": 3,
+            },
+            {
+                "kind": "card",
+                "team": "away",
+                "player": "Carla",
+                "score_home": 21,
+                "score_away": 21,
+                "set_number": 3,
+            },
+        ],
+    }
+
+
+def player_career_demo() -> dict[str, Any]:
+    return {
+        "player": "Valentina",
+        "measurements": [
+            {
+                "period": "2026-01",
+                "vertical_jump_cm": "52",
+                "attack_reach_cm": "305",
+                "serve_speed_kmh": "78",
+                "attack_efficiency_pct": "38",
+                "reception_pct": "52",
+            },
+            {
+                "period": "2026-06",
+                "vertical_jump_cm": "61",
+                "attack_reach_cm": "318",
+                "serve_speed_kmh": "92",
+                "attack_efficiency_pct": "47",
+                "reception_pct": "61",
+            },
+        ],
+    }
+
+
 DEMOS = {
     "biomechanics": biomechanics_demo,
     "rotation": rotation_demo,
@@ -780,4 +897,10 @@ DEMOS = {
     "roster-pass": roster_pass_demo,
     "equipment-inspector": equipment_inspector_demo,
     "match-poster": match_poster_demo,
+    "serve-radar": serve_radar_demo,
+    "matchup-matrix": matchup_matrix_demo,
+    "blockout-lab": blockout_lab_demo,
+    "practice-planner": practice_planner_demo,
+    "play-by-play": play_by_play_demo,
+    "player-career": player_career_demo,
 }

@@ -17,9 +17,9 @@ export const SECTION_LABELS: Record<SeoSection, Record<Locale, string>> = {
 
 export const SECTION_INTROS: Record<SeoSection, Record<Locale, string>> = {
   modules: {
-    es: "Treinta estaciones offline que cubren cancha, cuerpo técnico, arbitraje, tribuna y transmisión. Todas funcionan sin internet y sin cuentas.",
-    en: "Thirty offline stations covering the court, coaching staff, refereeing, fans and streaming. All work without internet or accounts.",
-    pt: "Vinte e quatro estações offline que cobrem quadra, comissão técnica, arbitragem, torcida e transmissão. Todas funcionam sem internet e sem contas.",
+    es: "Treinta y seis estaciones offline que cubren cancha, cuerpo técnico, arbitraje, tribuna y transmisión. Todas funcionan sin internet y sin cuentas.",
+    en: "Thirty-six offline stations covering the court, coaching staff, refereeing, fans and streaming. All work without internet or accounts.",
+    pt: "Trinta e seis estações offline que cobrem quadra, comissão técnica, arbitragem, torcida e transmissão. Todas funcionam sem internet e sem contas.",
   },
   positions: {
     es: "Roles, zonas y responsabilidades de cada posición del vóley indoor, con métricas que podés medir en VolleyOS.",
@@ -208,6 +208,36 @@ const MODULE_FACTS: Record<string, LArr> = {
     ["Story 1080 x 1920 y feed cuadrado 1080 x 1080.", "Escapa nombres y escapa el SVG contra inyección.", "Incluye sello HMAC, MVP, sets y matriz de sala."],
     ["1080 x 1920 story and 1080 x 1080 square feed.", "Escapes names and the SVG against injection.", "Includes HMAC seal, MVP, sets and room matrix."],
     ["Story 1080 x 1920 e feed quadrado 1080 x 1080.", "Escapa nomes e o SVG contra injeção.", "Inclui selo HMAC, MVP, sets e matriz de sala."],
+  ),
+  "serve-radar": la(
+    ["Velocidad inicial con factor aerodinamico 1.18 y 3.6 km/h por m/s.", "Clasifica en flotado, hibrido, jump serve y bomba mundial.", "Margen de reaccion = vuelo menos 250 ms humanos."],
+    ["Initial speed with a 1.18 aero factor and 3.6 km/h per m/s.", "Classifies float, hybrid, jump serve and world-class bomb.", "Reaction margin = flight time minus 250 ms."],
+    ["Velocidade inicial com fator aerodinamico 1.18 e 3.6 km/h por m/s.", "Classifica em flutuante, hibrido, jump serve e bomba mundial.", "Margem de reacao = voo menos 250 ms."],
+  ),
+  "matchup-matrix": la(
+    ["Matriz 6x6 de diferencial entre bloqueo propio y ataque rival.", "Elige la mejor y la peor rotacion de inicio.", "Identifica al atacante rival mas fuerte y quien lo neutraliza."],
+    ["6x6 differential matrix between own block and rival attack.", "Picks the best and worst starting rotation.", "Finds the strongest rival attacker and the best counter."],
+    ["Matriz 6x6 de diferencial entre bloqueio proprio e ataque rival.", "Escolhe a melhor e a pior rotacao inicial.", "Identifica o atacante rival mais forte e quem o neutraliza."],
+  ),
+  "blockout-lab": la(
+    ["Cuatro decisiones: mano afuera, costura, reciclaje y roll shot.", "Valor esperado con probabilidad acotada entre 5% y 95%.", "Angulo de muneca ajustado por zona, distancia y cierre."],
+    ["Four decisions: hand wipe, seam, recycle and roll shot.", "Expected value with probability clamped between 5% and 95%.", "Wrist angle adjusted by zone, distance and block closure."],
+    ["Quatro decisoes: mao fora, costura, reciclagem e roll shot.", "Valor esperado com probabilidade entre 5% e 95%.", "Angulo de punho ajustado por zona, distancia e fechamento."],
+  ),
+  "practice-planner": la(
+    ["Divide 4 a 24 jugadores en grupos de seis o menos.", "Plantillas de 60, 90 y 120 minutos con cierre incluido.", "Cada bloque trae objetivo, ejercicio y meta de puntuacion."],
+    ["Splits 4 to 24 players into groups of six or fewer.", "60, 90 and 120 minute templates with a closing block.", "Every block has an objective, drill and scoring target."],
+    ["Divide 4 a 24 jogadores em grupos de seis ou menos.", "Modelos de 60, 90 e 120 minutos com fechamento.", "Cada bloco traz objetivo, exercicio e meta de pontuacao."],
+  ),
+  "play-by-play": la(
+    ["Feed con puntos, tiempos, cambios, tarjetas y cierres de set.", "Marca puntos clutch cuando ambos equipos pasan de 20.", "Resumen automatico en ES, EN y PT con viradas."],
+    ["Feed with points, timeouts, subs, cards and set ends.", "Flags clutch points when both teams pass 20.", "Automatic ES, EN and PT recap with lead changes."],
+    ["Feed com pontos, tempos, substituicoes, cartoes e fim de set.", "Marca pontos clutch quando ambos passam de 20.", "Resumo automatico em ES, EN e PT com viradas."],
+  ),
+  "player-career": la(
+    ["Deltas de salto, alcance, saque, ataque y recepcion.", "Indice 0-100 con 70% absoluto y 30% progreso.", "Detecta el cuello de botella y la brecha a la proxima categoria."],
+    ["Deltas for jump, reach, serve, attack and reception.", "0-100 index with 70% absolute and 30% progress.", "Finds the bottleneck and the gap to the next category."],
+    ["Deltas de salto, alcance, saque, ataque e recepcao.", "Indice 0-100 com 70% absoluto e 30% progresso.", "Detecta o gargalo e a distancia para a proxima categoria."],
   ),
 };
 

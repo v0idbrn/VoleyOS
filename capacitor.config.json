@@ -1,0 +1,12 @@
+{
+  "appId": "org.voleyos.global",
+  "appName": "VoleyOS Global",
+  "webDir": "frontend/out",
+  "bundledWebRuntime": false,
+  "android": {
+    "minSdkVersion": 24,
+    "targetSdkVersion": 35,
+    "versionCode": 500,
+    "versionName": "5.0.0"
+  }
+}

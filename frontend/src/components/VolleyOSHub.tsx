@@ -6,6 +6,7 @@ import { COPY, LOCALE_NAMES, t } from "@/lib/i18n";
 import { buildTarget, paywallEnabled, type Locale, type Profile } from "@/lib/local-engines";
 import { MODULES, PROFILE_LABELS } from "@/lib/modules";
 import { addVaultEntry } from "@/lib/vault";
+import { announceScoreTTS, requestCourtWakeLock, triggerCourtHaptics } from "@/lib/court-ux";
 import { EphemeralVaultBar } from "@/components/EphemeralVaultBar";
 import { STATIONS } from "@/components/stations";
 
@@ -66,6 +67,9 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [contrast, setContrast] = useState(false);
+  const [voice, setVoice] = useState(false);
+  const [awake, setAwake] = useState(false);
+  const [view, setView] = useState<"bento" | "list">("bento");
   const [checkout, setCheckout] = useState<Plan | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const target = buildTarget();
@@ -97,6 +101,33 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const chooseProfile = (value: Profile | "all"): void => {
     setProfile(value);
     window.localStorage.setItem(ROLE_KEY, value);
+    triggerCourtHaptics(25);
+  };
+
+  const toggleWakeLock = async (): Promise<void> => {
+    if (awake) {
+      setAwake(false);
+      setToast(t(locale, "Wake Lock liberado.", "Wake Lock released.", "Wake Lock liberado."));
+      return;
+    }
+    const sentinel = await requestCourtWakeLock();
+    setAwake(sentinel !== null);
+    setToast(
+      sentinel
+        ? t(locale, "Pantalla despierta durante el partido.", "Screen kept awake during the match.", "Tela acordada durante a partida.")
+        : t(locale, "Wake Lock no disponible en este navegador.", "Wake Lock unavailable in this browser.", "Wake Lock indisponivel neste navegador."),
+    );
+  };
+
+  const toggleVoice = (): void => {
+    const next = !voice;
+    setVoice(next);
+    setToast(
+      next
+        ? t(locale, "Narrador de voz activado.", "Voice announcer enabled.", "Narrador de voz ativado.")
+        : t(locale, "Narrador de voz apagado.", "Voice announcer off.", "Narrador de voz desligado."),
+    );
+    announceScoreTTS(t(locale, "Narrador listo.", "Announcer ready.", "Narrador pronto."), next, locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : "es-ES");
   };
 
   useEffect(() => {
@@ -123,11 +154,14 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const handleSave = (slug: string, rows: number): void => {
     addVaultEntry(slug, rows);
     const meta = MODULES.find((module) => module.slug === slug);
-    setToast(`${meta?.name[locale] ?? slug} · ${rows} ${t(locale, "filas guardadas en la bóveda", "rows saved to the vault", "linhas salvas no cofre")}`);
+    const text = `${meta?.name[locale] ?? slug}: ${rows} ${t(locale, "filas guardadas en la bóveda", "rows saved to the vault", "linhas salvas no cofre")}`;
+    setToast(text);
+    triggerCourtHaptics([60, 40, 80]);
+    announceScoreTTS(text, voice, locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : "es-ES");
   };
 
   return (
-    <main id="main" lang={locale} className="pb-20">
+    <main id="main" lang={locale} className="pb-32">
       <a
         href="#stations"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-crimson focus:px-3 focus:py-2 focus:text-sm focus:font-bold focus:text-white"
@@ -173,6 +207,37 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
         </div>
       </header>
 
+      <div className="border-b border-white/10 bg-panel/60">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-2 text-[10px] font-bold uppercase tracking-wider">
+          <span className="rounded-full border border-emerald/40 bg-emerald/10 px-2 py-1 text-emerald">36/36 engines local</span>
+          <button
+            type="button"
+            aria-pressed={awake}
+            onClick={() => { void toggleWakeLock(); }}
+            className={`rounded-full border px-2 py-1 ${awake ? "border-volt bg-volt text-obsidian" : "border-white/15 text-white/60 hover:text-white"}`}
+          >
+            {t(locale, "Pantalla despierta", "Wake lock", "Tela acordada")}
+          </button>
+          <button
+            type="button"
+            aria-pressed={voice}
+            onClick={toggleVoice}
+            className={`rounded-full border px-2 py-1 ${voice ? "border-volt bg-volt text-obsidian" : "border-white/15 text-white/60 hover:text-white"}`}
+          >
+            {t(locale, "Narrador", "Voice", "Narrador")}
+          </button>
+          <button
+            type="button"
+            aria-pressed={contrast}
+            onClick={() => setContrast((value) => !value)}
+            className={`rounded-full border px-2 py-1 ${contrast ? "border-volt bg-volt text-obsidian" : "border-white/15 text-white/60 hover:text-white"}`}
+          >
+            {t(locale, "Contraste", "Contrast", "Contraste")}
+          </button>
+          <span className="ml-auto text-white/35">ES | EN | PT</span>
+        </div>
+      </div>
+
       <section className="hero-grid border-b border-white/10">
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-14 md:grid-cols-[1.4fr_1fr] md:py-20">
           <div>
@@ -191,7 +256,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
           </div>
           <div className="grid grid-cols-2 gap-3 self-center">
             {[
-              { value: "30", label: t(locale, "módulos", "modules", "módulos") },
+              { value: "36", label: t(locale, "módulos", "modules", "módulos") },
               { value: "3", label: t(locale, "idiomas", "languages", "idiomas") },
               { value: "0", label: t(locale, "telemetría", "telemetry", "telemetria") },
               { value: "1", label: t(locale, "clic por reporte", "click per report", "clique por relatório") },
@@ -222,6 +287,13 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
             aria-label={t(locale, "Buscar módulo", "Search modules", "Buscar módulo")}
             className="w-full rounded-lg border border-white/15 bg-obsidian px-3 py-1.5 text-xs text-white outline-none placeholder:text-white/35 focus:border-volt sm:w-56"
           />
+          <button
+            type="button"
+            onClick={() => setView((value) => (value === "bento" ? "list" : "bento"))}
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-[11px] font-bold text-white/60 hover:text-white"
+          >
+            {view === "bento" ? t(locale, "Vista lista", "List view", "Vista lista") : t(locale, "Vista bento", "Bento view", "Vista bento")}
+          </button>
           <div className="flex flex-wrap gap-1" role="tablist" aria-label={copy.modules}>
             {FILTERS.map((filter) => (
               <button
@@ -239,7 +311,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
             ))}
           </div>
         </div>
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className={view === "bento" ? "mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3" : "mt-6 grid gap-3"}>
           {visible.map((meta) => {
             const Station = STATIONS[meta.slug];
             if (!Station) return null;
@@ -350,10 +422,30 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
         </div>
       ) : null}
       {toast ? (
-        <div role="status" className="fixed bottom-16 left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 rounded-xl border border-emerald/40 bg-emerald/15 px-3 py-2 text-center text-[11px] font-semibold text-emerald backdrop-blur">
+        <div role="status" className="fixed bottom-28 left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 rounded-xl border border-emerald/40 bg-emerald/15 px-3 py-2 text-center text-[11px] font-semibold text-emerald backdrop-blur">
           {toast}
         </div>
       ) : null}
+      <nav
+        aria-label={t(locale, "Perfiles", "Profiles", "Perfis")}
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-white/15 bg-obsidian/95 px-2 py-2 backdrop-blur"
+      >
+        <div className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto">
+          {(FILTERS.filter((value): value is Profile => value !== "all")).map((value) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={profile === value}
+              onClick={() => chooseProfile(value)}
+              className={`min-w-[74px] flex-1 rounded-xl border px-2 py-2 text-[10px] font-black uppercase tracking-wide transition ${
+                profile === value ? "border-volt bg-volt text-obsidian" : "border-white/10 text-white/55 hover:text-white"
+              }`}
+            >
+              {PROFILE_LABELS[value][locale]}
+            </button>
+          ))}
+        </div>
+      </nav>
     </main>
   );
 }
