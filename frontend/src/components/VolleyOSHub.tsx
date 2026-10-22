@@ -79,6 +79,12 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
 
   return (
     <main id="main" lang={locale} className="pb-20">
+      <a
+        href="#stations"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-crimson focus:px-3 focus:py-2 focus:text-sm focus:font-bold focus:text-white"
+      >
+        {t(locale, "Saltar a las estaciones", "Skip to stations", "Pular para as esta??es")}
+      </a>
       <header className="sticky top-0 z-30 border-b border-white/10 bg-obsidian/85 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
           <a href="#main" className="flex items-center gap-2 font-black tracking-tight">

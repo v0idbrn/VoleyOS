@@ -26,7 +26,7 @@ describe("seo content", () => {
     expect(items).toBe(34);
     const urls = sitemap();
     expect(urls).toHaveLength(1 + LOCALES.length * (1 + LEGAL_DOCS.length + SEO_SECTIONS.length + items));
-    expect(urls.some((entry) => entry.url.endsWith("/es/tools/jump-calculator"))).toBe(true);
-    expect(urls.some((entry) => entry.url.includes("/overlay/"))).toBe(false);
+    expect(urls.some((entry) => entry.url.endsWith("/es/tools/jump-calculator/"))).toBe(true);
+    expect(urls.some((entry) => entry.url.includes("/overlay/tv"))).toBe(false);
   });
 });

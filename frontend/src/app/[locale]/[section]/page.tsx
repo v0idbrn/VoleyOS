@@ -26,8 +26,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     title,
     description: SECTION_INTROS[section][locale],
     alternates: {
-      canonical: `/${locale}/${section}`,
-      languages: Object.fromEntries(LOCALES.map((code) => [code, `/${code}/${section}`])),
+      canonical: `/${locale}/${section}/`,
+      languages: Object.fromEntries(LOCALES.map((code) => [code, `/${code}/${section}/`])),
     },
   };
 }

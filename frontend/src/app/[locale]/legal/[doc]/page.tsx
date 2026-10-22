@@ -24,8 +24,8 @@ export async function generateMetadata({ params }: { params: Promise<RouteParams
     title: page.title,
     description: page.intro,
     alternates: {
-      canonical: `/${locale}/legal/${doc}`,
-      languages: Object.fromEntries(LOCALES.map((code) => [code, `/${code}/legal/${doc}`])),
+      canonical: `/${locale}/legal/${doc}/`,
+      languages: Object.fromEntries(LOCALES.map((code) => [code, `/${code}/legal/${doc}/`])),
     },
     robots: doc === "trademarks" ? { index: true, follow: true } : undefined,
   };

@@ -13,10 +13,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
   ];
 
   for (const locale of LOCALES) {
-    entries.push({ url: `${BASE}/${locale}`, lastModified: LAST_MODIFIED, changeFrequency: "weekly", priority: 0.9 });
+    entries.push({ url: `${BASE}/${locale}/`, lastModified: LAST_MODIFIED, changeFrequency: "weekly", priority: 0.9 });
     for (const doc of LEGAL_DOCS) {
       entries.push({
-        url: `${BASE}/${locale}/legal/${doc}`,
+        url: `${BASE}/${locale}/legal/${doc}/`,
         lastModified: LAST_MODIFIED,
         changeFrequency: "yearly",
         priority: 0.3,
@@ -24,14 +24,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }
     for (const section of SEO_SECTIONS) {
       entries.push({
-        url: `${BASE}/${locale}/${section}`,
+        url: `${BASE}/${locale}/${section}/`,
         lastModified: LAST_MODIFIED,
         changeFrequency: "monthly",
         priority: 0.7,
       });
       for (const item of SEO_ITEMS[section]) {
         entries.push({
-          url: `${BASE}/${locale}/${section}/${item.slug}`,
+          url: `${BASE}/${locale}/${section}/${item.slug}/`,
           lastModified: LAST_MODIFIED,
           changeFrequency: "monthly",
           priority: 0.6,

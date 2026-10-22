@@ -12,7 +12,7 @@ import {
 
 export function SeoArticle({ locale, section, item }: { locale: Locale; section: SeoSection; item: SeoItem }) {
   const related = SEO_ITEMS[section].filter((entry) => entry.slug !== item.slug).slice(0, 4);
-  const canonical = `/${locale}/${section}/${item.slug}`;
+  const canonical = `/${locale}/${section}/${item.slug}/`;
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [

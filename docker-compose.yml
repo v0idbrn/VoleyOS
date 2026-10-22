@@ -1,0 +1,22 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-volleyos-dev-secret}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      NEXT_PUBLIC_BUILD_TARGET: ${NEXT_PUBLIC_BUILD_TARGET:-cloud}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped

@@ -27,8 +27,8 @@ export async function generateMetadata({
     title: item.title[locale],
     description: item.description[locale],
     alternates: {
-      canonical: `/${locale}/${section}/${slug}`,
-      languages: Object.fromEntries(LOCALES.map((code) => [code, `/${code}/${section}/${slug}`])),
+      canonical: `/${locale}/${section}/${slug}/`,
+      languages: Object.fromEntries(LOCALES.map((code) => [code, `/${code}/${section}/${slug}/`])),
     },
     openGraph: { title: item.title[locale], description: item.description[locale], type: "article", locale },
   };
