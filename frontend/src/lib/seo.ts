@@ -17,9 +17,9 @@ export const SECTION_LABELS: Record<SeoSection, Record<Locale, string>> = {
 
 export const SECTION_INTROS: Record<SeoSection, Record<Locale, string>> = {
   modules: {
-    es: "Dieciocho estaciones offline que cubren cancha, cuerpo técnico, arbitraje y transmisión. Todas funcionan sin internet y sin cuentas.",
-    en: "Eighteen offline stations covering the court, coaching staff, refereeing and streaming. All work without internet or accounts.",
-    pt: "Dezoito estações offline que cobrem quadra, comissão técnica, arbitragem e transmissão. Todas funcionam sem internet e sem contas.",
+    es: "Veinticuatro estaciones offline que cubren cancha, cuerpo técnico, arbitraje, tribuna y transmisión. Todas funcionan sin internet y sin cuentas.",
+    en: "Twenty-four offline stations covering the court, coaching staff, refereeing, fans and streaming. All work without internet or accounts.",
+    pt: "Vinte e quatro estações offline que cobrem quadra, comissão técnica, arbitragem, torcida e transmissão. Todas funcionam sem internet e sem contas.",
   },
   positions: {
     es: "Roles, zonas y responsabilidades de cada posición del vóley indoor, con métricas que podés medir en VolleyOS.",
@@ -148,6 +148,36 @@ const MODULE_FACTS: Record<string, LArr> = {
     ["Archivo .volleyos con formato y versión explícitos.", "Checksum SHA-256 del contenido exportado.", "La importación rechaza cualquier alteración del archivo."],
     [".volleyos file with explicit format and version.", "SHA-256 checksum of the exported content.", "Import rejects any modified file."],
     [".volleyos com formato e versão explícitos.", "Checksum SHA-256 do conteúdo exportado.", "A importação rejeita qualquer alteração do arquivo."],
+  ),
+  "referee-console": la(
+    ["Tarjetas FIVB 21.1-21.6 con texto reglamentario.", "Amarilla repetida escala a roja y punto rival.", "Temporizador de saque de 8 s y tiempo de 30 s."],
+    ["FIVB 21.1-21.6 cards with the official text.", "A repeated yellow escalates to red and a rival point.", "8 s serve timer and 30 s timeout."],
+    ["Cartões FIVB 21.1-21.6 com texto oficial.", "Amarelo repetido escala para vermelho e ponto rival.", "Cronômetro de saque de 8 s e tempo de 30 s."],
+  ),
+  "substitution-tracker": la(
+    ["Seis cambios por set y pares atados por posición.", "El titular puede reingresar una vez por el mismo par.", "La lesión excepcional no consume el cupo."],
+    ["Six substitutions per set and position-bound pairs.", "A starter may re-enter once for the same pair.", "Exceptional injury does not consume the limit."],
+    ["Seis substituições por set e pares presos à posição.", "O titular pode retornar uma vez pelo mesmo par.", "Lesão excepcional não consome o limite."],
+  ),
+  "court-split": la(
+    ["Reparte cancha, luz y tercer tiempo al centavo exacto.", "Señas, descuentos y devoluciones quedan conciliadas.", "Genera un texto de WhatsApp listo para cobrar."],
+    ["Splits court, lights and third half to the exact cent.", "Deposits, discounts and refunds are reconciled.", "Generates a ready-to-send WhatsApp text."],
+    ["Divide quadra, luz e terceiro tempo ao centavo exato.", "Sinais, descontos e devoluções ficam conciliados.", "Gera um texto de WhatsApp pronto para cobrar."],
+  ),
+  "fan-companion": la(
+    ["Ocho gestos arbitrales explicados en ES, EN y PT.", "Cinco preguntas de trivia con explicación y regla.", "Rangos desde novato hasta oráculo de tribuna."],
+    ["Eight referee gestures explained in ES, EN and PT.", "Five trivia questions with explanation and rule.", "Ranks from novice to tribune oracle."],
+    ["Oito gestos de arbitragem em ES, EN e PT.", "Cinco perguntas de trivia com explicação e regra.", "Ranks de novato a oráculo da torcida."],
+  ),
+  "setter-signals": la(
+    ["Siete gestos y seis jugadas posibles por equipo.", "Detecta colisiones de gesto y jugadas duplicadas.", "Exporta una hoja de señas lista para entrenar."],
+    ["Seven gestures and six possible plays per team.", "Detects gesture collisions and duplicate plays.", "Exports a training-ready signal sheet."],
+    ["Sete gestos e seis jogadas possíveis por equipe.", "Detecta colisões de gesto e jogadas duplicadas.", "Exporta uma folha de sinais pronta para treinar."],
+  ),
+  "mvp-awards": la(
+    ["Seis premios: MVP, Muro, Candado, Francotirador, Albañil y Sangre Fría.", "El líbero recibe peso extra en defensa y pases.", "Tarjeta compartible sellada con HMAC-SHA256."],
+    ["Six awards: MVP, Wall, Lock, Sniper, Builder and Ice.", "The libero gets extra weight in defence and passes.", "Share card sealed with HMAC-SHA256."],
+    ["Seis prêmios: MVP, Muro, Cadeado, Franco-Atirador, Pedreiro e Sangue Frio.", "O líbero recebe peso extra em defesa e passes.", "Cartão compartilhável selado com HMAC-SHA256."],
   ),
 };
 

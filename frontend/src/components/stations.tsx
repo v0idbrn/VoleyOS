@@ -4,14 +4,18 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { COPY, t } from "@/lib/i18n";
 import {
+  FAN_QUESTIONS,
+  REFEREE_GESTURES,
   TEMPO_SPECS,
   analyseFiveFrames,
   awardBeachPoint,
   awardIndoorPoint,
+  awardMvp,
   balanceTeams,
   beachSwitchInterval,
   buildLineupSlip,
   buildSeal,
+  buildSignalSheet,
   buildVolleyCard,
   classifyTiming,
   computeBlockShadow,
@@ -20,6 +24,7 @@ import {
   decideVar,
   defaultPositions,
   exportCapsule,
+  fanReport,
   heatmap,
   importCapsule,
   jumpLoad,
@@ -27,24 +32,34 @@ import {
   newScoreboard,
   overlayFromScoreboard,
   parsePlay,
+  refereeReport,
   scoutingReport,
+  splitCosts,
   standings,
   tempoWindow,
+  trackSubstitutions,
   validateOverlap,
   verifySeal,
   verticalJumpCm,
   type AttackZone,
   type Axis,
   type BlockScheme,
+  type CardKind,
   type DailyJumps,
   type HeatCell,
   type JsonValue,
   type LineupNumbers,
   type Locale,
+  type MvpPlayer,
+  type RefereeEvent,
+  type RefereeGesture,
   type SeamFormation,
   type ServeType,
   type SetDistribution,
+  type SetterGesture,
+  type SetterPlay,
   type SixAttributes,
+  type SubEvent,
   type TempoCode,
   type ZonePoint,
 } from "@/lib/local-engines";
@@ -1184,6 +1199,391 @@ export function CapsuleStation({ meta, locale, onSave }: StationProps) {
   );
 }
 
+/* 19 --------------------------------------------------------------------- */
+
+const CARD_BUTTON: Record<CardKind, string> = {
+  WARNING_YELLOW: "border-amber-400/60 bg-amber-400/10 text-amber-200",
+  PENALTY_RED: "border-crimson/60 bg-crimson/10 text-crimson",
+  EXPULSION_JOINT: "border-orange-500/60 bg-orange-500/10 text-orange-200",
+  DISQUALIFICATION_SEPARATE: "border-rose-700/60 bg-rose-700/10 text-rose-200",
+  DELAY_WARNING: "border-sky-400/60 bg-sky-400/10 text-sky-200",
+  DELAY_PENALTY: "border-indigo-400/60 bg-indigo-400/10 text-indigo-200",
+};
+
+export function RefereeConsoleStation({ meta, locale, onSave }: StationProps) {
+  const [events, setEvents] = useState<RefereeEvent[]>([
+    { team: "A", player: 4, kind: "WARNING_YELLOW" },
+    { team: "B", kind: "DELAY_WARNING" },
+  ]);
+  const report = useMemo(
+    () => refereeReport({ scoreA: 18, scoreB: 17, serving: "A", events }),
+    [events],
+  );
+
+  const add = (event: RefereeEvent): void => setEvents((previous) => [...previous, event]);
+
+  return (
+    <StationShell
+      meta={meta}
+      locale={locale}
+      rows={report.sanctions.length}
+      onSave={onSave}
+      onExample={() => setEvents([])}
+    >
+      <div className="grid grid-cols-3 gap-2">
+        <Metric label={t(locale, "Marcador", "Score", "Placar")} value={`${report.scoreA}-${report.scoreB}`} tone="text-volt" />
+        <Metric label={t(locale, "Saque", "Serve", "Saque")} value={report.serving} />
+        <Metric label={t(locale, "Reloj", "Clock", "Relógio")} value={`${report.serveSeconds}s`} tone="text-emerald" />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1">
+        <button type="button" className={BTN} onClick={() => add({ team: "A", player: 4, kind: "WARNING_YELLOW" })}>🟨 A #4</button>
+        <button type="button" className={BTN} onClick={() => add({ team: "A", player: 4, kind: "WARNING_YELLOW" })}>🟨🟥 A #4</button>
+        <button type="button" className={BTN} onClick={() => add({ team: "B", kind: "DELAY_WARNING" })}>⏱ B demora</button>
+        <button type="button" className={BTN} onClick={() => add({ team: "B", player: 7, kind: "EXPULSION_JOINT" })}>🟥 B #7</button>
+      </div>
+      <div className="mt-3 space-y-1">
+        {report.sanctions.map((sanction) => (
+          <div key={sanction.index} className={`rounded-lg border px-2 py-1 text-[10px] ${CARD_BUTTON[sanction.applied]}`}>
+            <p className="font-bold">
+              #{sanction.index} {sanction.team}{sanction.player ? ` #${sanction.player}` : ""} · {sanction.applied.replaceAll("_", " ")}
+              {sanction.escalated ? " · ESCALADO" : ""}
+            </p>
+            <p className="text-white/60">{sanction.text}</p>
+            <p className="tabular-nums text-white/40">{sanction.scoreA}-{sanction.scoreB} · saque {sanction.serving}</p>
+          </div>
+        ))}
+        {report.sanctions.length === 0 ? <p className="text-[11px] text-white/40">{t(locale, "Sin sanciones: partido limpio.", "No sanctions: clean match.", "Sem sanções: jogo limpo.")}</p> : null}
+      </div>
+      <p className="mt-2 text-[10px] text-white/50">{t(locale, "Regla 21 FIVB · amarilla escala a roja · demora escala a castigo.", "FIVB Rule 21 · yellow escalates to red · delay escalates to penalty.", "Regra 21 FIVB · amarelo escala para vermelho · demora escala para castigo.")}</p>
+    </StationShell>
+  );
+}
+
+/* 20 --------------------------------------------------------------------- */
+
+const SUB_SAMPLE: SubEvent[] = [
+  { team: "A", outNumber: 5, inNumber: 15, position: 1 },
+  { team: "A", outNumber: 6, inNumber: 16, position: 2 },
+  { team: "A", outNumber: 15, inNumber: 5, position: 1 },
+];
+
+export function SubstitutionTrackerStation({ meta, locale, onSave }: StationProps) {
+  const [events, setEvents] = useState<SubEvent[]>(SUB_SAMPLE);
+  const report = useMemo(() => trackSubstitutions(events), [events]);
+
+  const add = (event: SubEvent): void => setEvents((previous) => [...previous, event]);
+  const fillSet = (): void => {
+    const pairs: SubEvent[] = [4, 5, 6, 7, 8, 9].map((starter, index) => ({
+      team: "A" as const,
+      outNumber: starter,
+      inNumber: starter + 10,
+      position: index + 1,
+    }));
+    setEvents(pairs);
+  };
+
+  return (
+    <StationShell
+      meta={meta}
+      locale={locale}
+      rows={report.events.length}
+      onSave={onSave}
+      onExample={() => setEvents(SUB_SAMPLE)}
+    >
+      <div className="grid grid-cols-3 gap-2">
+        <Metric label={t(locale, "Quedan A", "A left", "Restam A")} value={`${report.remainingSubs.A}`} tone="text-volt" />
+        <Metric label={t(locale, "Quedan B", "B left", "Restam B")} value={`${report.remainingSubs.B}`} />
+        <Metric label={t(locale, "Pares", "Pairs", "Pares")} value={`${report.pairs.length}`} tone="text-emerald" />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1">
+        <button type="button" className={BTN} onClick={fillSet}>{t(locale, "Llenar set", "Fill set", "Preencher set")}</button>
+        <button type="button" className={BTN} onClick={() => add({ team: "A", outNumber: 10, inNumber: 20, position: 6 })}>{t(locale, "Séptimo cambio", "Seventh sub", "Sétima troca")}</button>
+        <button type="button" className={BTN} onClick={() => add({ team: "B", outNumber: 3, inNumber: 13, position: 3, exceptional: true })}>{t(locale, "Lesión B", "B injury", "Lesão B")}</button>
+      </div>
+      <div className="mt-3 space-y-1">
+        {report.events.map((event) => (
+          <div key={event.index} className={`rounded-lg px-2 py-1 text-[10px] ${event.status === "LEGAL" ? "bg-emerald/10 text-emerald" : "bg-crimson/10 text-crimson"}`}>
+            <p className="font-bold">
+              {event.team} · P{event.position} · #{event.outNumber} → #{event.inNumber} · {event.status.replaceAll("_", " ")}
+            </p>
+            <p className="text-white/60">{event.reason} · {t(locale, "quedan", "left", "restam")} {event.remainingSubs}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[10px] text-white/50">{t(locale, "Máximo 6 por set · el par queda atado a su posición · la lesión excepcional no consume cupo.", "Max 6 per set · the pair is bound to its position · exceptional injury does not consume the limit.", "Máximo 6 por set · o par fica preso à posição · lesão excepcional não consome limite.")}</p>
+    </StationShell>
+  );
+}
+
+/* 21 --------------------------------------------------------------------- */
+
+export function CourtSplitStation({ meta, locale, onSave }: StationProps) {
+  const [mode, setMode] = useState<"pickup" | "tournament">("pickup");
+  const [courtCost, setCourtCost] = useState(90);
+  const [teams, setTeams] = useState(8);
+  const report = useMemo(
+    () =>
+      splitCosts({
+        mode,
+        courtCost,
+        extrasCost: 30,
+        thirdHalfCost: 15,
+        attendees: [
+          { name: "Ana", deposit: 30 },
+          { name: "Beto" },
+          { name: "Caro", discountPct: 50 },
+          { name: "Dani" },
+        ],
+        paymentAlias: "volleyos.demo",
+        paymentHolder: "Tesoreria",
+        teams,
+        teamFee: 50,
+        refereeCost: 20,
+        prizesCost: 10,
+      }),
+    [courtCost, mode, teams],
+  );
+
+  return (
+    <StationShell
+      meta={meta}
+      locale={locale}
+      rows={report.pickup?.rows.length ?? 1}
+      onSave={onSave}
+      onExample={() => {
+        setMode("pickup");
+        setCourtCost(90);
+        setTeams(8);
+      }}
+    >
+      <div className="flex gap-1">
+        {(["pickup", "tournament"] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            className={value === mode ? BTN_PRIMARY : BTN}
+            onClick={() => setMode(value)}
+          >
+            {value === "pickup" ? t(locale, "Vaquita", "Pickup", "Rateio") : t(locale, "Torneo", "Tournament", "Torneio")}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <label className="text-xs">
+          <span className={LABEL}>{t(locale, "Cancha", "Court", "Quadra")}</span>
+          <input className={INPUT} type="number" min={0} value={courtCost} onChange={(event) => setCourtCost(Number(event.target.value))} />
+        </label>
+        <label className="text-xs">
+          <span className={LABEL}>{t(locale, "Equipos", "Teams", "Equipes")}</span>
+          <input className={INPUT} type="number" min={1} value={teams} onChange={(event) => setTeams(Number(event.target.value))} />
+        </label>
+      </div>
+      {report.pickup ? (
+        <>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Metric label={t(locale, "Total", "Total", "Total")} value={`${report.pickup.currency} ${report.pickup.total}`} tone="text-volt" />
+            <Metric label={t(locale, "Personas", "People", "Pessoas")} value={`${report.pickup.rows.length}`} />
+          </div>
+          <div className="mt-2 space-y-1">
+            {report.pickup.rows.map((row) => (
+              <div key={row.name} className="flex items-center justify-between rounded-lg bg-white/5 px-2 py-1 text-[10px]">
+                <span>{row.name} {row.discountPct ? `(-${row.discountPct}%)` : ""}</span>
+                <span className="tabular-nums text-white/60">{row.share} · {row.status}</span>
+              </div>
+            ))}
+          </div>
+          <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap rounded-lg border border-white/10 bg-obsidian/60 p-2 text-[9px] text-white/60">{report.pickup.whatsapp}</pre>
+        </>
+      ) : null}
+      {report.tournament ? (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Metric label={t(locale, "Ingresos", "Revenue", "Receita")} value={`${report.tournament.revenue}`} />
+          <Metric label={t(locale, "Costos", "Costs", "Custos")} value={`${report.tournament.costs}`} />
+          <Metric label={t(locale, "Resultado", "Profit", "Resultado")} value={`${report.tournament.profit}`} tone="text-emerald" />
+          <Metric label="Break-even" value={`${report.tournament.breakEvenTeams}`} tone="text-volt" />
+        </div>
+      ) : null}
+    </StationShell>
+  );
+}
+
+/* 22 --------------------------------------------------------------------- */
+
+const GESTURE_KEYS = Object.keys(REFEREE_GESTURES) as RefereeGesture[];
+
+export function FanCompanionStation({ meta, locale, onSave }: StationProps) {
+  const [gesture, setGesture] = useState<RefereeGesture>("touch_top_net");
+  const [answers, setAnswers] = useState<Array<number | null>>(FAN_QUESTIONS.map(() => null));
+  const decoded = useMemo(() => fanReport({ action: "decode", gesture }), [gesture]);
+  const numeric = answers.filter((answer): answer is number => answer !== null);
+  const trivia = numeric.length === FAN_QUESTIONS.length ? fanReport({ action: "trivia", answers: numeric }) : null;
+
+  return (
+    <StationShell
+      meta={meta}
+      locale={locale}
+      rows={trivia?.trivia?.score ?? 1}
+      onSave={onSave}
+      onExample={() => {
+        setGesture("touch_top_net");
+        setAnswers(FAN_QUESTIONS.map(() => null));
+      }}
+    >
+      <label className="text-xs">
+        <span className={LABEL}>{t(locale, "Gesto del árbitro", "Referee gesture", "Gesto do árbitro")}</span>
+        <select className={INPUT} value={gesture} onChange={(event) => setGesture(event.target.value as RefereeGesture)}>
+          {GESTURE_KEYS.map((key) => (
+            <option key={key} value={key}>{REFEREE_GESTURES[key].call[locale]}</option>
+          ))}
+        </select>
+      </label>
+      {decoded.decision ? (
+        <div className="mt-2 rounded-lg border border-volt/30 bg-volt/5 p-2 text-[11px]">
+          <p className="font-bold text-volt">{decoded.decision.call[locale]} <span className="text-white/40">{decoded.decision.rule}</span></p>
+          <p className="mt-1 text-white/70">{decoded.decision.why[locale]}</p>
+          <p className="mt-1 text-white/50">{decoded.decision.example[locale]}</p>
+        </div>
+      ) : null}
+      <div className="mt-3 space-y-2">
+        {FAN_QUESTIONS.map((question, index) => (
+          <div key={question.id} className="rounded-lg border border-white/10 bg-obsidian/40 p-2 text-[10px]">
+            <p className="font-semibold text-white/80">{index + 1}. {question.question[locale]}</p>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {question.options[locale].map((option, optionIndex) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={answers[index] === optionIndex ? BTN_PRIMARY : BTN}
+                  onClick={() => setAnswers((previous) => previous.map((value, position) => (position === index ? optionIndex : value)))}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      {trivia?.trivia ? (
+        <div className="mt-2 rounded-lg border border-emerald/30 bg-emerald/5 p-2 text-[10px] text-emerald">
+          <p className="font-bold">{trivia.trivia.score}/{trivia.trivia.total} · {trivia.trivia.rank}</p>
+          {trivia.trivia.answers.map((answer) => (
+            <p key={answer.id} className="text-white/60">#{answer.id} {answer.isCorrect ? "✓" : "✗"} {answer.explanation[locale]} ({answer.rule})</p>
+          ))}
+        </div>
+      ) : null}
+    </StationShell>
+  );
+}
+
+/* 23 --------------------------------------------------------------------- */
+
+const SETTER_SIGNAL_SAMPLE: Array<{ gesture: SetterGesture; play: SetterPlay }> = [
+  { gesture: "index_finger", play: "A" },
+  { gesture: "two_fingers", play: "B/Shoot" },
+  { gesture: "three_fingers", play: "C/7" },
+  { gesture: "fist", play: "D/Atras" },
+  { gesture: "open_hand", play: "Pipe" },
+  { gesture: "pinky", play: "Doble (Cruce)" },
+  { gesture: "thumb_up", play: "A" },
+];
+
+export function SetterSignalsStation({ meta, locale, onSave }: StationProps) {
+  const [assignments, setAssignments] = useState(SETTER_SIGNAL_SAMPLE);
+  const report = useMemo(
+    () => buildSignalSheet({ team: "Tiburones", setterName: "Sofi", assignments }),
+    [assignments],
+  );
+
+  return (
+    <StationShell
+      meta={meta}
+      locale={locale}
+      rows={report.assignments.length}
+      onSave={onSave}
+      onExample={() => setAssignments(SETTER_SIGNAL_SAMPLE)}
+    >
+      <div className="grid grid-cols-2 gap-2">
+        <Metric label={t(locale, "Válida", "Valid", "Válida")} value={report.valid ? "SÍ" : "NO"} tone={report.valid ? "text-emerald" : "text-crimson"} />
+        <Metric label={t(locale, "Colisiones", "Collisions", "Colisões")} value={`${report.collisions.length}`} tone={report.collisions.length ? "text-crimson" : "text-emerald"} />
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1">
+        <button type="button" className={BTN} onClick={() => setAssignments([...assignments, { gesture: "index_finger", play: "Pipe" }])}>
+          {t(locale, "Duplicar gesto", "Duplicate gesture", "Duplicar gesto")}
+        </button>
+        <button type="button" className={BTN} onClick={() => setAssignments(SETTER_SIGNAL_SAMPLE)}>{t(locale, "Reparar", "Repair", "Reparar")}</button>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-1 text-[10px]">
+        {report.assignments.map((assignment) => (
+          <div key={`${assignment.gesture}-${assignment.play}`} className="flex items-center justify-between rounded bg-white/5 px-2 py-1">
+            <span className="font-mono text-volt">{assignment.icon} {assignment.gesture.replaceAll("_", " ")}</span>
+            <span className="font-bold">{assignment.play}</span>
+          </div>
+        ))}
+      </div>
+      {report.duplicatePlays.length > 0 ? <p className="mt-1 text-[10px] text-crimson">{t(locale, "Jugadas duplicadas", "Duplicate plays", "Jogadas duplicadas")}: {report.duplicatePlays.join(", ")}</p> : null}
+      <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded-lg border border-white/10 bg-obsidian/60 p-2 text-[9px] text-white/60">{report.sheet}</pre>
+    </StationShell>
+  );
+}
+
+/* 24 --------------------------------------------------------------------- */
+
+const MVP_SAMPLE: MvpPlayer[] = [
+  { name: "Ana", team: "Tiburones", points: 22, blocks: 3, aces: 2, digs: 9, pressurePoints: 5, votes: 4 },
+  { name: "Beto", team: "Marlins", points: 19, blocks: 7, aces: 1, digs: 6, assists: 4 },
+  { name: "Caro", team: "Tiburones", points: 8, digs: 22, isLibero: true },
+  { name: "Dani", team: "Marlins", points: 14, blocks: 2, aces: 3, pressurePoints: 3 },
+];
+
+export function MvpAwardsStation({ meta, locale, onSave }: StationProps) {
+  const [report, setReport] = useState<Awaited<ReturnType<typeof awardMvp>> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = (): void => {
+    awardMvp({ match: "Final · Tiburones vs Marlins", players: MVP_SAMPLE })
+      .then((result) => {
+        setReport(result);
+        setError(null);
+      })
+      .catch(() => setError(t(locale, "Web Crypto no disponible.", "Web Crypto unavailable.", "Web Crypto indisponível.")));
+  };
+
+  useEffect(() => {
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <StationShell
+      meta={meta}
+      locale={locale}
+      rows={report?.awards.length ?? 6}
+      onSave={onSave}
+      onExample={run}
+    >
+      <div className="grid grid-cols-2 gap-1 text-[10px]">
+        {(report?.awards ?? []).map((award) => (
+          <div key={award.key} className="rounded-lg border border-white/10 bg-obsidian/60 px-2 py-1">
+            <p className="font-bold text-white/80">{award.emoji} {award.label}</p>
+            <p className="text-volt">{award.winner} <span className="text-white/40">{award.value}</span></p>
+          </div>
+        ))}
+      </div>
+      {report ? (
+        <>
+          <div className="mt-2 rounded-lg border border-volt/30 bg-volt/5 p-2 text-[9px]">
+            <p className="break-all font-mono text-volt">{report.seal}</p>
+            <p className="break-all font-mono text-white/40">SHA-256 {report.sha256.slice(0, 32)}…</p>
+          </div>
+          <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-white/5 p-2 text-[10px] text-white/70">{report.card}</pre>
+        </>
+      ) : null}
+      <button type="button" className={`${BTN} mt-2`} onClick={run}>{t(locale, "Re-sellar premios", "Re-seal awards", "Re-selar prêmios")}</button>
+      {error ? <p className="mt-1 text-[10px] text-crimson">{error}</p> : null}
+    </StationShell>
+  );
+}
+
 export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   biomechanics: BiomechanicsStation,
   rotation: RotationStation,
@@ -1203,4 +1603,10 @@ export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   "lineup-slip": LineupSlipStation,
   "integrity-seal": IntegritySealStation,
   "capsule-io": CapsuleStation,
+  "referee-console": RefereeConsoleStation,
+  "substitution-tracker": SubstitutionTrackerStation,
+  "court-split": CourtSplitStation,
+  "fan-companion": FanCompanionStation,
+  "setter-signals": SetterSignalsStation,
+  "mvp-awards": MvpAwardsStation,
 };

@@ -9,7 +9,7 @@ import { addVaultEntry } from "@/lib/vault";
 import { EphemeralVaultBar } from "@/components/EphemeralVaultBar";
 import { STATIONS } from "@/components/stations";
 
-const FILTERS: Array<Profile | "all"> = ["all", "players", "coaches", "court", "tournaments"];
+const FILTERS: Array<Profile | "all"> = ["all", "players", "coaches", "court", "referees", "fans", "tournaments"];
 const LOCALES: Locale[] = ["es", "en", "pt"];
 
 interface Plan {

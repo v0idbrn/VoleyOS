@@ -1,10 +1,10 @@
 /**
- * Offline-first TypeScript mirror of the 12 VolleyOS Python engines.
+ * Offline-first TypeScript mirror of the 24 VolleyOS Python engines.
  * Runs in the browser with zero network and zero telemetry.
  */
 
 export type Locale = "es" | "en" | "pt";
-export type Profile = "players" | "coaches" | "court" | "tournaments";
+export type Profile = "players" | "coaches" | "court" | "tournaments" | "referees" | "fans";
 export type Side = "A" | "B";
 
 export const LOCALES: Locale[] = ["es", "en", "pt"];
@@ -1510,5 +1510,1010 @@ export async function importCapsule(text: string): Promise<CapsuleReport> {
     title,
     data,
     message: "Cápsula importada y verificada: checksum SHA-256 válido.",
+  };
+}
+
+/* --------------------------------------------------------------- module 19 */
+
+export type CardKind =
+  | "WARNING_YELLOW"
+  | "PENALTY_RED"
+  | "EXPULSION_JOINT"
+  | "DISQUALIFICATION_SEPARATE"
+  | "DELAY_WARNING"
+  | "DELAY_PENALTY";
+
+export interface RefereeEvent {
+  team: Side;
+  player?: number;
+  kind: CardKind;
+}
+
+export interface RefereeInput {
+  events: RefereeEvent[];
+  scoreA?: number;
+  scoreB?: number;
+  serving?: Side;
+}
+
+export interface RefereeSanction {
+  index: number;
+  team: Side;
+  player: number | null;
+  requested: CardKind;
+  applied: CardKind;
+  escalated: boolean;
+  scoreA: number;
+  scoreB: number;
+  serving: Side;
+  playerOutSet: boolean;
+  playerOutMatch: boolean;
+  text: string;
+}
+
+export interface RefereeReport {
+  sanctions: RefereeSanction[];
+  scoreA: number;
+  scoreB: number;
+  serving: Side;
+  warnings: number;
+  penalties: number;
+  expulsions: number;
+  disqualifications: number;
+  delayWarnings: number;
+  delayPenalties: number;
+  serveSeconds: number;
+  timeoutSeconds: number;
+  message: string;
+}
+
+const CARD_TEXT: Record<CardKind, string> = {
+  WARNING_YELLOW: "Amonestacion: sin consecuencia en el marcador (FIVB 21.1).",
+  PENALTY_RED: "Castigo: punto y saque al rival (FIVB 21.2).",
+  EXPULSION_JOINT: "Expulsion: sale por el resto del set (FIVB 21.3).",
+  DISQUALIFICATION_SEPARATE: "Descalificacion: sale por todo el partido (FIVB 21.4).",
+  DELAY_WARNING: "Primera demora del equipo: advertencia (FIVB 21.5).",
+  DELAY_PENALTY: "Demora repetida: punto y saque al rival (FIVB 21.6).",
+};
+
+export function refereeReport(input: RefereeInput): RefereeReport {
+  const score = { A: input.scoreA ?? 0, B: input.scoreB ?? 0 };
+  let serving: Side = input.serving ?? "A";
+  const warned = new Set<string>();
+  const delays = { A: 0, B: 0 };
+  const sanctions: RefereeSanction[] = [];
+  let warnings = 0;
+  let penalties = 0;
+  let expulsions = 0;
+  let disqualifications = 0;
+  let delayWarnings = 0;
+  let delayPenalties = 0;
+
+  input.events.forEach((event, index) => {
+    if (event.kind !== "DELAY_WARNING" && event.kind !== "DELAY_PENALTY" && event.player === undefined) {
+      throw new Error("individual conduct cards require a player number");
+    }
+    let applied = event.kind;
+    let escalated = false;
+    if (event.kind === "WARNING_YELLOW" && event.player !== undefined) {
+      const key = `${event.team}:${event.player}`;
+      if (warned.has(key)) {
+        applied = "PENALTY_RED";
+        escalated = true;
+      } else {
+        warned.add(key);
+      }
+    }
+    if (event.kind === "DELAY_WARNING" || event.kind === "DELAY_PENALTY") {
+      delays[event.team] += 1;
+      if (delays[event.team] > 1) {
+        applied = "DELAY_PENALTY";
+        escalated = event.kind === "DELAY_WARNING";
+      }
+    }
+    if (applied === "PENALTY_RED" || applied === "DELAY_PENALTY") {
+      const rival: Side = event.team === "A" ? "B" : "A";
+      score[rival] += 1;
+      serving = rival;
+    }
+    if (applied === "WARNING_YELLOW") warnings += 1;
+    if (applied === "PENALTY_RED") penalties += 1;
+    if (applied === "EXPULSION_JOINT") expulsions += 1;
+    if (applied === "DISQUALIFICATION_SEPARATE") disqualifications += 1;
+    if (applied === "DELAY_WARNING") delayWarnings += 1;
+    if (applied === "DELAY_PENALTY") delayPenalties += 1;
+    sanctions.push({
+      index: index + 1,
+      team: event.team,
+      player: event.player ?? null,
+      requested: event.kind,
+      applied,
+      escalated,
+      scoreA: score.A,
+      scoreB: score.B,
+      serving,
+      playerOutSet: applied === "EXPULSION_JOINT" || applied === "DISQUALIFICATION_SEPARATE",
+      playerOutMatch: applied === "DISQUALIFICATION_SEPARATE",
+      text: CARD_TEXT[applied],
+    });
+  });
+
+  return {
+    sanctions,
+    scoreA: score.A,
+    scoreB: score.B,
+    serving,
+    warnings,
+    penalties,
+    expulsions,
+    disqualifications,
+    delayWarnings,
+    delayPenalties,
+    serveSeconds: 8,
+    timeoutSeconds: 30,
+    message: `${sanctions.length} sanciones. Marcador ${score.A}-${score.B}, saque ${serving}.`,
+  };
+}
+
+/* --------------------------------------------------------------- module 20 */
+
+export interface SubEvent {
+  team: Side;
+  outNumber: number;
+  inNumber: number;
+  position: number;
+  exceptional?: boolean;
+}
+
+export interface SubResult {
+  index: number;
+  team: Side;
+  position: number;
+  outNumber: number;
+  inNumber: number;
+  status: "LEGAL" | "ILLEGAL_SUBSTITUTION";
+  reason: string;
+  remainingSubs: number;
+  exceptional: boolean;
+}
+
+export interface SubPair {
+  team: Side;
+  position: number;
+  starter: number;
+  substitute: number;
+  status: "open" | "closed";
+}
+
+export interface SubReport {
+  events: SubResult[];
+  pairs: SubPair[];
+  remainingSubs: Record<Side, number>;
+  message: string;
+}
+
+interface TeamSubState {
+  subs: number;
+  pairs: Map<number, SubPair>;
+  substitutes: Set<number>;
+  reentered: Set<number>;
+}
+
+function emptySubState(): TeamSubState {
+  return { subs: 0, pairs: new Map(), substitutes: new Set(), reentered: new Set() };
+}
+
+export function trackSubstitutions(events: SubEvent[]): SubReport {
+  const teams: Record<Side, TeamSubState> = { A: emptySubState(), B: emptySubState() };
+  const results: SubResult[] = [];
+
+  events.forEach((event, index) => {
+    const team = teams[event.team];
+    let status: SubResult["status"] = "LEGAL";
+    let reason = "substitution registered";
+    const pair = team.pairs.get(event.position);
+    if (event.outNumber === event.inNumber) {
+      status = "ILLEGAL_SUBSTITUTION";
+      reason = "a player cannot substitute themself";
+    } else if (event.exceptional) {
+      if (team.substitutes.has(event.inNumber)) {
+        status = "ILLEGAL_SUBSTITUTION";
+        reason = "substitute cannot re-enter the same set";
+      } else if (pair?.status === "closed") {
+        status = "ILLEGAL_SUBSTITUTION";
+        reason = "pair is already closed for this position";
+      } else {
+        team.pairs.set(event.position, {
+          team: event.team,
+          position: event.position,
+          starter: pair?.starter ?? event.outNumber,
+          substitute: event.inNumber,
+          status: "closed",
+        });
+        team.substitutes.add(event.inNumber);
+        reason = "exceptional injury substitution does not consume the limit";
+      }
+    } else if (team.subs >= 6) {
+      status = "ILLEGAL_SUBSTITUTION";
+      reason = "team already used its six substitutions this set";
+    } else if (pair) {
+      if (pair.status === "closed") {
+        status = "ILLEGAL_SUBSTITUTION";
+        reason = "pair is closed; substitute cannot re-enter the same set";
+      } else if (event.outNumber === pair.substitute && event.inNumber === pair.starter) {
+        pair.status = "closed";
+        team.reentered.add(pair.starter);
+        team.subs += 1;
+        reason = "starter re-enters once for the same substitute";
+      } else {
+        status = "ILLEGAL_SUBSTITUTION";
+        reason = `position ${event.position} is bound to #${pair.starter}/#${pair.substitute}`;
+      }
+    } else {
+      const existing = [...team.pairs.values()].find((item) => item.substitute === event.outNumber);
+      if (existing || team.substitutes.has(event.outNumber)) {
+        status = "ILLEGAL_SUBSTITUTION";
+        reason = "pair is bound to another position; substitute cannot re-enter";
+      } else if (team.substitutes.has(event.inNumber)) {
+        status = "ILLEGAL_SUBSTITUTION";
+        reason = "substitute cannot re-enter the same set";
+      } else if (team.reentered.has(event.outNumber)) {
+        status = "ILLEGAL_SUBSTITUTION";
+        reason = "starter already used their one re-entry this set";
+      } else {
+        team.pairs.set(event.position, {
+          team: event.team,
+          position: event.position,
+          starter: event.outNumber,
+          substitute: event.inNumber,
+          status: "open",
+        });
+        team.substitutes.add(event.inNumber);
+        team.subs += 1;
+        reason = "substitution inside the FIVB limit";
+      }
+    }
+    results.push({
+      index: index + 1,
+      team: event.team,
+      position: event.position,
+      outNumber: event.outNumber,
+      inNumber: event.inNumber,
+      status,
+      reason,
+      remainingSubs: 6 - team.subs,
+      exceptional: event.exceptional ?? false,
+    });
+  });
+
+  return {
+    events: results,
+    pairs: [...teams.A.pairs.values(), ...teams.B.pairs.values()],
+    remainingSubs: { A: 6 - teams.A.subs, B: 6 - teams.B.subs },
+    message: `${results.length} cambios procesados. Quedan ${6 - teams.A.subs} A y ${6 - teams.B.subs} B.`,
+  };
+}
+
+/* --------------------------------------------------------------- module 21 */
+
+export interface SplitAttendee {
+  name: string;
+  deposit?: number;
+  discountPct?: number;
+}
+
+export interface SplitInput {
+  mode: "pickup" | "tournament";
+  courtCost?: number;
+  extrasCost?: number;
+  thirdHalfCost?: number;
+  attendees?: SplitAttendee[];
+  paymentAlias?: string;
+  paymentHolder?: string;
+  currency?: string;
+  teams?: number;
+  teamFee?: number;
+  refereeCost?: number;
+  prizesCost?: number;
+}
+
+export interface SplitRow {
+  name: string;
+  weight: number;
+  discountPct: number;
+  shareCents: number;
+  depositCents: number;
+  balanceCents: number;
+  share: string;
+  deposit: string;
+  balance: string;
+  status: "pay" | "refund" | "settled";
+}
+
+export interface SplitTransfer {
+  payer: string;
+  payee: string;
+  amount: string;
+  concept: string;
+}
+
+export interface PickupSplit {
+  totalCents: number;
+  total: string;
+  rows: SplitRow[];
+  transfers: SplitTransfer[];
+  whatsapp: string;
+  currency: string;
+}
+
+export interface TournamentSplit {
+  teams: number;
+  revenueCents: number;
+  costsCents: number;
+  profitCents: number;
+  revenue: string;
+  costs: string;
+  profit: string;
+  marginPct: number;
+  breakEvenTeams: number;
+  currency: string;
+}
+
+export interface SplitReport {
+  mode: "pickup" | "tournament";
+  pickup: PickupSplit | null;
+  tournament: TournamentSplit | null;
+  message: string;
+}
+
+const cents = (value: number): number => Math.round(value * 100);
+const money = (value: number): string => (value / 100).toFixed(2);
+
+function pickupSplit(input: SplitInput): PickupSplit {
+  const attendees = input.attendees ?? [];
+  if (attendees.length === 0) throw new Error("at least one attendee is required");
+  const currency = input.currency ?? "ARS";
+  const totalCents = cents(input.courtCost ?? 0) + cents(input.extrasCost ?? 0) + cents(input.thirdHalfCost ?? 0);
+  const weights = attendees.map((attendee) => 100 - (attendee.discountPct ?? 0));
+  const weightSum = weights.reduce((sum, weight) => sum + weight, 0);
+  if (weightSum <= 0) throw new Error("discounts leave no payable share");
+  const shares = weights.map((weight) => Math.round((totalCents * weight) / weightSum));
+  shares[0] = (shares[0] as number) + (totalCents - shares.reduce((sum, share) => sum + share, 0));
+  const holder = input.paymentHolder ?? "Tesoreria";
+  const rows: SplitRow[] = [];
+  const transfers: SplitTransfer[] = [];
+  attendees.forEach((attendee, index) => {
+    const shareCents = shares[index] as number;
+    const depositCents = cents(attendee.deposit ?? 0);
+    const balanceCents = shareCents - depositCents;
+    if (balanceCents > 0) {
+      transfers.push({
+        payer: attendee.name,
+        payee: holder,
+        amount: money(balanceCents),
+        concept: "cuota de cancha",
+      });
+    } else if (balanceCents < 0) {
+      transfers.push({
+        payer: holder,
+        payee: attendee.name,
+        amount: money(-balanceCents),
+        concept: "devolucion de sena",
+      });
+    }
+    rows.push({
+      name: attendee.name,
+      weight: (weights[index] as number) / 100,
+      discountPct: attendee.discountPct ?? 0,
+      shareCents,
+      depositCents,
+      balanceCents,
+      share: money(shareCents),
+      deposit: money(depositCents),
+      balance: money(balanceCents),
+      status: balanceCents > 0 ? "pay" : balanceCents < 0 ? "refund" : "settled",
+    });
+  });
+  const lines = [
+    "🏐 *La Vaquita - VolleyOS*",
+    `Cancha + luz + tercer tiempo: *${currency} ${money(totalCents)}*`,
+    `Entre ${rows.length} personas.`,
+    "",
+    "💸 *Pagar por transferencia*",
+    ...transfers.map(
+      (transfer) =>
+        `• ${transfer.payer} -> ${transfer.payee}: ${currency} ${transfer.amount} (${transfer.concept})`,
+    ),
+  ];
+  if (input.paymentAlias) {
+    lines.push("", `🏦 Alias/CVU: *${input.paymentAlias}*`, `Titular: ${holder}`);
+  }
+  lines.push("", "Sello VolleyOS: cuentas exactas al centavo, sin telemetria.");
+  return {
+    totalCents,
+    total: money(totalCents),
+    rows,
+    transfers,
+    whatsapp: lines.join("\n"),
+    currency,
+  };
+}
+
+function tournamentSplit(input: SplitInput): TournamentSplit {
+  const teams = input.teams ?? 0;
+  const fee = cents(input.teamFee ?? 0);
+  if (teams <= 0 || fee <= 0) throw new Error("teams and teamFee must be greater than zero");
+  const revenueCents = teams * fee;
+  const costsCents = cents(input.courtCost ?? 0) + cents(input.refereeCost ?? 0) + cents(input.prizesCost ?? 0);
+  const profitCents = revenueCents - costsCents;
+  return {
+    teams,
+    revenueCents,
+    costsCents,
+    profitCents,
+    revenue: money(revenueCents),
+    costs: money(costsCents),
+    profit: money(profitCents),
+    marginPct: Math.round((profitCents / revenueCents) * 10000) / 100,
+    breakEvenTeams: Math.ceil(costsCents / fee),
+    currency: input.currency ?? "ARS",
+  };
+}
+
+export function splitCosts(input: SplitInput): SplitReport {
+  if (input.mode === "pickup") {
+    const pickup = pickupSplit(input);
+    return {
+      mode: "pickup",
+      pickup,
+      tournament: null,
+      message: `Vaquita de ${pickup.currency} ${pickup.total} repartida al centavo.`,
+    };
+  }
+  const tournament = tournamentSplit(input);
+  return {
+    mode: "tournament",
+    pickup: null,
+    tournament,
+    message: `Torneo con ${tournament.profit} de resultado y break-even en ${tournament.breakEvenTeams} equipos.`,
+  };
+}
+
+/* --------------------------------------------------------------- module 22 */
+
+export type RefereeGesture =
+  | "two_fingers_up"
+  | "forearm_touch"
+  | "crossed_arms"
+  | "four_fingers"
+  | "hands_twirling"
+  | "touch_top_net"
+  | "point_court_line"
+  | "thumbs_up_out";
+
+export interface GestureInfo {
+  gesture: RefereeGesture;
+  call: Record<Locale, string>;
+  why: Record<Locale, string>;
+  example: Record<Locale, string>;
+  rule: string;
+}
+
+export const REFEREE_GESTURES: Record<RefereeGesture, GestureInfo> = {
+  two_fingers_up: {
+    gesture: "two_fingers_up",
+    call: { es: "Doble contacto", en: "Double contact", pt: "Dois toques" },
+    why: {
+      es: "El mismo jugador toco la pelota dos veces seguidas.",
+      en: "The same player touched the ball twice in a row.",
+      pt: "O mesmo jogador tocou a bola duas vezes seguidas.",
+    },
+    example: {
+      es: "El armador corrige su pase y vuelve a tocarla.",
+      en: "The setter fixes the pass and touches it again.",
+      pt: "O levantador corrige o passe e toca de novo.",
+    },
+    rule: "FIVB 9.3.3",
+  },
+  forearm_touch: {
+    gesture: "forearm_touch",
+    call: { es: "Balon tocado", en: "Ball touched", pt: "Bola tocada" },
+    why: {
+      es: "El balon rozo el brazo y salio fuera.",
+      en: "The ball brushed an arm and went out.",
+      pt: "A bola raspou o braco e saiu.",
+    },
+    example: {
+      es: "El bloqueo desvia la pelota.",
+      en: "The block deflects the ball.",
+      pt: "O bloqueio desvia a bola.",
+    },
+    rule: "FIVB 9.1",
+  },
+  crossed_arms: {
+    gesture: "crossed_arms",
+    call: { es: "Fin de set", en: "End of set", pt: "Fim do set" },
+    why: {
+      es: "El set llego a 25 con dos de diferencia o 15 en el tie-break.",
+      en: "The set reached 25 with a two-point lead or 15 in the tie-break.",
+      pt: "O set chegou a 25 com dois de vantagem ou 15 no tie-break.",
+    },
+    example: {
+      es: "25-23 y se cambia de lado.",
+      en: "25-23 and teams switch sides.",
+      pt: "25-23 e as equipes trocam de lado.",
+    },
+    rule: "FIVB 6.2",
+  },
+  four_fingers: {
+    gesture: "four_fingers",
+    call: { es: "Cuatro toques", en: "Four touches", pt: "Quatro toques" },
+    why: {
+      es: "El equipo toco la pelota cuatro veces.",
+      en: "The team touched the ball four times.",
+      pt: "A equipe tocou a bola quatro vezes.",
+    },
+    example: {
+      es: "Recepcion, armado, ataque y bloqueo propio.",
+      en: "Pass, set, attack and an own block.",
+      pt: "Passe, levantamento, ataque e bloqueio proprio.",
+    },
+    rule: "FIVB 9.3.1",
+  },
+  hands_twirling: {
+    gesture: "hands_twirling",
+    call: { es: "Cambio de cancha", en: "Change of courts", pt: "Troca de quadra" },
+    why: {
+      es: "Los equipos cambian de lado antes del siguiente set.",
+      en: "Teams switch sides before the next set.",
+      pt: "As equipes trocam de lado antes do proximo set.",
+    },
+    example: {
+      es: "El arbitro gira los antebrazos.",
+      en: "The referee rotates their forearms.",
+      pt: "O arbitro gira os antebracos.",
+    },
+    rule: "FIVB 18.2",
+  },
+  touch_top_net: {
+    gesture: "touch_top_net",
+    call: { es: "Toque de red", en: "Net touch", pt: "Toque na rede" },
+    why: {
+      es: "Un jugador toco la banda superior o la antena.",
+      en: "A player touched the top band or antenna.",
+      pt: "Um jogador tocou a faixa superior ou a antena.",
+    },
+    example: {
+      es: "El bloqueador roza la malla.",
+      en: "The blocker brushes the net.",
+      pt: "O bloqueador roca a rede.",
+    },
+    rule: "FIVB 11.3.1",
+  },
+  point_court_line: {
+    gesture: "point_court_line",
+    call: { es: "Balon dentro", en: "Ball in", pt: "Bola dentro" },
+    why: {
+      es: "La pelota toco el piso dentro de las lineas.",
+      en: "The ball touched the floor inside the lines.",
+      pt: "A bola tocou o piso dentro das linhas.",
+    },
+    example: {
+      es: "El juez senala la linea.",
+      en: "The referee points at the line.",
+      pt: "O arbitro aponta para a linha.",
+    },
+    rule: "FIVB 8.4.1",
+  },
+  thumbs_up_out: {
+    gesture: "thumbs_up_out",
+    call: { es: "Balon fuera", en: "Ball out", pt: "Bola fora" },
+    why: {
+      es: "La pelota cayo fuera o toco la antena.",
+      en: "The ball landed out or hit the antenna.",
+      pt: "A bola caiu fora ou tocou a antena.",
+    },
+    example: {
+      es: "El remate pasa fuera de la antena.",
+      en: "The spike passes outside the antenna.",
+      pt: "O ataque passa fora da antena.",
+    },
+    rule: "FIVB 8.4.3",
+  },
+};
+
+export interface FanQuestion {
+  id: number;
+  question: Record<Locale, string>;
+  options: Record<Locale, string[]>;
+  correct: number;
+  explanation: Record<Locale, string>;
+  rule: string;
+}
+
+export const FAN_QUESTIONS: FanQuestion[] = [
+  {
+    id: 1,
+    question: {
+      es: "¿Se puede salvar la pelota con el pie?",
+      en: "Can a player save the ball with a foot?",
+      pt: "Pode-se salvar a bola com o pe?",
+    },
+    options: {
+      es: ["Si, cualquier parte del cuerpo", "No, solo manos", "Solo el libero"],
+      en: ["Yes, any part of the body", "No, hands only", "Libero only"],
+      pt: ["Sim, qualquer parte do corpo", "Nao, so as maos", "So o libero"],
+    },
+    correct: 0,
+    explanation: {
+      es: "Cualquier parte del cuerpo puede tocar la pelota en defensa.",
+      en: "Any part of the body may contact the ball in defence.",
+      pt: "Qualquer parte do corpo pode tocar a bola na defesa.",
+    },
+    rule: "FIVB 9.2",
+  },
+  {
+    id: 2,
+    question: {
+      es: "¿Que pasa si la pelota toca la antena?",
+      en: "What happens if the ball touches the antenna?",
+      pt: "O que acontece se a bola tocar a antena?",
+    },
+    options: {
+      es: ["Sigue el juego", "Es fuera", "Es punto del bloqueo"],
+      en: ["Play continues", "It is out", "Point for the block"],
+      pt: ["O jogo continua", "E fora", "Ponto do bloqueio"],
+    },
+    correct: 1,
+    explanation: {
+      es: "La antena es parte de la red y el balon queda fuera.",
+      en: "The antenna is part of the net and the ball is out.",
+      pt: "A antena faz parte da rede e a bola esta fora.",
+    },
+    rule: "FIVB 8.4.3",
+  },
+  {
+    id: 3,
+    question: {
+      es: "¿El libero puede sacar?",
+      en: "Can the libero serve?",
+      pt: "O libero pode sacar?",
+    },
+    options: {
+      es: ["Si, siempre", "No, no puede sacar", "Solo en el tie-break"],
+      en: ["Yes, always", "No, the libero cannot serve", "Only in the tie-break"],
+      pt: ["Sim, sempre", "Nao, o libero nao pode sacar", "So no tie-break"],
+    },
+    correct: 1,
+    explanation: {
+      es: "El libero no puede sacar ni completar un ataque.",
+      en: "The libero cannot serve or complete an attack.",
+      pt: "O libero nao pode sacar nem completar um ataque.",
+    },
+    rule: "FIVB 19.3.1",
+  },
+  {
+    id: 4,
+    question: {
+      es: "¿Un set termina 25-24?",
+      en: "Does a set end at 25-24?",
+      pt: "Um set termina em 25-24?",
+    },
+    options: {
+      es: ["Si", "No, hacen falta dos de diferencia", "Depende del saque"],
+      en: ["Yes", "No, a two-point lead is required", "Depends on serve"],
+      pt: ["Sim", "Nao, sao necessarios dois de vantagem", "Depende do saque"],
+    },
+    correct: 1,
+    explanation: {
+      es: "El set sigue hasta que un equipo saca dos puntos.",
+      en: "The set continues until a team leads by two.",
+      pt: "O set continua ate uma equipe abrir dois pontos.",
+    },
+    rule: "FIVB 6.2",
+  },
+  {
+    id: 5,
+    question: {
+      es: "¿Cuanto dura el tiempo tecnico indoor?",
+      en: "How long is an indoor technical timeout?",
+      pt: "Quanto dura o tempo tecnico indoor?",
+    },
+    options: {
+      es: ["30 segundos", "60 segundos", "90 segundos"],
+      en: ["30 seconds", "60 seconds", "90 seconds"],
+      pt: ["30 segundos", "60 segundos", "90 segundos"],
+    },
+    correct: 1,
+    explanation: {
+      es: "El tiempo tecnico FIVB dura 60 segundos.",
+      en: "The FIVB technical timeout lasts 60 seconds.",
+      pt: "O tempo tecnico da FIVB dura 60 segundos.",
+    },
+    rule: "FIVB 15.4",
+  },
+];
+
+export interface FanAnswer {
+  id: number;
+  answer: number;
+  correct: number;
+  isCorrect: boolean;
+  explanation: Record<Locale, string>;
+  rule: string;
+}
+
+export interface FanReport {
+  decision: GestureInfo | null;
+  trivia: {
+    questions: FanQuestion[];
+    answers: FanAnswer[];
+    score: number;
+    total: number;
+    rank: string;
+    message: string;
+  } | null;
+  message: string;
+}
+
+export function fanReport(input: {
+  action: "decode" | "trivia";
+  gesture?: RefereeGesture;
+  answers?: number[];
+}): FanReport {
+  if (input.action === "decode") {
+    if (!input.gesture) throw new Error("gesture is required");
+    const decision = REFEREE_GESTURES[input.gesture];
+    return {
+      decision,
+      trivia: null,
+      message: `El juez cobro ${decision.call.es} (${decision.rule}).`,
+    };
+  }
+  const answers = input.answers ?? [];
+  if (answers.length > FAN_QUESTIONS.length) throw new Error("too many trivia answers");
+  const results = answers.map((answer, index): FanAnswer => {
+    const question = FAN_QUESTIONS[index] as FanQuestion;
+    if (answer < 0 || answer >= (question.options.es as string[]).length) {
+      throw new Error("trivia answer is out of range");
+    }
+    return {
+      id: question.id,
+      answer,
+      correct: question.correct,
+      isCorrect: answer === question.correct,
+      explanation: question.explanation,
+      rule: question.rule,
+    };
+  });
+  const score = results.filter((answer) => answer.isCorrect).length;
+  const total = FAN_QUESTIONS.length;
+  const rank =
+    results.length === 0
+      ? "TRIBUNA_NOVATA"
+      : score === total
+        ? "ORACULO_DE_TRIBUNA"
+        : score * 10 >= total * 7
+          ? "TRIBUNERO_AVANZADO"
+          : score * 5 >= total * 2
+            ? "TRIBUNERO"
+            : "TRIBUNA_NOVATA";
+  const message = `Trivia de tribuna: ${score}/${results.length || total} - ${rank}.`;
+  return {
+    decision: null,
+    trivia: {
+      questions: FAN_QUESTIONS,
+      answers: results,
+      score,
+      total,
+      rank,
+      message,
+    },
+    message,
+  };
+}
+
+/* --------------------------------------------------------------- module 23 */
+
+export type SetterGesture =
+  | "index_finger"
+  | "two_fingers"
+  | "three_fingers"
+  | "fist"
+  | "open_hand"
+  | "pinky"
+  | "thumb_up";
+export type SetterPlay = "A" | "B/Shoot" | "C/7" | "D/Atras" | "Pipe" | "Doble (Cruce)";
+
+export const SETTER_GESTURES: SetterGesture[] = [
+  "index_finger",
+  "two_fingers",
+  "three_fingers",
+  "fist",
+  "open_hand",
+  "pinky",
+  "thumb_up",
+];
+
+export interface SignalAssignment {
+  gesture: SetterGesture;
+  play: SetterPlay;
+}
+
+export interface SignalSheetReport {
+  valid: boolean;
+  assignments: Array<{ gesture: SetterGesture; play: SetterPlay; icon: string }>;
+  collisions: Array<{ gesture: string; plays: string[] }>;
+  duplicatePlays: string[];
+  missingGestures: string[];
+  sheet: string;
+  message: string;
+}
+
+const SIGNAL_ICONS: Record<SetterGesture, string> = {
+  index_finger: "1",
+  two_fingers: "2",
+  three_fingers: "3",
+  fist: "P",
+  open_hand: "5",
+  pinky: "Q",
+  thumb_up: "+",
+};
+
+export function buildSignalSheet(input: {
+  team?: string;
+  setterName?: string;
+  assignments: SignalAssignment[];
+}): SignalSheetReport {
+  if (input.assignments.length === 0) throw new Error("at least one signal is required");
+  const grouped = new Map<SetterGesture, SetterPlay[]>();
+  const counts = new Map<SetterPlay, number>();
+  for (const assignment of input.assignments) {
+    grouped.set(assignment.gesture, [...(grouped.get(assignment.gesture) ?? []), assignment.play]);
+    counts.set(assignment.play, (counts.get(assignment.play) ?? 0) + 1);
+  }
+  const collisions = [...grouped.entries()]
+    .filter(([, plays]) => plays.length > 1)
+    .map(([gesture, plays]) => ({ gesture, plays }));
+  const duplicatePlays = [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([play]) => play)
+    .sort();
+  const ordered = [...input.assignments].sort(
+    (left, right) => SETTER_GESTURES.indexOf(left.gesture) - SETTER_GESTURES.indexOf(right.gesture),
+  );
+  const lines = [
+    `# Senas del armador - ${input.team ?? "Mi equipo"}`,
+    `Armador: ${input.setterName || "sin nombre"}`,
+    "",
+    "| Sena | Jugada |",
+    "| --- | --- |",
+    ...ordered.map((assignment) => `| ${SIGNAL_ICONS[assignment.gesture]} ${assignment.gesture} | ${assignment.play} |`),
+  ];
+  const valid = collisions.length === 0 && duplicatePlays.length === 0;
+  return {
+    valid,
+    assignments: ordered.map((assignment) => ({
+      ...assignment,
+      icon: SIGNAL_ICONS[assignment.gesture],
+    })),
+    collisions,
+    duplicatePlays,
+    missingGestures: SETTER_GESTURES.filter((gesture) => !grouped.has(gesture)),
+    sheet: lines.join("\n"),
+    message: valid
+      ? "Hoja de senas valida y sin colisiones."
+      : `${collisions.length} colisiones y ${duplicatePlays.length} jugadas duplicadas.`,
+  };
+}
+
+/* --------------------------------------------------------------- module 24 */
+
+export interface MvpPlayer {
+  name: string;
+  team?: string;
+  points?: number;
+  blocks?: number;
+  aces?: number;
+  digs?: number;
+  assists?: number;
+  errors?: number;
+  pressurePoints?: number;
+  votes?: number;
+  isLibero?: boolean;
+}
+
+export interface MvpAward {
+  key: "MVP" | "WALL" | "LOCK" | "SNIPER" | "BUILDER" | "ICE";
+  label: string;
+  emoji: string;
+  winner: string;
+  team: string;
+  metric: string;
+  value: string;
+  message: string;
+}
+
+export interface MvpReport {
+  match: string;
+  awards: MvpAward[];
+  mvpScore: string;
+  card: string;
+  shareText: string;
+  seal: string;
+  sha256: string;
+  message: string;
+}
+
+function mvpScore(player: MvpPlayer): number {
+  return (
+    (player.points ?? 0) +
+    (player.blocks ?? 0) * 1.5 +
+    (player.aces ?? 0) * 1.3 +
+    (player.digs ?? 0) * 0.6 +
+    (player.assists ?? 0) * 0.5 +
+    (player.votes ?? 0) * 2 +
+    (player.pressurePoints ?? 0) * 1.2 -
+    (player.errors ?? 0) * 0.5
+  );
+}
+
+function mvpMetric(player: MvpPlayer, metric: string): number {
+  if (metric === "score") return mvpScore(player);
+  if (metric === "blocks") return (player.blocks ?? 0) + (player.isLibero ? 0.1 : 0);
+  if (metric === "digs") return (player.digs ?? 0) + (player.isLibero ? 2 : 0);
+  if (metric === "aces") return player.aces ?? 0;
+  if (metric === "assists") return player.assists ?? 0;
+  return player.pressurePoints ?? 0;
+}
+
+const MVP_AWARDS: Array<Omit<MvpAward, "winner" | "team" | "value" | "message">> = [
+  { key: "MVP", label: "MVP Global", emoji: "🏆", metric: "score" },
+  { key: "WALL", label: "El Muro", emoji: "🧱", metric: "blocks" },
+  { key: "LOCK", label: "El Candado", emoji: "🛡️", metric: "digs" },
+  { key: "SNIPER", label: "Francotirador", emoji: "🎯", metric: "aces" },
+  { key: "BUILDER", label: "El Albanil", emoji: "👷", metric: "assists" },
+  { key: "ICE", label: "Sangre Fria 24-24", emoji: "🧊", metric: "pressurePoints" },
+];
+
+export async function awardMvp(input: { match?: string; players: MvpPlayer[] }): Promise<MvpReport> {
+  if (input.players.length === 0) throw new Error("at least one player is required");
+  const match = input.match ?? "Partido VolleyOS";
+  const awards = MVP_AWARDS.map((award): MvpAward => {
+    const winner = [...input.players].sort((left, right) => {
+      const delta = mvpMetric(right, award.metric) - mvpMetric(left, award.metric);
+      return delta !== 0 ? delta : left.name.localeCompare(right.name);
+    })[0] as MvpPlayer;
+    return {
+      ...award,
+      winner: winner.name,
+      team: winner.team ?? "Equipo",
+      value: mvpMetric(winner, award.metric).toFixed(2),
+      message: `${award.label}: ${winner.name} (${winner.team ?? "Equipo"}).`,
+    };
+  });
+  const card = [
+    `🏐 ${match}`,
+    "",
+    ...awards.map((award) => `${award.emoji} ${award.label}: ${award.winner} (${award.team})`),
+  ].join("\n");
+  const seal = await buildSeal({
+    match,
+    awards: awards.map((award) => ({
+      key: award.key,
+      winner: award.winner,
+      team: award.team,
+      value: award.value,
+    })),
+  });
+  return {
+    match,
+    awards,
+    mvpScore: (awards[0] as MvpAward).value,
+    card,
+    shareText: `${card}\n\n${seal.seal}`,
+    seal: seal.seal,
+    sha256: seal.sha256,
+    message: `Tarjeta de premios sellada. MVP: ${(awards[0] as MvpAward).winner}.`,
   };
 }

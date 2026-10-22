@@ -13,13 +13,13 @@ describe("command center", () => {
     cleanup();
   });
 
-  it("renders all eighteen stations and filters by profile", () => {
+  it("renders all twenty-four stations and filters by profile", () => {
     render(<VolleyOSHub locale="es" />);
-    expect(screen.getAllByText(/^Módulo \d{2}$/)).toHaveLength(18);
+    expect(screen.getAllByText(/^Módulo \d{2}$/)).toHaveLength(24);
     fireEvent.click(screen.getByRole("tab", { name: "Jugadores" }));
     const filtered = screen.getAllByText(/^Módulo \d{2}$/).length;
     expect(filtered).toBeGreaterThan(0);
-    expect(filtered).toBeLessThan(18);
+    expect(filtered).toBeLessThan(24);
   });
 
   it("searches instantly by name and opens filters with Ctrl+K", () => {
@@ -32,9 +32,9 @@ describe("command center", () => {
   });
 
   for (const locale of ["es", "en", "pt"] as const) {
-    it(`renders all eighteen stations in ${locale}`, () => {
+    it(`renders all twenty-four stations in ${locale}`, () => {
       render(<VolleyOSHub locale={locale} />);
-      expect(screen.getAllByText(/^(Módulo|Module) \d{2}$/)).toHaveLength(18);
+      expect(screen.getAllByText(/^(Módulo|Module) \d{2}$/)).toHaveLength(24);
     });
   }
 
