@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "VolleyOS Global API",
-    "description": "12 volleyball engines: biomechanics, rotations, scouting, scoreboards, tournaments, pickup, OBS overlay, pocket VAR, beach, volleycards, tempo and ACWR. Decimal-only maths, no telemetry.",
+    "description": "18 volleyball engines: biomechanics, rotations, scouting, scoreboards, tournaments, pickup, OBS overlay, pocket VAR, beach, volleycards, tempo, ACWR, block shadow, seams, setter IQ, lineup slips, integrity seals and offline capsules. Decimal-only maths, no telemetry.",
     "contact": {
       "name": "VolleyOS Global",
       "url": "https://github.com/v0idbrn/VoleyOS"
@@ -11,7 +11,7 @@
       "name": "AGPL-3.0-or-later",
       "url": "https://www.gnu.org/licenses/agpl-3.0.html"
     },
-    "version": "1.0.0"
+    "version": "2.0.0"
   },
   "paths": {
     "/api/v1/catalog/modules": {
@@ -195,6 +195,46 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Create Api V1 Jobs Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/security/verify-seal": {
+      "post": {
+        "summary": "Security Verify Seal",
+        "operationId": "security_verify_seal_api_v1_security_verify_seal_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifySealRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Security Verify Seal Api V1 Security Verify Seal Post"
                 }
               }
             }
@@ -465,8 +505,7 @@
           "summary": {
             "additionalProperties": true,
             "type": "object",
-            "title": "Summary",
-            "default": {}
+            "title": "Summary"
           },
           "rows": {
             "items": {
@@ -474,10 +513,10 @@
               "type": "object"
             },
             "type": "array",
-            "title": "Rows",
-            "default": []
+            "title": "Rows"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "module",
@@ -524,6 +563,46 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VerifySealRequest": {
+        "properties": {
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "seal": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 9,
+            "title": "Seal"
+          },
+          "action": {
+            "type": "string",
+            "const": "verify",
+            "title": "Action",
+            "default": "verify"
+          },
+          "original": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "payload",
+          "seal"
+        ],
+        "title": "VerifySealRequest"
       }
     }
   }

@@ -31,6 +31,13 @@ describe("command center", () => {
     expect(screen.getAllByText(/^Módulo \d{2}$/)).toHaveLength(1);
   });
 
+  for (const locale of ["es", "en", "pt"] as const) {
+    it(`renders all eighteen stations in ${locale}`, () => {
+      render(<VolleyOSHub locale={locale} />);
+      expect(screen.getAllByText(/^(Módulo|Module) \d{2}$/)).toHaveLength(18);
+    });
+  }
+
   it("saves a station report into the local vault", () => {
     render(<VolleyOSHub locale="es" />);
     const saveButtons = screen.getAllByRole("button", { name: "Guardar reporte" });

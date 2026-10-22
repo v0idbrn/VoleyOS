@@ -1,0 +1,6 @@
+v2.0.0
+• Seis módulos nuevos: Sombra de Bloqueo, Radar de Costuras, Setter IQ, Boleta FIVB I-VI, Sello de Integridad y Cápsula .volleyos.
+• Escudo de seguridad: saneamiento de entradas, protección contra inyección de fórmulas, tope de 256 KiB, límite de peticiones y cabeceras CSP.
+• Interfaz, SEO y páginas legales completos en español, inglés y portugués.
+• Búsqueda instantánea de módulos con Ctrl+K y nuevos filtros por rol.
+• README, política de seguridad y guía de contribución trilingües.

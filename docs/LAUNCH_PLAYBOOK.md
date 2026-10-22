@@ -1,4 +1,4 @@
-# Launch Playbook - VolleyOS Global v1.0.0
+# Launch Playbook - VolleyOS Global v2.0.0
 
 Everything below assumes the repository root and a clean `main` branch.
 
@@ -19,7 +19,7 @@ cd ..
 python scripts\e2e_check.py   # requires both servers running
 ```
 
-Expected: 202 backend tests, 25 frontend tests, 140 static pages, 22/22 E2E.
+Expected: 232 backend tests, 35 frontend tests, 158 static routes, 27/27 E2E.
 Docker was not built on the dev machine (daemon stopped). Before publishing:
 
 ```bash
@@ -40,8 +40,10 @@ docker build -f backend/Dockerfile -t volleyos-api .
 docker run -p 8000:8000 -e PAYMENT_WEBHOOK_SECRET=<secret> volleyos-api
 ```
 
-Set `PAYMENT_WEBHOOK_SECRET` to a random 32+ byte value. Never reuse the dev
-default in production. The API is stateless except for the in-memory job store:
+Set `PAYMENT_WEBHOOK_SECRET` and `INTEGRITY_SEAL_SECRET` to random 32+ byte
+values. Never reuse the dev defaults in production. The API enforces a 256 KiB
+body cap and 120 mutations/minute/IP; tune `VOLLEYOS_RATE_LIMIT` only with a
+reverse proxy that forwards the real client IP. The API is stateless except for the in-memory job store:
 restarting it deletes unpaid and paid jobs. Add Redis/SQLite before relying on
 long-lived downloads.
 

@@ -1,10 +1,15 @@
 # VolleyOS Global
 
-The volleyball operating system: 12 modules for players, coaches, referees,
+**English** | [Español](README.es.md) | [Português](README.pt.md)
+
+The volleyball operating system: 18 modules for players, coaches, referees,
 organisers and clubs. Offline-first FOSS (F-Droid ready) + optional Cloud Pro.
 
 - Backend: Python 3.13+ / FastAPI / Pydantic v2 / Decimal-only maths.
 - Frontend: Next.js App Router / TypeScript strict / Tailwind / Zod.
+- Security: CSP, rate limiting, 256 KiB body cap, XSS and formula-injection
+  sanitisation, HMAC-SHA256 integrity seals.
+- Locales: Spanish, English and Portuguese (UI, SEO and legal pages).
 - Licence: AGPL-3.0-or-later. No telemetry. No proprietary SDKs.
 
 ## Quick start
@@ -41,15 +46,26 @@ docker compose up --build
 | 10 | VolleyCard + hexagon radar | `volleycard` |
 | 11 | Attack tempo trainer | `tempo` |
 | 12 | ACWR jump-load monitor | `acwr` |
+| 13 | Block shadow and defensive coverage | `block-shadow` |
+| 14 | Reception seam radar and ownership | `seam-radar` |
+| 15 | Setter distribution unpredictability | `setter-iq` |
+| 16 | FIVB lineup slip I-VI with libero window | `lineup-slip` |
+| 17 | HMAC-SHA256 integrity seal | `integrity-seal` |
+| 18 | Portable `.volleyos` capsule | `capsule-io` |
 
 ## API surface
 
-- `GET /api/v1/health/deep` - 12-engine health.
+- `GET /api/v1/health/deep` - 18-engine health and version.
 - `GET /api/v1/catalog/modules` - modules, samples and pricing.
 - `POST /api/v1/modules/{slug}/run` and `/demo` - run an engine.
+- `POST /api/v1/security/verify-seal` - verify a signed match sheet.
 - `POST /api/v1/jobs` -> `GET /jobs/{id}/preview` -> signed payment webhook ->
   `GET /jobs/{id}/download?format=xlsx|csv` (402 until paid).
 - `DELETE /api/v1/jobs/{id}` - destroy data and return a signed UTC receipt.
+
+Every API response carries `no-store`, `nosniff`, `SAMEORIGIN`, `no-referrer`
+and a strict Permissions-Policy. Mutating requests are capped at 256 KiB and
+120 per minute per IP.
 
 ## Development gates
 
@@ -67,8 +83,12 @@ cd frontend && npm run typecheck && npm run test && npm run build
 - `docs/LAUNCH_PLAYBOOK.md` - deploy, domain, payments, rollback.
 - `docs/FDROID_SUBMISSION_GUIDE.md` - offline Android distribution.
 - `docs/openapi.json` - generated API contract.
+- `SECURITY.md` - vulnerability disclosure and threat model.
+- `CONTRIBUTING.md` - local setup, style and pull-request gates.
 
 ## Status
 
-v1.0.0: 202 backend tests, 25 frontend tests, 140 static pages, 22/22 live E2E.
+v2.0.0: 18 modules, 18 engine tests, trilingual UI and docs, live E2E for
+modules, security, paywall and header policy.
+
 Cloud export uses an HMAC webhook; wire a checkout provider before charging.

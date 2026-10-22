@@ -1,0 +1,6 @@
+v2.0.0
+• Six new modules: Block Shadow, Seam Radar, Setter IQ, FIVB Lineup Slip, Integrity Seal and .volleyos Capsule.
+• Security shield: input sanitisation, formula-injection protection, 256 KiB body cap, rate limiting and CSP headers.
+• Full Spanish, English and Portuguese UI, SEO and legal pages.
+• Instant Ctrl+K module search and new role filters.
+• Trilingual README, security policy and contribution guide.

@@ -1,4 +1,4 @@
-VolleyOS é o sistema operacional offline-first do vôlei. Doze módulos que funcionam em um ginásio sem sinal, no celular, tablet ou notebook.
+VolleyOS é o sistema operacional offline-first do vôlei. Dezoito módulos que funcionam em um ginásio sem sinal, no celular, tablet ou notebook.
 
 O QUE INCLUI
 • Laboratório 5 Fotogramas: meça salto e mecânica de ataque com física, não com achismo.
@@ -13,12 +13,19 @@ O QUE INCLUI
 • Volleycards: radar hexagonal com alcance de ataque e bloqueio.
 • Tempo de Ataque: janelas de 1º, 2º, pipe e 3º tempo em milissegundos.
 • Monitor ACWR: carga aguda:crônica de saltos com zonas de fadiga e risco.
+• Sombra de Bloqueio: cone de sombra, expulsão de defensores e cobertura da quadra.
+• Radar de Costuras: dono da costura, prioridade e drill para fechar o vão.
+• Setter IQ: distribuição R1-R6, imprevisibilidade 0-100 e viés por qualidade de passe.
+• Boleta FIVB I-VI: pares a três posições e janelas exatas do líbero.
+• Selo de Integridade: HMAC-SHA256 sobre JSON canônico para detectar súmulas alteradas.
+• Cápsula .volleyos: exporte e importe quadros, elencos e torneios com checksum SHA-256.
 
 FEITO PARA QUADRAS REAIS
 • 100% offline. Sem contas, sem anúncios, sem telemetria.
 • Espanhol, inglês e português.
 • Cofre efêmero: relatórios ficam no armazenamento local e são destruídos com um toque, com recibo UTC.
 • Exports Excel com nota de auditoria em cada cálculo.
+• Escudo de segurança: saneamento de entradas, proteção contra injeção de fórmulas, teto de 256 KiB e limite de requisições na API.
 • Software livre AGPL-3.0-or-later. Sem SDKs proprietários.
 
 CLOUD PRO (OPCIONAL)

@@ -1,4 +1,4 @@
-VolleyOS es el sistema operativo offline-first del vóley. Doce módulos que funcionan en un gimnasio sin señal, en celular, tablet o notebook.
+VolleyOS es el sistema operativo offline-first del vóley. Dieciocho módulos que funcionan en un gimnasio sin señal, en celular, tablet o notebook.
 
 QUÉ INCLUYE
 • Laboratorio 5 Fotogramas: medí salto y mecánica de remate con física, no con intuición.
@@ -11,14 +11,21 @@ QUÉ INCLUYE
 • VAR de Bolsillo: chequeos de reglas en lenguaje claro con citas FIVB y sorteo inicial.
 • Playa: puntuación 21/15, cambios de lado cada 7/5 puntos y control de saque.
 • Volleycards: radar hexagonal con alcance de remate y bloqueo.
-• Tempo de Ataque: ventanas de 1° tiempo, 2°, pipe y 3° en milisegundos.
+• Tempo de Ataque: ventanas de 1er tiempo, 2do, pipe y 3er en milisegundos.
 • Monitor ACWR: carga aguda:crónica de saltos con zonas de fatiga y riesgo.
+• Sombra de Bloqueo: cono de sombra, expulsión de defensores y cobertura de cancha.
+• Radar de Costuras: dueño de la costura, prioridad y drill para cerrar el hueco.
+• Setter IQ: distribución R1-R6, imprevisibilidad 0-100 y sesgo por calidad de pase.
+• Boleta FIVB I-VI: pares a tres posiciones y ventanas exactas del líbero.
+• Sello de Integridad: HMAC-SHA256 sobre JSON canónico para detectar actas alteradas.
+• Cápsula .volleyos: exportá e importá pizarras, planteles y torneos con checksum SHA-256.
 
 HECHO PARA CANCHAS REALES
 • 100% offline. Sin cuentas, sin publicidad, sin telemetría.
 • Español, inglés y portugués.
 • Bóveda efímera: los reportes quedan en tu almacenamiento local y se destruyen con un toque, con recibo UTC.
 • Exportes Excel con nota de auditoría en cada cálculo.
+• Escudo de seguridad: saneamiento de entradas, protección contra inyección de fórmulas, tope de 256 KiB y límite de peticiones en la API.
 • Software libre AGPL-3.0-or-later. Sin SDKs propietarios.
 
 CLOUD PRO (OPCIONAL)

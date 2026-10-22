@@ -93,7 +93,7 @@ function StationShell({
       <header className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-crimson">
-            Módulo {meta.number.toString().padStart(2, "0")}
+            {t(locale, "Módulo", "Module", "Módulo")} {meta.number.toString().padStart(2, "0")}
           </p>
           <h3 className="mt-1 text-lg font-bold leading-tight text-white">
             <span aria-hidden className="mr-2">{meta.icon}</span>
@@ -169,11 +169,11 @@ export function BiomechanicsStation({ meta, locale, onSave }: StationProps) {
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <label className="text-xs">
-          <span className={LABEL}>Takeoff (ms)</span>
+          <span className={LABEL}>{t(locale, "Despegue (ms)", "Takeoff (ms)", "Decolagem (ms)")}</span>
           <input className={INPUT} type="number" min={0} value={takeoff} onChange={(event) => setTakeoff(Number(event.target.value))} />
         </label>
         <label className="text-xs">
-          <span className={LABEL}>Landing (ms)</span>
+          <span className={LABEL}>{t(locale, "Aterrizaje (ms)", "Landing (ms)", "Aterrissagem (ms)")}</span>
           <input className={INPUT} type="number" min={0} value={landing} onChange={(event) => setLanding(Number(event.target.value))} />
         </label>
       </div>
@@ -225,7 +225,7 @@ export function RotationStation({ meta, locale, onSave }: StationProps) {
       }}
     >
       <div className="flex items-center gap-2">
-        <span className={LABEL}>Rotación</span>
+        <span className={LABEL}>{t(locale, "Rotación", "Rotation", "Rotação")}</span>
         {[1, 2, 3, 4, 5, 6].map((value) => (
           <button
             key={value}
@@ -239,7 +239,7 @@ export function RotationStation({ meta, locale, onSave }: StationProps) {
           </button>
         ))}
       </div>
-      <svg viewBox="0 0 900 700" className="mt-2 w-full rounded-xl border border-white/10 bg-[#0b1a13]" role="img" aria-label="Cancha 9x9 con posiciones 5-1">
+      <svg viewBox="0 0 900 700" className="mt-2 w-full rounded-xl border border-white/10 bg-[#0b1a13]" role="img" aria-label={t(locale, "Cancha 9x9 con posiciones 5-1", "9x9 court with 5-1 positions", "Quadra 9x9 com posições 5-1")}>
         <rect x="0" y="0" width="900" height="700" fill="#0b1a13" />
         <line x1="0" y1="4" x2="900" y2="4" stroke="#F59E0B" strokeWidth="5" />
         <line x1="0" y1="300" x2="900" y2="300" stroke="#F59E0B" strokeDasharray="12 10" strokeWidth="3" />
@@ -389,7 +389,7 @@ export function TournamentStation({ meta, locale, onSave }: StationProps) {
           <thead className="text-white/40">
             <tr>
               <th className="py-1">#</th>
-              <th>Equipo</th>
+                <th>{t(locale, "Equipo", "Team", "Equipe")}</th>
               <th className="text-right">Pts</th>
               <th className="text-right">Sets</th>
               <th className="text-right">Ratio</th>
@@ -442,7 +442,7 @@ export function PickupStation({ meta, locale, onSave }: StationProps) {
         Delta: <strong className={result.delta <= 0.15 ? "text-emerald" : "text-volt"}>{result.delta.toFixed(2)}</strong>
         {result.balanced ? t(locale, " · equipos parejos", " · balanced", " · times parelhos") : t(locale, " · ajuste mínimo posible", " · minimal possible gap", " · ajuste mínimo possível")}
       </p>
-      <p className="mt-1 text-[10px] text-white/40">Rey de la Cancha: Tiburones → Cóndores → Panteras</p>
+        <p className="mt-1 text-[10px] text-white/40">{t(locale, "Rey de la Cancha", "King of the Court", "Rei da Quadra")}: Tiburones → Cóndores → Panteras</p>
     </StationShell>
   );
 }
@@ -474,7 +474,7 @@ export function OverlayStation({ meta, locale, onSave }: StationProps) {
         </div>
       </div>
       <div className="mt-2 flex items-center justify-between gap-2">
-        <p className="text-[10px] text-white/50">Saque #{overlay.serverNumber} · racha {overlay.streak}</p>
+          <p className="text-[10px] text-white/50">{t(locale, "Saque", "Serve", "Saque")} #{overlay.serverNumber} · {t(locale, "racha", "streak", "sequência")} {overlay.streak}</p>
         <a className={BTN} href="/overlay/tv" target="_blank" rel="noreferrer">
           /overlay/tv ↗
         </a>
@@ -628,9 +628,9 @@ export function VolleycardStation({ meta, locale, onSave }: StationProps) {
   return (
     <StationShell meta={meta} locale={locale} rows={6} onSave={onSave} onExample={() => { setHeight(190); setReach(250); setJump(78); }}>
       <div className="grid grid-cols-3 gap-2">
-        <label className="text-xs"><span className={LABEL}>Altura</span><input className={INPUT} type="number" value={height} onChange={(event) => setHeight(Number(event.target.value))} /></label>
-        <label className="text-xs"><span className={LABEL}>Reach</span><input className={INPUT} type="number" value={reach} onChange={(event) => setReach(Number(event.target.value))} /></label>
-        <label className="text-xs"><span className={LABEL}>Salto</span><input className={INPUT} type="number" value={jump} onChange={(event) => setJump(Number(event.target.value))} /></label>
+          <label className="text-xs"><span className={LABEL}>{t(locale, "Altura", "Height", "Altura")}</span><input className={INPUT} type="number" value={height} onChange={(event) => setHeight(Number(event.target.value))} /></label>
+          <label className="text-xs"><span className={LABEL}>Reach</span><input className={INPUT} type="number" value={reach} onChange={(event) => setReach(Number(event.target.value))} /></label>
+          <label className="text-xs"><span className={LABEL}>{t(locale, "Salto", "Jump", "Salto")}</span><input className={INPUT} type="number" value={jump} onChange={(event) => setJump(Number(event.target.value))} /></label>
       </div>
       {card ? (
         <div className="mt-3 flex items-center gap-2">
@@ -638,8 +638,8 @@ export function VolleycardStation({ meta, locale, onSave }: StationProps) {
           <div className="min-w-0 flex-1 space-y-1">
             <p className="truncate text-xs font-bold text-volt">{card.name}</p>
             <p className="text-[10px] text-white/50">{card.archetype} · {card.rarity}</p>
-            <p className="text-[11px]">Ataque <strong className="text-crimson">{card.spikeReachCm.toFixed(1)} cm</strong></p>
-            <p className="text-[11px]">Bloqueo <strong className="text-emerald">{card.blockReachCm.toFixed(1)} cm</strong></p>
+          <p className="text-[11px]">{t(locale, "Ataque", "Attack", "Ataque")} <strong className="text-crimson">{card.spikeReachCm.toFixed(1)} cm</strong></p>
+          <p className="text-[11px]">{t(locale, "Bloqueo", "Block", "Bloqueio")} <strong className="text-emerald">{card.blockReachCm.toFixed(1)} cm</strong></p>
           </div>
         </div>
       ) : (
@@ -669,7 +669,7 @@ export function TempoStation({ meta, locale, onSave }: StationProps) {
       <p className="mt-2 text-[11px] text-white/60">{window.description}</p>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <Metric label="Ideal" value={`${window.idealMs} ms`} tone="text-volt" />
-        <Metric label="Ventana" value={`${window.startMs} / ${window.endMs}`} />
+        <Metric label={t(locale, "Ventana", "Window", "Janela")} value={`${window.startMs} / ${window.endMs}`} />
       </div>
       <label className="mt-2 block text-xs">
         <span className={LABEL}>Offset: {offset} ms</span>
@@ -696,7 +696,7 @@ export function AcwrStation({ meta, locale, onSave }: StationProps) {
   return (
     <StationShell meta={meta} locale={locale} rows={28} onSave={onSave} onExample={() => setLoad(185)}>
       <div className="flex items-center gap-2">
-        {[{ label: "Suave", value: 110 }, { label: "Carga", value: 150 }, { label: "Alta", value: 185 }].map((option) => (
+        {[{ label: t(locale, "Suave", "Light", "Leve"), value: 110 }, { label: t(locale, "Carga", "Load", "Carga"), value: 150 }, { label: t(locale, "Alta", "High", "Alta"), value: 185 }].map((option) => (
           <button key={option.value} type="button" onClick={() => setLoad(option.value)} className={`rounded-lg border px-2 py-1 text-[10px] font-bold ${load === option.value ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>
             {option.label}
           </button>
@@ -704,7 +704,7 @@ export function AcwrStation({ meta, locale, onSave }: StationProps) {
       </div>
       <div className="mt-2 grid grid-cols-3 gap-2">
         <Metric label="Aguda 7d" value={String(report.acute)} />
-        <Metric label="Crónica" value={report.chronicWeekly.toFixed(1)} />
+        <Metric label={t(locale, "Crónica", "Chronic", "Crônica")} value={report.chronicWeekly.toFixed(1)} />
         <Metric label="ACWR" value={report.ratio.toFixed(2)} tone={tone} />
       </div>
       <div className={`mt-2 rounded-lg ${bg} px-2 py-1 text-center text-[11px] font-black text-obsidian`}>{report.zone}</div>

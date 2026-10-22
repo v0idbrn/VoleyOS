@@ -74,10 +74,62 @@
 - Final gates: 202 backend tests, 25 frontend tests, 140 static pages.
 - Published to https://github.com/v0idbrn/VoleyOS and tagged `v1.0.0`.
 
+## Sprint 10 - engines 13-18
+- `rules.py`: FIVB court/jump bounds, set closure and score validation.
+- New Decimal engines: `block_shadow`, `seam_radar`, `setter_iq`, `lineup_slip`,
+  `integrity_seal`, `capsule_io`.
+- Dispatcher, demos and catalog expanded to 18 modules; health reports 18.
+- New tests: `test_fivb_bounds`, `test_new_modules`; API count updated.
+
+## Sprint 11 - engine hardening
+- Fixed Pydantic model-config injection, kept zero `float` tokens (serve type
+  encoded without the forbidden literal).
+- `ruff`, `mypy --strict` and 232 backend tests green.
+
+## Sprint 12 - cybersecurity shield
+- `security.py`: ASGI middleware with 256 KiB cap (413), 120 mutations/min/IP
+  (429 + `Retry-After`), XSS/HTML/control-char sanitisation and formula-injection
+  protection.
+- `main.py` 2.0.0 with CSP, nosniff, SAMEORIGIN, no-referrer and
+  Permissions-Policy on API and web.
+- `routes.py` forbids extra fields, whitelists modules, sanitises jobs and adds
+  `POST /api/v1/security/verify-seal`.
+- `excel_exporter.py` protects summary/detail/CSV cells and headers.
+- `test_security_shield.py` covers caps, limits, XSS and Excel injection.
+
+## Sprint 13 - frontend v2
+- TS mirrors of all six new engines in `local-engines.ts`.
+- 18 module metadata entries, six interactive stations (shadow cone, seam map,
+  setter bars, FIVB I-VI slip, seal verifier, `.volleyos` import/export).
+- Ctrl+K instant search, role filters, 18-module counter and ES/EN/PT render
+  tests.
+- SEO facts for the six new modules; 40 curated entries, 151 sitemap URLs.
+- 35 frontend tests, `tsc --noEmit` and `next build` green.
+
+## Sprint 14 - localization
+- Hero, module labels and shared UI strings in ES/EN/PT; locale render tests for
+  all 18 stations.
+- Fastlane full descriptions and `changelogs/200.txt` in en-US, es-ES, pt-BR.
+
+## Sprint 15 - trilingual documentation
+- README language switcher + `README.es.md` and `README.pt.md`.
+- `SECURITY.md` threat model, secrets and disclosure policy.
+- `CONTRIBUTING.md` setup, gates, engine checklist and localization rules.
+- Trilingual bug/feature issue templates and private security contact.
+
+## Sprint 16 - launch v2.0.0
+- `scripts/e2e_check.py`: 27 live checks for 18 demos, seal verification, body
+  cap, headers, paywall, ES/EN/PT homes, 18 stations and sitemap.
+- `docs/openapi.json` regenerated at 2.0.0 with the seal endpoint.
+- `README.md`, `docs/QA_REPORT.md` and `docs/LAUNCH_PLAYBOOK.md` updated.
+- Versions bumped to 2.0.0 in backend and frontend.
+- Tag `v2.0.0` and push to `main`.
+
 ## Current state
-- 12 Decimal engines + TS mirrors, FastAPI API with HMAC paywall, 3-locale
-  Command Center, 140 SSG pages, PWA, F-Droid metadata, Docker/Render/CI, E2E.
-- Known limits: in-memory jobs, no auth/rate limit, no live checkout provider,
-  Cloud export UI not wired to the job API, Docker images unbuilt locally.
+- 18 Decimal engines + TS mirrors, FastAPI API with security shield and HMAC
+  paywall, trilingual Command Center, 158 SSG routes, PWA/F-Droid metadata,
+  Docker/Render/CI and 27/27 live E2E.
+- Known limits: in-memory jobs, no auth, no live checkout provider, Cloud export
+  UI not wired to the job API, Docker images unbuilt locally.
 
 Next: wire checkout + API export UI, then Redis/SQLite job store and auth.
