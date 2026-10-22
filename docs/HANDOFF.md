@@ -33,4 +33,12 @@ Next: Sprint 4 (frontend + offline engine).
 - 19 vitest tests green; `tsc --noEmit`, `next build` (SSG es/en/pt) pass; 0 `: any`.
 - Root `/` renders the Spanish hub with canonical to `/es` (redirect() broke SSG).
 
-Next: Sprint 5 (legal pages per locale).
+Next: Sprint 6 (F-Droid, PWA, store metadata).
+
+## Sprint 5 ? legal pages
+- `/es|en|pt/legal/{terms,privacy,disclaimer,trademarks}` (12 SSG routes).
+- Content covers AGPL, HMAC paywall, ephemeral vault, Cloud data retention,
+  FIVB/VAR/health disclaimers and third-party trademark attribution.
+- 21 vitest tests green; `next build` generates 20 static pages.
+
+Next: Sprint 6 (F-Droid, PWA, store metadata).

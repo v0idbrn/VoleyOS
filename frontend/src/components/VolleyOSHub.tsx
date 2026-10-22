@@ -222,6 +222,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
             <a className="hover:text-volt" href={`/${locale}/legal/privacy`}>{t(locale, "Privacidad", "Privacy", "Privacidade")}</a>
             <a className="hover:text-volt" href={`/${locale}/legal/terms`}>{t(locale, "Términos", "Terms", "Termos")}</a>
             <a className="hover:text-volt" href={`/${locale}/legal/disclaimer`}>{t(locale, "Aviso", "Disclaimer", "Aviso")}</a>
+            <a className="hover:text-volt" href={`/${locale}/legal/trademarks`}>{t(locale, "Marcas", "Trademarks", "Marcas")}</a>
           </p>
         </div>
       </footer>
