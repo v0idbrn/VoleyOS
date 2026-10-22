@@ -1,0 +1,6 @@
+v4.0.0
+• Seis módulos nuevos: Pizarra de tiempo muerto, Coach de momentum, Draft de capitanes, Pase de plantilla, Inspector de equipo y Póster de partido.
+• Deshacer/rehacer en el marcador con historial de 50 estados y atajos A/L/Z/W/B/C.
+• Pósters SVG trilingües con temas, matriz de salas y sello HMAC.
+• Grilla de perfiles rebalanceada a cinco módulos por jugador, DT, cancha, torneo, árbitro y tribuna.
+• 30 módulos replicados offline en TypeScript con 51 pruebas frontend.

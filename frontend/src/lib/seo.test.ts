@@ -21,9 +21,9 @@ describe("seo content", () => {
     }
   });
 
-  it("ships 138 localized seo urls plus legal and homes", () => {
+  it("ships 156 localized seo urls plus legal and homes", () => {
     const items = SEO_SECTIONS.reduce((sum, section) => sum + SEO_ITEMS[section].length, 0);
-    expect(items).toBe(46);
+    expect(items).toBe(52);
     const urls = sitemap();
     expect(urls).toHaveLength(1 + LOCALES.length * (1 + LEGAL_DOCS.length + SEO_SECTIONS.length + items));
     expect(urls.some((entry) => entry.url.endsWith("/es/tools/jump-calculator/"))).toBe(true);

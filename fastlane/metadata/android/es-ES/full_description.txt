@@ -1,10 +1,10 @@
-VolleyOS es el sistema operativo offline-first del vóley. Veinticuatro módulos que funcionan en un gimnasio sin señal, en celular, tablet o notebook.
+VolleyOS es el sistema operativo offline-first del vóley. Treinta módulos que funcionan en un gimnasio sin señal, en celular, tablet o notebook.
 
 QUÉ INCLUYE
 • Laboratorio 5 Fotogramas: medí salto y mecánica de remate con física, no con intuición.
 • Pizarra 5-1: validá cada rotación R1-R6 contra la regla FIVB de solapamiento al golpe de saque.
 • Scouting en 3 Clics: escribí o dictá la jugada y obtené side-out por rotación y mapa de calor 3x3.
-• Marcador en Vivo: puntos indoor con rotación automática y lógica de sets y partido.
+• Marcador en Vivo: puntos indoor con rotación automática, lógica de sets y partido, deshacer/rehacer y atajos.
 • Torneo: tablas con puntos 3-2-1-0 y coeficientes de sets y tantos.
 • Armado de Equipos: equipos parejos con un armador cada uno y cola de rey de la cancha.
 • Overlay OBS: fuente de navegador transparente con banners de set point y match point.
@@ -25,6 +25,12 @@ QUÉ INCLUYE
 • Compañero de tribuna: ocho gestos arbitrales y trivia con rangos.
 • Señas del armador: siete gestos, seis jugadas y detección de colisiones.
 • Premios MVP: MVP, Muro, Candado, Francotirador, Albañil y Sangre Fría sellados.
+• Pizarra de tiempo muerto: reloj FIVB de 30 s, dos consignas y cancha de 9x18 m.
+• Coach de momentum: ventanas de seis rallies con llamados por racha o estancamiento.
+• Draft de capitanes: orden serpentina A-B-B-A, 2-4 capitanes y auditoría por departamento.
+• Pase de plantilla: 6-14 jugadores, hasta dos líberos, dorsales únicos y control de capitán.
+• Inspector de equipo: alturas FIVB de red, tolerancia por lado, presión indoor/playa y apilado de balones.
+• Póster de partido: SVG escapado en 1080x1920 y 1080x1080 con temas y sello HMAC.
 • Salas en vivo: persistencia SQLite WAL, token de administración y lectura pública.
 
 HECHO PARA CANCHAS REALES

@@ -1,0 +1,6 @@
+v4.0.0
+• Six new modules: Timeout Chalkboard, Momentum Coach, Captain Draft, Roster Pass, Equipment Inspector and Match Poster.
+• Scoreboard undo/redo with a 50-state history and A/L/Z/W/B/C hotkeys.
+• Trilingual SVG match posters with themes, room matrix and HMAC seal.
+• Profile grid rebalanced to five modules each across players, coaches, court, tournaments, referees and fans.
+• 30 modules mirrored offline in TypeScript with 51 frontend tests.

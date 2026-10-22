@@ -148,10 +148,26 @@
   trilingual `/[locale]/live/[roomId]` viewer with public polling.
 - E2E: live room lifecycle, 24 demos, 24 rendered stations, 169 sitemap URLs.
 
+## Sprint 19 - engines 25-30 and pro arena UX
+- New Decimal engines: `timeout_chalkboard` (30 s FIVB timer, two cues, 9x18 m
+  strokes), `momentum_coach` (6-rally window, timeout calls), `captain_draft`
+  (snake A-B-B-A, 2-4 captains, department audit), `roster_pass` (6-14 players,
+  two liberos, unique 1-99, captain != libero), `equipment_inspector` (FIVB net
+  heights +/-2 cm, indoor/beach pressure, 21 cm ball stacking), `match_poster`
+  (escaped 1080x1920 and 1080x1080 SVG, themes, HMAC seal).
+- Dispatcher, demos, catalog and health expanded to 30; profiles rebalanced to
+  five modules each across players, coaches, court, tournaments, referees and
+  fans. Versions bumped to 4.0.0.
+- Six TypeScript mirrors, 51 frontend tests, 30 hub stations and metadata
+  entries, six station UIs and 52 SEO entries (187 sitemap URLs).
+- Scoreboard: 50-state undo/redo history, A/L/Z/W/B/C hotkeys, high-contrast
+  toggle persisted locally.
+- E2E: 30 demos, 30 rendered stations, live room lifecycle and 32/32 checks.
+
 ## Current state
-- 24 Decimal engines + TS mirrors, FastAPI API with security shield, HMAC
-  paywall and SQLite WAL live rooms, trilingual Command Center, 176 routes,
-  PWA/F-Droid metadata, Docker/Render/CI and 32/32 live E2E.
+- 30 Decimal engines + TS mirrors, FastAPI API with security shield, HMAC
+  paywall and SQLite WAL live rooms, trilingual Command Center, 194 static
+  pages, PWA/F-Droid metadata, Docker/Render/CI and 32/32 live E2E.
 - Known limits: no user auth, no live checkout provider, Cloud export UI not
   wired to the job API, Docker images unbuilt locally, live rooms poll every 5 s.
 

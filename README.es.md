@@ -2,7 +2,7 @@
 
 [English](README.md) | **Español** | [Português](README.pt.md)
 
-El sistema operativo del vóley: 24 módulos para jugadores, entrenadores,
+El sistema operativo del vóley: 30 módulos para jugadores, entrenadores,
 árbitros, tribuna, organizadores y clubes. FOSS offline-first (listo para
 F-Droid) + Cloud Pro opcional, con salas en vivo persistentes.
 
@@ -59,10 +59,16 @@ docker compose up --build
 | 22 | Compañero de tribuna + trivia arbitral | `fan-companion` |
 | 23 | Señas del armador con colisiones | `setter-signals` |
 | 24 | Premios MVP, Muro, Candado y Sangre Fría | `mvp-awards` |
+| 25 | Pizarra de tiempo muerto + reloj FIVB de 30 s | `timeout-chalkboard` |
+| 26 | Coach de momentum con ventanas de 6 rallies | `momentum-coach` |
+| 27 | Draft serpentina de capitanes + auditoría | `captain-draft` |
+| 28 | Pase de plantilla + control de líbero y capitán | `roster-pass` |
+| 29 | Inspector de equipo + tolerancias de red y balón | `equipment-inspector` |
+| 30 | Póster SVG 1080x1920 / 1080x1080 | `match-poster` |
 
 ## Superficie de API
 
-- `GET /api/v1/health/deep` - salud de los 24 motores y versión.
+- `GET /api/v1/health/deep` - salud de los 30 motores y versión.
 - `GET /api/v1/catalog/modules` - módulos, ejemplos, perfiles y precios.
 - `POST /api/v1/modules/{slug}/run` y `/demo` - ejecutar un motor.
 - `POST /api/v1/security/verify-seal` - verificar un acta firmada.
@@ -97,9 +103,11 @@ cd frontend && npm run typecheck && npm run test && npm run build
 
 ## Estado
 
-v3.0.0: 24 módulos, 289 pruebas backend, salas en vivo SQLite WAL, seis perfiles
-de rol, silbato de árbitro, alto contraste, UI y documentación trilingüe, y E2E
-en vivo para módulos, salas, seguridad, paywall y cabeceras.
+v4.0.0: 30 módulos, 331 pruebas backend, 51 pruebas frontend, salas en vivo
+SQLite WAL, seis perfiles de rol, deshacer/rehacer y atajos en el marcador,
+pizarra de tiempo muerto, draft serpentina, control de equipamiento, pósters SVG,
+UI y documentación trilingüe, y E2E en vivo para módulos, salas, seguridad,
+paywall y cabeceras.
 
 La exportación Cloud usa un webhook HMAC; conecta un proveedor de checkout antes
 de cobrar.

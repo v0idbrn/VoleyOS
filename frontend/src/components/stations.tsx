@@ -9,13 +9,18 @@ import {
   REFEREE_GESTURES,
   TEMPO_SPECS,
   analyseFiveFrames,
+  analyzeMomentum,
   awardBeachPoint,
   awardIndoorPoint,
   awardMvp,
   balanceTeams,
   beachSwitchInterval,
+  buildChalkboard,
   buildLineupSlip,
+  buildMatchPoster,
+  buildRosterPass,
   buildSeal,
+  commitScoreboard,
   buildSignalSheet,
   buildVolleyCard,
   classifyTiming,
@@ -28,17 +33,22 @@ import {
   fanReport,
   heatmap,
   importCapsule,
+  inspectEquipment,
   jumpLoad,
   newBeach,
   newScoreboard,
+  newScoreboardHistory,
   overlayFromScoreboard,
   parsePlay,
   refereeReport,
+  redoScoreboard,
   scoutingReport,
+  snakeDraft,
   splitCosts,
   standings,
   tempoWindow,
   trackSubstitutions,
+  undoScoreboard,
   validateOverlap,
   verifySeal,
   verticalJumpCm,
@@ -46,14 +56,19 @@ import {
   type Axis,
   type BlockScheme,
   type CardKind,
+  type ChalkReason,
   type DailyJumps,
+  type DraftPlayer,
+  type EquipmentCategory,
   type HeatCell,
   type JsonValue,
   type LineupNumbers,
   type Locale,
   type MvpPlayer,
+  type PosterTheme,
   type RefereeEvent,
   type RefereeGesture,
+  type RosterPlayerInput,
   type SeamFormation,
   type ServeType,
   type SetDistribution,
@@ -330,13 +345,14 @@ export function ScoutingStation({ meta, locale, onSave }: StationProps) {
 /* 4 ---------------------------------------------------------------------- */
 
 export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
-  const [state, setState] = useState(() => newScoreboard("Tiburones", "Cóndores", 3));
+  const [history, setHistory] = useState(() => newScoreboardHistory(newScoreboard("Tiburones", "Cóndores", 3)));
   const [message, setMessage] = useState(t(locale, "Elegí un equipo para sumar.", "Pick a team to score.", "Escolha um time para pontuar."));
+  const state = history.present;
 
   const point = (team: "A" | "B"): void => {
     try {
       const result = awardIndoorPoint(state, team);
-      setState(result.state);
+      setHistory(commitScoreboard(history, result.state));
       setMessage(
         `${result.message}${result.rotated ? t(locale, " · rotación", " · rotation", " · rotação") : ""}${
           result.sideSwitchDue ? t(locale, " · cambio de lado", " · switch sides", " · troca de lado") : ""
@@ -347,6 +363,50 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     }
   };
 
+  const undo = (): void => {
+    setHistory((previous) => undoScoreboard(previous));
+    setMessage(t(locale, "Jugada deshecha.", "Play undone.", "Jogada desfeita."));
+  };
+
+  const redo = (): void => {
+    setHistory((previous) => redoScoreboard(previous));
+    setMessage(t(locale, "Jugada rehecha.", "Play redone.", "Jogada refeita."));
+  };
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      const target = event.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+      if (event.metaKey || event.ctrlKey || event.altKey || event.repeat) return;
+      const key = event.key.toLowerCase();
+      if (key === "a" || key === "l") {
+        event.preventDefault();
+        const team = key === "a" ? "A" : "B";
+        setHistory((previous) => {
+          const result = awardIndoorPoint(previous.present, team);
+          return commitScoreboard(previous, result.state);
+        });
+      } else if (key === "z") {
+        event.preventDefault();
+        setHistory((previous) => undoScoreboard(previous));
+      } else if (key === "w") {
+        event.preventDefault();
+        playWhistle("short");
+      } else if (key === "b") {
+        event.preventDefault();
+        playWhistle("long");
+      } else if (key === "c") {
+        event.preventDefault();
+        const next = !document.documentElement.classList.contains("high-contrast");
+        document.documentElement.classList.toggle("high-contrast", next);
+        window.localStorage.setItem("volleyos.contrast", next ? "1" : "0");
+        setMessage(t(locale, "Alto contraste alternado.", "High contrast toggled.", "Alto contraste alternado."));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [locale]);
+
   return (
     <StationShell
       meta={meta}
@@ -354,7 +414,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       rows={6}
       onSave={onSave}
       onExample={() => {
-        setState({ ...newScoreboard("Tiburones", "Cóndores", 3), scoreA: 22, scoreB: 20, setsA: 1, setsB: 1 });
+        setHistory(newScoreboardHistory({ ...newScoreboard("Tiburones", "Cóndores", 3), scoreA: 22, scoreB: 20, setsA: 1, setsB: 1 }));
         setMessage(t(locale, "Ejemplo cargado: set decisivo 22-20.", "Example loaded: decider 22-20.", "Exemplo carregado: set decisivo 22-20."));
       }}
     >
@@ -376,8 +436,19 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           </div>
         </div>
         <div className="mt-2 flex justify-center gap-2">
-          <button type="button" className={BTN_PRIMARY} onClick={() => point("A")}>+ {state.teamA}</button>
-          <button type="button" className={BTN_PRIMARY} onClick={() => point("B")}>+ {state.teamB}</button>
+          <button type="button" className={BTN_PRIMARY} onClick={() => point("A")}>+ {state.teamA} [A]</button>
+          <button type="button" className={BTN_PRIMARY} onClick={() => point("B")}>+ {state.teamB} [L]</button>
+        </div>
+        <div className="mt-2 flex flex-wrap justify-center gap-1">
+          <button type="button" className={BTN} onClick={undo} disabled={history.past.length === 0}>[Z] {t(locale, "Deshacer", "Undo", "Desfazer")} ({history.past.length})</button>
+          <button type="button" className={BTN} onClick={redo} disabled={history.future.length === 0}>[Y] {t(locale, "Rehacer", "Redo", "Refazer")}</button>
+          <button type="button" className={BTN} onClick={() => playWhistle("short")}>[W] {t(locale, "Silbato", "Whistle", "Apito")}</button>
+          <button type="button" className={BTN} onClick={() => playWhistle("long")}>[B] {t(locale, "Buzzer", "Buzzer", "Buzzer")}</button>
+          <button type="button" className={BTN} onClick={() => {
+            const next = !document.documentElement.classList.contains("high-contrast");
+            document.documentElement.classList.toggle("high-contrast", next);
+            window.localStorage.setItem("volleyos.contrast", next ? "1" : "0");
+          }}>[C] {t(locale, "Contraste", "Contrast", "Contraste")}</button>
         </div>
       </div>
       <p className="mt-2 text-[11px] text-white/60">{message}</p>
@@ -389,9 +460,11 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           </div>
         ))}
       </div>
+      <p className="mt-1 text-[9px] uppercase tracking-widest text-white/30">A/L punto · Z undo · W silbato · B buzzer · C contraste</p>
     </StationShell>
   );
 }
+
 
 /* 5 ---------------------------------------------------------------------- */
 
@@ -1586,6 +1659,266 @@ export function MvpAwardsStation({ meta, locale, onSave }: StationProps) {
   );
 }
 
+/* 25 -------------------------------------------------------------------- */
+
+const CHALK_SAMPLE = [
+  { points: [{ x: 1, y: 1 }, { x: 4, y: 6 }, { x: 6, y: 12 }] },
+  { points: [{ x: 6, y: 14 }, { x: 8, y: 17 }] },
+];
+
+export function TimeoutChalkboardStation({ meta, locale, onSave }: StationProps) {
+  const [reason, setReason] = useState<ChalkReason>("stop_serve_run");
+  const report = useMemo(
+    () => buildChalkboard({ reason, rotation: 4, scoreA: 18, scoreB: 21, strokes: CHALK_SAMPLE }),
+    [reason],
+  );
+  const reasons: Array<{ key: ChalkReason; label: string }> = [
+    { key: "stop_serve_run", label: t(locale, "Cortar saque", "Stop serve run", "Cortar saque") },
+    { key: "organize_sideout", label: t(locale, "Side-out", "Side-out", "Side-out") },
+    { key: "match_point_defense", label: t(locale, "Defensa MP", "Match point D", "Defesa MP") },
+  ];
+  return (
+    <StationShell meta={meta} locale={locale} rows={report.cues.length} onSave={onSave} onExample={() => setReason("stop_serve_run")}>
+      <div className="flex flex-wrap gap-1">
+        {reasons.map((item) => (
+          <button key={item.key} type="button" className={reason === item.key ? BTN_PRIMARY : BTN} onClick={() => setReason(item.key)}>
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 flex items-center justify-between rounded-lg bg-obsidian/60 px-3 py-2">
+        <span className="text-[10px] uppercase tracking-widest text-white/40">{t(locale, "Reloj FIVB", "FIVB clock", "Relógio FIVB")}</span>
+        <span className="font-mono text-2xl font-black text-volt">{report.seconds.toFixed(1)}s</span>
+      </div>
+      <div className="mt-2 space-y-1">
+        {report.cues.map((cue) => (
+          <div key={cue.code} className="rounded-lg border border-white/10 bg-white/5 px-2 py-1">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-crimson">{cue.priority} · {cue.code}</p>
+            <p className="text-[11px] text-white/70">{cue.text}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-1 text-[10px] text-white/40">{report.strokes.length} {t(locale, "trazos", "strokes", "traços")} · {report.totalLengthM.toFixed(2)} m</p>
+    </StationShell>
+  );
+}
+
+/* 26 -------------------------------------------------------------------- */
+
+export function MomentumCoachStation({ meta, locale, onSave }: StationProps) {
+  const [history, setHistory] = useState<Array<"A" | "B">>(["A", "A", "B", "B", "B"]);
+  const report = useMemo(
+    () => analyzeMomentum({ team: "A", history, rotations: [1, 2, 3, 3, 3].slice(0, history.length) }),
+    [history],
+  );
+  const add = (team: "A" | "B"): void => setHistory((previous) => [...previous, team].slice(-20));
+  return (
+    <StationShell meta={meta} locale={locale} rows={history.length} onSave={onSave} onExample={() => setHistory(["A", "A", "B", "B", "B"])}>
+      <div className="grid grid-cols-2 gap-2">
+        <Metric label={t(locale, "Momentum", "Momentum", "Momentum")} value={`${report.momentumIndex > 0 ? "+" : ""}${report.momentumIndex.toFixed(0)}`} tone={report.momentumIndex >= 0 ? "text-emerald" : "text-crimson"} />
+        <Metric label={t(locale, "Racha rival", "Opponent run", "Sequência rival")} value={`${report.opponentRun}`} tone={report.opponentRun >= 3 ? "text-crimson" : "text-emerald"} />
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1">
+        <button type="button" className={BTN_PRIMARY} onClick={() => add("A")}>+ A</button>
+        <button type="button" className={BTN_PRIMARY} onClick={() => add("B")}>+ B</button>
+        <button type="button" className={BTN} onClick={() => setHistory([])}>{t(locale, "Limpiar", "Clear", "Limpar")}</button>
+      </div>
+      <p className="mt-2 rounded-lg border border-white/10 bg-obsidian/60 px-2 py-2 text-[11px] text-white/70">{report.message}</p>
+      <p className="mt-1 text-[10px] text-white/40">
+        {report.recommendation} · {t(locale, "peor rotación", "worst rotation", "pior rotação")}: {report.worstRotation ?? "-"}
+      </p>
+    </StationShell>
+  );
+}
+
+/* 27 -------------------------------------------------------------------- */
+
+const DRAFT_SAMPLE: DraftPlayer[] = [
+  { name: "Sofia", role: "setter", level: 5 },
+  { name: "Valentina", role: "outside", level: 5 },
+  { name: "Micaela", role: "middle", level: 5 },
+  { name: "Carla", role: "opposite", level: 4 },
+  { name: "Renata", role: "libero", level: 4 },
+  { name: "Julieta", role: "outside", level: 4 },
+  { name: "Martina", role: "middle", level: 3 },
+  { name: "Lucia", role: "setter", level: 3 },
+  { name: "Paula", role: "outside", level: 3 },
+  { name: "Ines", role: "libero", level: 2 },
+];
+
+export function CaptainDraftStation({ meta, locale, onSave }: StationProps) {
+  const [nonce, setNonce] = useState(0);
+  const report = useMemo(
+    () => snakeDraft({ captains: ["Tiburones", "Cóndores"], players: DRAFT_SAMPLE.map((player) => ({ ...player, level: player.level - (nonce % 2) }) ) }),
+    [nonce],
+  );
+  return (
+    <StationShell meta={meta} locale={locale} rows={report.pickOrder.length} onSave={onSave} onExample={() => setNonce((value) => value + 1)}>
+      <div className="grid grid-cols-2 gap-2">
+        {report.teams.map((team) => (
+          <div key={team.captain} className="rounded-lg border border-white/10 bg-obsidian/60 p-2">
+            <p className="text-[11px] font-bold text-volt">{team.captain} · {team.averageLevel.toFixed(2)}</p>
+            <p className="text-[9px] text-white/40">{team.balanced ? t(locale, "Equilibrado", "Balanced", "Equilibrado") : `${t(locale, "Falta", "Missing", "Falta")}: ${team.weakestDepartment}`}</p>
+            <ul className="mt-1 space-y-0.5 text-[10px] text-white/70">
+              {team.players.map((player) => <li key={player.name}>{player.name} <span className="text-white/30">{player.role}</span></li>)}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[10px] text-white/50">{t(locale, "Orden", "Order", "Ordem")}: {report.pickOrder.slice(0, 8).map((pick) => `${pick.captain[0]}:${pick.player.name}`).join(" · ")}</p>
+      <p className="mt-1 text-[10px] text-emerald">{t(locale, "Mejor balance", "Best balance", "Melhor equilíbrio")}: {report.bestBalance} · {report.totalLevel} pts</p>
+    </StationShell>
+  );
+}
+
+/* 28 -------------------------------------------------------------------- */
+
+const ROSTER_SAMPLE: RosterPlayerInput[] = [
+  { name: "Sofia", number: 1, role: "setter", isCaptain: true },
+  { name: "Valentina", number: 4, role: "outside" },
+  { name: "Micaela", number: 7, role: "outside" },
+  { name: "Renata", number: 9, role: "middle" },
+  { name: "Carla", number: 11, role: "opposite" },
+  { name: "Julieta", number: 14, role: "middle" },
+  { name: "Martina", number: 21, role: "libero", isLibero: true },
+];
+
+export function RosterPassStation({ meta, locale, onSave }: StationProps) {
+  const [report, setReport] = useState<Awaited<ReturnType<typeof buildRosterPass>> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    buildRosterPass({ team: "Tiburones", tournament: "Copa Verano", players: ROSTER_SAMPLE })
+      .then((result) => { if (alive) { setReport(result); setError(null); } })
+      .catch(() => { if (alive) setError(t(locale, "Web Crypto no disponible.", "Web Crypto unavailable.", "Web Crypto indisponível.")); });
+    return () => { alive = false; };
+  }, [locale]);
+  return (
+    <StationShell meta={meta} locale={locale} rows={ROSTER_SAMPLE.length} onSave={onSave} onExample={() => undefined}>
+      {report ? (
+        <>
+          <div className="grid grid-cols-3 gap-1 text-center text-[10px]">
+            <Metric label={t(locale, "Jugadores", "Players", "Jogadores")} value={`${ROSTER_SAMPLE.length}`} tone="text-white" />
+            <Metric label={t(locale, "Liberos", "Liberos", "Líberos")} value={`${report.liberos}`} tone="text-white" />
+            <Metric label={t(locale, "Capitán", "Captain", "Capitão")} value={report.captain} tone="text-volt" />
+          </div>
+          <p className="mt-2 break-all rounded-lg border border-volt/30 bg-volt/5 p-2 font-mono text-[11px] text-volt">{report.passCode}</p>
+          <p className="mt-1 break-all font-mono text-[9px] text-white/40">{report.seal}</p>
+          <p className="mt-1 text-[10px] text-emerald">{report.checks.join(" · ")}</p>
+        </>
+      ) : null}
+      {error ? <p className="mt-1 text-[10px] text-crimson">{error}</p> : null}
+    </StationShell>
+  );
+}
+
+/* 29 -------------------------------------------------------------------- */
+
+const EQUIPMENT_SAMPLE: Record<EquipmentCategory, { center: number; label: string }> = {
+  men_indoor: { center: 243, label: "Masculino" },
+  women_indoor: { center: 224, label: "Femenino" },
+  mixed_recreational: { center: 235, label: "Mixto" },
+  u18_boys: { center: 235, label: "U18 M" },
+  u18_girls: { center: 218, label: "U18 F" },
+  newcom_senior: { center: 243, label: "Newcom" },
+};
+
+export function EquipmentInspectorStation({ meta, locale, onSave }: StationProps) {
+  const [category, setCategory] = useState<EquipmentCategory>("men_indoor");
+  const [surface, setSurface] = useState<"indoor" | "beach">("indoor");
+  const sample = EQUIPMENT_SAMPLE[category];
+  const report = useMemo(
+    () => inspectEquipment({
+      category,
+      centerHeightCm: sample.center,
+      sideAHeightCm: sample.center,
+      sideBHeightCm: sample.center - 1,
+      ballPressureKgfCm2: surface === "beach" ? 0.2 : 0.31,
+      surface,
+    }),
+    [category, sample.center, surface],
+  );
+  return (
+    <StationShell meta={meta} locale={locale} rows={5} onSave={onSave} onExample={() => { setCategory("men_indoor"); setSurface("indoor"); }}>
+      <div className="flex flex-wrap gap-1">
+        {(Object.keys(EQUIPMENT_SAMPLE) as EquipmentCategory[]).map((key) => (
+          <button key={key} type="button" className={category === key ? BTN_PRIMARY : BTN} onClick={() => setCategory(key)}>{EQUIPMENT_SAMPLE[key].label}</button>
+        ))}
+      </div>
+      <div className="mt-1 flex gap-1">
+        <button type="button" className={surface === "indoor" ? BTN_PRIMARY : BTN} onClick={() => setSurface("indoor")}>Indoor</button>
+        <button type="button" className={surface === "beach" ? BTN_PRIMARY : BTN} onClick={() => setSurface("beach")}>Beach</button>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <Metric label={t(locale, "Red", "Net", "Rede")} value={`${report.expectedCm} cm`} tone={report.netOk ? "text-emerald" : "text-crimson"} />
+        <Metric label={t(locale, "Desvío", "Deviation", "Desvio")} value={`${report.maxDeviationCm} cm`} tone={report.maxDeviationCm <= 2 ? "text-emerald" : "text-crimson"} />
+        <Metric label="PSI" value={`${report.pressurePsi}`} tone={report.ballOk ? "text-emerald" : "text-crimson"} />
+        <Metric label="kPa" value={`${report.pressureKpa}`} tone={report.ballOk ? "text-emerald" : "text-crimson"} />
+      </div>
+      <p className="mt-2 text-[11px] text-white/70">{report.ballStatus} · {report.ballsStacked} {t(locale, "balones apilados", "stacked balls", "bolas empilhadas")}</p>
+      <p className={`mt-1 text-[10px] ${report.status === "OK" ? "text-emerald" : "text-crimson"}`}>{report.message}</p>
+    </StationShell>
+  );
+}
+
+/* 30 -------------------------------------------------------------------- */
+
+export function MatchPosterStation({ meta, locale, onSave }: StationProps) {
+  const [theme, setTheme] = useState<PosterTheme>("obsidian");
+  const [format, setFormat] = useState<"story" | "feed">("story");
+  const [nonce, setNonce] = useState(0);
+  const [report, setReport] = useState<Awaited<ReturnType<typeof buildMatchPoster>> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    buildMatchPoster({
+      homeTeam: "Tiburones",
+      awayTeam: "Cóndores",
+      setsHome: 3,
+      setsAway: 1,
+      periods: [{ home: 25, away: 21 }, { home: 22, away: 25 }, { home: 25, away: 19 }, { home: 25, away: 23 }],
+      tournament: "Copa Verano",
+      mvp: "Valentina",
+      roomId: "TIB-2026",
+      theme,
+      format,
+    })
+      .then((result) => { if (alive) { setReport(result); setError(null); } })
+      .catch(() => { if (alive) setError(t(locale, "Web Crypto no disponible.", "Web Crypto unavailable.", "Web Crypto indisponível.")); });
+    return () => { alive = false; };
+  }, [locale, theme, format, nonce]);
+  const download = (): void => {
+    if (!report) return;
+    const url = URL.createObjectURL(new Blob([report.svg], { type: "image/svg+xml" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = report.filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <StationShell meta={meta} locale={locale} rows={4} onSave={onSave} onExample={() => setNonce((value) => value + 1)}>
+      <div className="flex flex-wrap gap-1">
+        {(["obsidian", "crimson", "volt"] as PosterTheme[]).map((key) => (
+          <button key={key} type="button" className={theme === key ? BTN_PRIMARY : BTN} onClick={() => setTheme(key)}>{key}</button>
+        ))}
+        <button type="button" className={format === "story" ? BTN_PRIMARY : BTN} onClick={() => setFormat("story")}>9:16</button>
+        <button type="button" className={format === "feed" ? BTN_PRIMARY : BTN} onClick={() => setFormat("feed")}>1:1</button>
+      </div>
+      {report ? (
+        <>
+          <img alt="Preview del poster SVG" className="mx-auto mt-2 max-h-72 w-auto rounded-lg border border-white/10" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(report.svg)}`} />
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <p className="break-all font-mono text-[9px] text-volt">{report.seal}</p>
+            <button type="button" className={BTN} onClick={download}>{t(locale, "Descargar SVG", "Download SVG", "Baixar SVG")}</button>
+          </div>
+        </>
+      ) : null}
+      {error ? <p className="mt-1 text-[10px] text-crimson">{error}</p> : null}
+    </StationShell>
+  );
+}
+
 export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   biomechanics: BiomechanicsStation,
   rotation: RotationStation,
@@ -1611,4 +1944,10 @@ export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   "fan-companion": FanCompanionStation,
   "setter-signals": SetterSignalsStation,
   "mvp-awards": MvpAwardsStation,
+  "timeout-chalkboard": TimeoutChalkboardStation,
+  "momentum-coach": MomentumCoachStation,
+  "captain-draft": CaptainDraftStation,
+  "roster-pass": RosterPassStation,
+  "equipment-inspector": EquipmentInspectorStation,
+  "match-poster": MatchPosterStation,
 };

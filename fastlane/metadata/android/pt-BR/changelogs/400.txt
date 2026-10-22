@@ -1,0 +1,6 @@
+v4.0.0
+• Seis módulos novos: Quadro de tempo técnico, Coach de momentum, Draft de capitães, Passe de elenco, Inspetor de equipamento e Pôster de partida.
+• Desfazer/refazer no placar com histórico de 50 estados e atalhos A/L/Z/W/B/C.
+• Pôsteres SVG trilíngues com temas, matriz de salas e selo HMAC.
+• Grade de perfis rebalanceada para cinco módulos por jogador, técnico, quadra, torneio, árbitro e torcida.
+• 30 módulos replicados offline em TypeScript com 51 testes frontend.

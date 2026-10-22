@@ -2,7 +2,7 @@
 
 **English** | [Español](README.es.md) | [Português](README.pt.md)
 
-The volleyball operating system: 24 modules for players, coaches, referees,
+The volleyball operating system: 30 modules for players, coaches, referees,
 fans, organisers and clubs. Offline-first FOSS (F-Droid ready) + optional
 Cloud Pro, with persistent live rooms.
 
@@ -59,10 +59,16 @@ docker compose up --build
 | 22 | Fan companion + referee gesture trivia | `fan-companion` |
 | 23 | Setter signal sheet with collision checks | `setter-signals` |
 | 24 | Sealed MVP, Wall, Lock and Ice awards | `mvp-awards` |
+| 25 | Coach timeout chalkboard + 30s FIVB timer | `timeout-chalkboard` |
+| 26 | Momentum coach with 6-rally windows | `momentum-coach` |
+| 27 | Snake captain draft + department audit | `captain-draft` |
+| 28 | Roster pass + libero and captain checks | `roster-pass` |
+| 29 | Equipment inspector + net/ball tolerances | `equipment-inspector` |
+| 30 | SVG match poster 1080x1920 / 1080x1080 | `match-poster` |
 
 ## API surface
 
-- `GET /api/v1/health/deep` - 24-engine health and version.
+- `GET /api/v1/health/deep` - 30-engine health and version.
 - `GET /api/v1/catalog/modules` - modules, samples, profiles and pricing.
 - `POST /api/v1/modules/{slug}/run` and `/demo` - run an engine.
 - `POST /api/v1/security/verify-seal` - verify a signed match sheet.
@@ -97,8 +103,9 @@ cd frontend && npm run typecheck && npm run test && npm run build
 
 ## Status
 
-v3.0.0: 24 modules, 289 backend tests, SQLite WAL live rooms, six role profiles,
-referee whistle audio, high-contrast mode, trilingual UI and docs, and live E2E
-for modules, live rooms, security, paywall and header policy.
+v4.0.0: 30 modules, 331 backend tests, 51 frontend tests, SQLite WAL live rooms,
+six role profiles, scoreboard undo/redo and keyboard hotkeys, timeout chalkboard,
+snake draft, equipment checks, SVG match posters, trilingual UI and docs, and
+live E2E for modules, live rooms, security, paywall and header policy.
 
 Cloud export uses an HMAC webhook; wire a checkout provider before charging.

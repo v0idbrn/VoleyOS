@@ -1,5 +1,5 @@
 /**
- * Offline-first TypeScript mirror of the 24 VolleyOS Python engines.
+ * Offline-first TypeScript mirror of the 30 VolleyOS Python engines.
  * Runs in the browser with zero network and zero telemetry.
  */
 
@@ -2515,5 +2515,573 @@ export async function awardMvp(input: { match?: string; players: MvpPlayer[] }):
     seal: seal.seal,
     sha256: seal.sha256,
     message: `Tarjeta de premios sellada. MVP: ${(awards[0] as MvpAward).winner}.`,
+  };
+}
+
+/* ------------------------------------------------- scoreboard undo / redo */
+
+export const SCOREBOARD_HISTORY_LIMIT = 50;
+
+export interface ScoreboardHistory {
+  past: ScoreboardState[];
+  present: ScoreboardState;
+  future: ScoreboardState[];
+}
+
+export function newScoreboardHistory(state: ScoreboardState): ScoreboardHistory {
+  return { past: [], present: state, future: [] };
+}
+
+export function commitScoreboard(
+  history: ScoreboardHistory,
+  next: ScoreboardState,
+): ScoreboardHistory {
+  const past = [...history.past, history.present].slice(-SCOREBOARD_HISTORY_LIMIT);
+  return { past, present: next, future: [] };
+}
+
+export function undoScoreboard(history: ScoreboardHistory): ScoreboardHistory {
+  const previous = history.past[history.past.length - 1];
+  if (!previous) return history;
+  return {
+    past: history.past.slice(0, -1),
+    present: previous,
+    future: [history.present, ...history.future],
+  };
+}
+
+export function redoScoreboard(history: ScoreboardHistory): ScoreboardHistory {
+  const next = history.future[0];
+  if (!next) return history;
+  return {
+    past: [...history.past, history.present].slice(-SCOREBOARD_HISTORY_LIMIT),
+    present: next,
+    future: history.future.slice(1),
+  };
+}
+
+/* --------------------------------------------------------------- module 25 */
+
+export type ChalkReason = "stop_serve_run" | "organize_sideout" | "match_point_defense";
+
+export interface ChalkPoint {
+  x: number;
+  y: number;
+}
+
+export interface ChalkStroke {
+  points: ChalkPoint[];
+}
+
+export interface ChalkCue {
+  code: string;
+  text: string;
+  priority: "NORMAL" | "HIGH" | "CRITICAL";
+}
+
+export interface ChalkStrokeReport {
+  points: ChalkPoint[];
+  lengthM: number;
+  arrowhead: ChalkPoint;
+}
+
+export interface ChalkboardReport {
+  reason: ChalkReason;
+  rotation: number;
+  seconds: number;
+  cues: ChalkCue[];
+  strokes: ChalkStrokeReport[];
+  totalLengthM: number;
+  message: string;
+}
+
+const CHALK_CUES: Record<ChalkReason, ChalkCue[]> = {
+  stop_serve_run: [
+    { code: "fix_reception", text: "Acorta la recepción: libero al centro y tres receptores en semicírculo.", priority: "HIGH" },
+    { code: "serve_short", text: "Saque corto al 1-2 para romper la rotación rival.", priority: "NORMAL" },
+  ],
+  organize_sideout: [
+    { code: "setter_release", text: "Libera al armador del bloqueo y fija el ataque por Z4.", priority: "HIGH" },
+    { code: "pin_attack", text: "Ataque de pin con cobertura de Z6 y pipe como segunda opción.", priority: "NORMAL" },
+  ],
+  match_point_defense: [
+    { code: "block_line", text: "Bloqueo a la línea y defensa escalonada en Z5-Z6.", priority: "CRITICAL" },
+    { code: "backcourt_cover", text: "Cubre el rebote del bloqueo con Z1 cerrado al centro.", priority: "HIGH" },
+  ],
+};
+
+export function buildChalkboard(input: {
+  reason: ChalkReason;
+  rotation?: number;
+  scoreA?: number;
+  scoreB?: number;
+  strokes?: ChalkStroke[];
+}): ChalkboardReport {
+  const rotation = input.rotation ?? 1;
+  if (rotation < 1 || rotation > 6) throw new Error("rotation must be 1-6");
+  const strokes = (input.strokes ?? []).map((stroke): ChalkStrokeReport => {
+    if (stroke.points.length < 2) throw new Error("a stroke needs at least two points");
+    let length = 0;
+    for (const point of stroke.points) {
+      if (point.x < 0 || point.x > 9 || point.y < 0 || point.y > 18) {
+        throw new Error("stroke point outside the 9 x 18 court");
+      }
+    }
+    for (let index = 0; index < stroke.points.length - 1; index += 1) {
+      const start = stroke.points[index] as ChalkPoint;
+      const end = stroke.points[index + 1] as ChalkPoint;
+      length += Math.hypot(end.x - start.x, end.y - start.y);
+    }
+    return {
+      points: stroke.points,
+      lengthM: round2(length),
+      arrowhead: stroke.points[stroke.points.length - 1] as ChalkPoint,
+    };
+  });
+  const total = strokes.reduce((sum, stroke) => sum + stroke.lengthM, 0);
+  return {
+    reason: input.reason,
+    rotation,
+    seconds: 30,
+    cues: CHALK_CUES[input.reason],
+    strokes,
+    totalLengthM: round2(total),
+    message: "Pizarra de tiempo muerto lista: 30 s FIVB, dos consignas y trazos validados.",
+  };
+}
+
+/* --------------------------------------------------------------- module 26 */
+
+export interface MomentumReport {
+  team: Side;
+  servingNow: Side;
+  momentumIndex: number;
+  consecutiveBreaks: number;
+  opponentRun: number;
+  worstRotation: number | null;
+  worstRun: number;
+  recommendation: "HOLD" | "CALL_TIMEOUT_NOW_3_RUN" | "URGENT_TIMEOUT_OR_SUB_5_RUN";
+  message: string;
+}
+
+export function analyzeMomentum(input: {
+  team?: Side;
+  history: Side[];
+  rotations?: number[];
+}): MomentumReport {
+  if (input.history.length === 0) throw new Error("rally history is required");
+  const rotations = input.rotations ?? [];
+  if (rotations.length > 0 && rotations.length !== input.history.length) {
+    throw new Error("rotation history must match rally history");
+  }
+  const team = input.team ?? "A";
+  const opponent: Side = team === "A" ? "B" : "A";
+  let opponentRun = 0;
+  for (let index = input.history.length - 1; index >= 0; index -= 1) {
+    if (input.history[index] !== opponent) break;
+    opponentRun += 1;
+  }
+  let serving: Side = "A";
+  let breaks = 0;
+  for (const winner of input.history) {
+    if (winner !== serving) breaks += 1;
+    serving = winner;
+  }
+  const window = input.history.slice(-6);
+  const teamPoints = window.filter((point) => point === team).length;
+  const momentumIndex = round2(((teamPoints - (window.length - teamPoints)) * 100) / window.length);
+  const pressure = new Map<number, number>();
+  if (rotations.length > 0) {
+    input.history.forEach((winner, index) => {
+      if (winner === team) return;
+      const rotation = rotations[index] as number;
+      pressure.set(rotation, (pressure.get(rotation) ?? 0) + 1);
+    });
+  }
+  let worstRotation: number | null = null;
+  let worstRun = 0;
+  for (const [rotation, run] of pressure.entries()) {
+    if (run > worstRun) {
+      worstRotation = rotation;
+      worstRun = run;
+    }
+  }
+  const recommendation =
+    opponentRun >= 5 ? "URGENT_TIMEOUT_OR_SUB_5_RUN" : opponentRun >= 3 ? "CALL_TIMEOUT_NOW_3_RUN" : "HOLD";
+  return {
+    team,
+    servingNow: input.history[input.history.length - 1] as Side,
+    momentumIndex,
+    consecutiveBreaks: breaks,
+    opponentRun,
+    worstRotation,
+    worstRun,
+    recommendation,
+    message:
+      recommendation === "HOLD"
+        ? "Sin racha crítica: mantén la rotación y el plan de saque."
+        : recommendation === "CALL_TIMEOUT_NOW_3_RUN"
+          ? "Racha de 3: pide tiempo muerto ahora."
+          : "Racha de 5 o más: tiempo muerto urgente o sustitución.",
+  };
+}
+
+/* --------------------------------------------------------------- module 27 */
+
+export type DraftRole = "setter" | "outside" | "middle" | "opposite" | "libero";
+
+export interface DraftPlayer {
+  name: string;
+  role: DraftRole;
+  level: number;
+}
+
+export interface DraftTeam {
+  captain: string;
+  players: DraftPlayer[];
+  count: number;
+  totalLevel: number;
+  averageLevel: number;
+  departments: Record<string, number>;
+  weakestDepartment: string | null;
+  balanced: boolean;
+}
+
+export interface DraftReport {
+  pickOrder: Array<{ pick: number; captain: string; player: DraftPlayer }>;
+  teams: DraftTeam[];
+  bench: DraftPlayer[];
+  totalLevel: number;
+  bestBalance: string;
+  message: string;
+}
+
+const DRAFT_DEPARTMENTS: Record<DraftRole, string> = {
+  setter: "setting",
+  outside: "reception",
+  middle: "attack",
+  opposite: "attack",
+  libero: "reception",
+};
+
+export function snakeDraft(input: { captains: string[]; players: DraftPlayer[] }): DraftReport {
+  if (input.captains.length < 2 || input.captains.length > 4) {
+    throw new Error("captains must be between 2 and 4");
+  }
+  if (new Set(input.captains).size !== input.captains.length) throw new Error("captain names must be unique");
+  if (input.players.length === 0) throw new Error("at least one player is required");
+  for (const player of input.players) {
+    if (player.level < 1 || player.level > 5) throw new Error("level must be between 1 and 5");
+  }
+  const ordered = [...input.players].sort((left, right) => right.level - left.level || left.name.localeCompare(right.name));
+  const rosters = new Map(input.captains.map((captain) => [captain, [] as DraftPlayer[]]));
+  const pickOrder: DraftReport["pickOrder"] = [];
+  let cursor = 0;
+  let round = 0;
+  while (cursor < ordered.length) {
+    const order = input.captains.map((_, index) => index);
+    if (round % 2 === 1) order.reverse();
+    for (const index of order) {
+      if (cursor >= ordered.length) break;
+      const captain = input.captains[index] as string;
+      const player = ordered[cursor] as DraftPlayer;
+      (rosters.get(captain) as DraftPlayer[]).push(player);
+      pickOrder.push({ pick: cursor + 1, captain, player });
+      cursor += 1;
+    }
+    round += 1;
+  }
+  const teams = input.captains.map((captain): DraftTeam => {
+    const players = rosters.get(captain) as DraftPlayer[];
+    const totalLevel = players.reduce((sum, player) => sum + player.level, 0);
+    const departments: Record<string, number> = {};
+    for (const player of players) {
+      const department = DRAFT_DEPARTMENTS[player.role];
+      departments[department] = (departments[department] ?? 0) + 1;
+    }
+    const weakest = ["setting", "reception", "attack"].find((department) => (departments[department] ?? 0) === 0) ?? null;
+    return {
+      captain,
+      players,
+      count: players.length,
+      totalLevel,
+      averageLevel: round2(players.length ? totalLevel / players.length : 0),
+      departments,
+      weakestDepartment: weakest,
+      balanced: weakest === null,
+    };
+  });
+  const best = teams.find((team) => team.balanced) ?? (teams[0] as DraftTeam);
+  return {
+    pickOrder,
+    teams,
+    bench: ordered.slice(cursor),
+    totalLevel: ordered.reduce((sum, player) => sum + player.level, 0),
+    bestBalance: best.captain,
+    message: "Draft serpiente generado con auditoría por departamento.",
+  };
+}
+
+/* --------------------------------------------------------------- module 28 */
+
+export interface RosterPlayerInput {
+  name: string;
+  number: number;
+  role: DraftRole;
+  isCaptain?: boolean;
+  isLibero?: boolean;
+}
+
+export interface RosterReport {
+  team: string;
+  tournament: string;
+  captain: string;
+  liberos: number;
+  passCode: string;
+  seal: string;
+  sha256: string;
+  checks: string[];
+  message: string;
+}
+
+export async function buildRosterPass(input: {
+  team: string;
+  tournament?: string;
+  players: RosterPlayerInput[];
+}): Promise<RosterReport> {
+  if (input.players.length < 6 || input.players.length > 14) throw new Error("roster needs 6-14 players");
+  const numbers = input.players.map((player) => player.number);
+  if (new Set(numbers).size !== numbers.length) throw new Error("jersey numbers must be unique");
+  const liberos = input.players.filter((player) => player.isLibero).length;
+  if (liberos > 2) throw new Error("at most two liberos");
+  const captains = input.players.filter((player) => player.isCaptain);
+  if (captains.length !== 1) throw new Error("exactly one captain is required");
+  if (captains[0]?.isLibero) throw new Error("the captain cannot be the libero");
+  const ordered = [...input.players].sort((left, right) => left.number - right.number);
+  const payload: JsonValue = {
+    team: input.team,
+    tournament: input.tournament ?? "",
+    players: ordered.map((player) => ({
+      name: player.name,
+      number: player.number,
+      role: player.role,
+      is_captain: player.isCaptain ?? false,
+      is_libero: player.isLibero ?? false,
+    })),
+  };
+  const seal = await buildSeal(payload);
+  const digest = seal.seal.replace("VOS-SEAL-", "");
+  return {
+    team: input.team,
+    tournament: input.tournament ?? "",
+    captain: captains[0]?.name ?? "",
+    liberos,
+    passCode: `VOS-ROSTER-${digest.slice(0, 24)}`,
+    seal: seal.seal,
+    sha256: seal.sha256,
+    checks: ["dorsales_unicos", "maximo_dos_liberos", "capitan_unico", "capitan_no_libero"],
+    message: "Pase de plantel verificado y listo para mesa.",
+  };
+}
+
+export async function verifyRosterPass(
+  input: { team: string; tournament?: string; players: RosterPlayerInput[] },
+  passCode: string,
+): Promise<boolean> {
+  const report = await buildRosterPass(input);
+  return report.passCode === passCode.trim().toUpperCase();
+}
+
+/* --------------------------------------------------------------- module 29 */
+
+export type EquipmentCategory =
+  | "men_indoor"
+  | "women_indoor"
+  | "mixed_recreational"
+  | "u18_boys"
+  | "u18_girls"
+  | "newcom_senior";
+
+export interface EquipmentReport {
+  category: EquipmentCategory;
+  surface: "indoor" | "beach";
+  expectedCm: number;
+  centerDeviationCm: number;
+  maxDeviationCm: number;
+  netOk: boolean;
+  pressureKgf: number;
+  pressurePsi: number;
+  pressureKpa: number;
+  ballStatus: string;
+  ballOk: boolean;
+  ballsStacked: number;
+  status: "OK" | "NET_OUT_OF_TOLERANCE" | "BALL_OUT_OF_RANGE";
+  message: string;
+}
+
+const EQUIPMENT_HEIGHTS: Record<EquipmentCategory, number> = {
+  men_indoor: 243,
+  women_indoor: 224,
+  mixed_recreational: 235,
+  u18_boys: 235,
+  u18_girls: 218,
+  newcom_senior: 243,
+};
+
+const PRESSURE_RANGES: Record<"indoor" | "beach", [number, number]> = {
+  indoor: [0.3, 0.325],
+  beach: [0.175, 0.225],
+};
+
+export function inspectEquipment(input: {
+  category: EquipmentCategory;
+  centerHeightCm: number;
+  sideAHeightCm: number;
+  sideBHeightCm: number;
+  ballPressureKgfCm2: number;
+  surface?: "indoor" | "beach";
+}): EquipmentReport {
+  const surface = input.surface ?? "indoor";
+  if (input.centerHeightCm < 100 || input.centerHeightCm > 400) throw new Error("height outside 100-400 cm");
+  const expected = EQUIPMENT_HEIGHTS[input.category];
+  const centerDeviation = Math.abs(input.centerHeightCm - expected);
+  const maxDeviation = Math.max(
+    Math.abs(input.sideAHeightCm - input.centerHeightCm),
+    Math.abs(input.sideBHeightCm - input.centerHeightCm),
+  );
+  const netOk = maxDeviation <= 2 && centerDeviation <= 2;
+  const [low, high] = PRESSURE_RANGES[surface];
+  const ballOk = input.ballPressureKgfCm2 >= low && input.ballPressureKgfCm2 <= high;
+  const ballStatus =
+    input.ballPressureKgfCm2 < low
+      ? "Desinflada"
+      : input.ballPressureKgfCm2 > high
+        ? "Demasiado dura (rebote descontrolado)"
+        : "Óptima FIVB";
+  const status = !netOk ? "NET_OUT_OF_TOLERANCE" : !ballOk ? "BALL_OUT_OF_RANGE" : "OK";
+  return {
+    category: input.category,
+    surface,
+    expectedCm: expected,
+    centerDeviationCm: round2(centerDeviation),
+    maxDeviationCm: round2(maxDeviation),
+    netOk,
+    pressureKgf: round2(input.ballPressureKgfCm2),
+    pressurePsi: round2(input.ballPressureKgfCm2 * 14.2233),
+    pressureKpa: round2(input.ballPressureKgfCm2 * 98.0665),
+    ballStatus,
+    ballOk,
+    ballsStacked: round2(input.centerHeightCm / 21),
+    status,
+    message:
+      status === "OK"
+        ? "Red y balón conformes: equipo listo."
+        : status === "NET_OUT_OF_TOLERANCE"
+          ? "Red fuera de tolerancia: corrige la tensión."
+          : "Balón fuera de rango: ajusta la presión.",
+  };
+}
+
+/* --------------------------------------------------------------- module 30 */
+
+export type PosterTheme = "obsidian" | "crimson" | "volt";
+
+export interface PosterReport {
+  width: number;
+  height: number;
+  svg: string;
+  filename: string;
+  roomMatrix: string[];
+  seal: string;
+  sha256: string;
+  message: string;
+}
+
+const POSTER_THEMES: Record<PosterTheme, [string, string, string]> = {
+  obsidian: ["#0B0B0F", "#FF3B5C", "#F5F5F7"],
+  crimson: ["#2A0A12", "#FF3355", "#FFF4F6"],
+  volt: ["#0A0F0A", "#C6FF00", "#F4FFE0"],
+};
+
+function escapeXml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+export async function buildMatchPoster(input: {
+  homeTeam: string;
+  awayTeam: string;
+  setsHome?: number;
+  setsAway?: number;
+  periods: Array<{ home: number; away: number }>;
+  tournament?: string;
+  mvp?: string;
+  roomId?: string;
+  theme?: PosterTheme;
+  format?: "story" | "feed";
+}): Promise<PosterReport> {
+  if (input.periods.length < 1 || input.periods.length > 5) throw new Error("poster needs 1-5 periods");
+  const format = input.format ?? "story";
+  const theme = input.theme ?? "obsidian";
+  const width = 1080;
+  const height = format === "story" ? 1920 : 1080;
+  const [background, accent, text] = POSTER_THEMES[theme];
+  const home = escapeXml(input.homeTeam);
+  const away = escapeXml(input.awayTeam);
+  const tournament = escapeXml(input.tournament || "VOLLEYOS ARENA");
+  const mvp = escapeXml(input.mvp || "MVP DEL PARTIDO");
+  const room = escapeXml(input.roomId || "VOS-ROOM");
+  const seal = await buildSeal({
+    home_team: input.homeTeam,
+    away_team: input.awayTeam,
+    sets_home: input.setsHome ?? 0,
+    sets_away: input.setsAway ?? 0,
+    periods: input.periods.map((period) => ({ home: period.home, away: period.away })),
+    tournament: input.tournament ?? "",
+    mvp: input.mvp ?? "",
+    room_id: input.roomId ?? "",
+    theme,
+    format,
+  });
+  const digest = await sha256(input.roomId || seal.sha256);
+  const roomMatrix = [...digest.slice(0, 25)].map((character) => (parseInt(character, 16) % 2).toString());
+  const periods = input.periods.map((period) => `${period.home}-${period.away}`).join("  ");
+  const cells = roomMatrix
+    .map((cell, index) => {
+      const x = 120 + (index % 5) * 46;
+      const y = 950 + Math.floor(index / 5) * 46;
+      return `<rect x="${x}" y="${y}" width="34" height="34" rx="6" fill="${accent}" opacity="${0.25 + Number(cell) * 0.55}"/>`;
+    })
+    .join("");
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img">`,
+    `<title>${home} vs ${away}</title>`,
+    `<rect width="${width}" height="${height}" fill="${background}"/>`,
+    `<text x="90" y="150" fill="${accent}" font-family="Arial, sans-serif" font-size="34" letter-spacing="8">${tournament}</text>`,
+    `<text x="90" y="330" fill="${text}" font-family="Arial, sans-serif" font-size="62" font-weight="700">${home}</text>`,
+    `<text x="90" y="430" fill="${accent}" font-family="Arial, sans-serif" font-size="46" font-weight="700">SETS ${input.setsHome ?? 0} - ${input.setsAway ?? 0}</text>`,
+    `<text x="90" y="530" fill="${text}" font-family="Arial, sans-serif" font-size="62" font-weight="700">${away}</text>`,
+    `<text x="90" y="720" fill="${text}" font-family="Arial, sans-serif" font-size="48" letter-spacing="6">${periods}</text>`,
+    `<rect x="90" y="790" width="900" height="120" rx="24" fill="${accent}" opacity="0.18"/>`,
+    `<text x="120" y="865" fill="${text}" font-family="Arial, sans-serif" font-size="38" font-weight="700">MVP ${mvp}</text>`,
+    `<text x="90" y="910" fill="${text}" font-family="Arial, sans-serif" font-size="30">SALA ${room}</text>`,
+    cells,
+    `<text x="90" y="${height - 110}" fill="${accent}" font-family="Arial, sans-serif" font-size="28" letter-spacing="4">VOLLEYOS // MATCH POSTER</text>`,
+    `<text x="90" y="${height - 60}" fill="${text}" opacity="0.72" font-family="Arial, sans-serif" font-size="24">${seal.seal}</text>`,
+    "</svg>",
+  ].join("");
+  return {
+    width,
+    height,
+    svg,
+    filename: `volleyos-match-poster-${format}.svg`,
+    roomMatrix,
+    seal: seal.seal,
+    sha256: seal.sha256,
+    message: "Poster SVG generado con nombres escapados, sello HMAC y matriz de sala.",
   };
 }

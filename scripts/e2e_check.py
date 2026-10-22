@@ -66,11 +66,11 @@ def api_checks() -> None:
 
     status, _, body = call("GET", f"{API}/api/v1/health/deep")
     health = json.loads(body) if status == 200 else {}
-    check("api.health_deep", status == 200 and health.get("status") == "ok" and health.get("count") == 24)
+    check("api.health_deep", status == 200 and health.get("status") == "ok" and health.get("count") == 30)
 
     status, _, body = call("GET", f"{API}/api/v1/catalog/modules")
     catalog = json.loads(body) if status == 200 else {}
-    check("api.catalog", status == 200 and catalog.get("count") == 24 and len(catalog.get("pricing", [])) == 3)
+    check("api.catalog", status == 200 and catalog.get("count") == 30 and len(catalog.get("pricing", [])) == 3)
 
     status, _, body = call("POST", f"{API}/api/v1/modules/biomechanics/demo", {})
     demo = json.loads(body) if status == 200 else {}
@@ -84,10 +84,11 @@ def api_checks() -> None:
         "overlay", "var", "beach", "volleycard", "tempo", "acwr",
         "block-shadow", "seam-radar", "setter-iq", "lineup-slip", "integrity-seal", "capsule-io",
         "referee-console", "substitution-tracker", "court-split", "fan-companion",
-        "setter-signals", "mvp-awards",
+        "setter-signals", "mvp-awards", "timeout-chalkboard", "momentum-coach",
+        "captain-draft", "roster-pass", "equipment-inspector", "match-poster",
     ]
     demos = {slug: call("POST", f"{API}/api/v1/modules/{slug}/demo", {})[0] for slug in slugs}
-    check("api.demo_all_24", all(code == 200 for code in demos.values()), str(demos))
+    check("api.demo_all_30", all(code == 200 for code in demos.values()), str(demos))
 
     status, _, body = call(
         "POST",
@@ -222,7 +223,7 @@ def web_checks() -> None:
     check("web.pt_home", status == 200 and b"Esta\xc3\xa7\xc3\xb5es" in body)
 
     status, _, body = call("GET", f"{WEB}/es/")
-    check("web.twenty_four_modules", status == 200 and body.count(b'id="station-') >= 24)
+    check("web.thirty_modules", status == 200 and body.count(b'id="station-') >= 30)
 
     status, _, body = call("GET", f"{WEB}/es/legal/privacy/")
     check("web.legal", status == 200 and b"privacidad" in body.lower())
@@ -231,7 +232,7 @@ def web_checks() -> None:
     check("web.overlay_noindex", status == 200 and b"noindex" in body)
 
     status, _, body = call("GET", f"{WEB}/sitemap.xml")
-    check("web.sitemap", status == 200 and body.count(b"<url>") >= 165, f"{body.count(b'<url>')} urls")
+    check("web.sitemap", status == 200 and body.count(b"<url>") >= 187, f"{body.count(b'<url>')} urls")
 
     status, _, body = call("GET", f"{WEB}/robots.txt")
     check("web.robots", status == 200 and b"sitemap.xml" in body)

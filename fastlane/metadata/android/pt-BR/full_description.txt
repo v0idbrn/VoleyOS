@@ -1,10 +1,10 @@
-VolleyOS é o sistema operacional offline-first do vôlei. Vinte e quatro módulos que funcionam em um ginásio sem sinal, no celular, tablet ou notebook.
+VolleyOS é o sistema operacional offline-first do vôlei. Trinta módulos que funcionam em um ginásio sem sinal, no celular, tablet ou notebook.
 
 O QUE INCLUI
 • Laboratório 5 Fotogramas: meça salto e mecânica de ataque com física, não com achismo.
 • Quadro 5-1: valide cada rotação R1-R6 contra a regra FIVB de sobreposição no contato do saque.
 • Scout em 3 Cliques: digite ou dite a jogada e receba side-out por rotação e mapa de calor 3x3.
-• Placar ao Vivo: pontuação indoor com rotação automática e lógica de sets e partida.
+• Placar ao Vivo: pontuação indoor com rotação automática, lógica de sets e partida, desfazer/refazer e atalhos.
 • Torneio: classificação com pontos 3-2-1-0 e coeficientes de sets e pontos.
 • Times de Pickup: equipes equilibradas com um levantador cada e fila de rei da quadra.
 • Overlay OBS: fonte de navegador transparente com banners de set point e match point.
@@ -25,6 +25,12 @@ O QUE INCLUI
 • Companheiro de torcida: oito gestos de arbitragem e trivia com ranks.
 • Sinais do levantador: sete gestos, seis jogadas e detecção de colisões.
 • Prêmios MVP: MVP, Muro, Cadeado, Franco-Atirador, Pedreiro e Sangue Frio selados.
+• Quadro de tempo técnico: cronômetro FIVB de 30 s, duas orientações e quadra de 9x18 m.
+• Coach de momentum: janelas de seis rallies com chamados por sequência ou estagnação.
+• Draft de capitães: ordem serpentina A-B-B-A, 2-4 capitães e auditoria por departamento.
+• Passe de elenco: 6-14 jogadores, até dois líberos, números únicos e checagem de capitão.
+• Inspetor de equipamento: alturas FIVB de rede, tolerância por lado, pressão indoor/praia e empilhamento de bolas.
+• Pôster de partida: SVG escapado em 1080x1920 e 1080x1080 com temas e selo HMAC.
 • Salas ao vivo: persistência SQLite WAL, token de administração e leitura pública.
 
 FEITO PARA QUADRAS REAIS

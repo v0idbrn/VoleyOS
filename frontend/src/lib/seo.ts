@@ -17,8 +17,8 @@ export const SECTION_LABELS: Record<SeoSection, Record<Locale, string>> = {
 
 export const SECTION_INTROS: Record<SeoSection, Record<Locale, string>> = {
   modules: {
-    es: "Veinticuatro estaciones offline que cubren cancha, cuerpo técnico, arbitraje, tribuna y transmisión. Todas funcionan sin internet y sin cuentas.",
-    en: "Twenty-four offline stations covering the court, coaching staff, refereeing, fans and streaming. All work without internet or accounts.",
+    es: "Treinta estaciones offline que cubren cancha, cuerpo técnico, arbitraje, tribuna y transmisión. Todas funcionan sin internet y sin cuentas.",
+    en: "Thirty offline stations covering the court, coaching staff, refereeing, fans and streaming. All work without internet or accounts.",
     pt: "Vinte e quatro estações offline que cobrem quadra, comissão técnica, arbitragem, torcida e transmissão. Todas funcionam sem internet e sem contas.",
   },
   positions: {
@@ -178,6 +178,36 @@ const MODULE_FACTS: Record<string, LArr> = {
     ["Seis premios: MVP, Muro, Candado, Francotirador, Albañil y Sangre Fría.", "El líbero recibe peso extra en defensa y pases.", "Tarjeta compartible sellada con HMAC-SHA256."],
     ["Six awards: MVP, Wall, Lock, Sniper, Builder and Ice.", "The libero gets extra weight in defence and passes.", "Share card sealed with HMAC-SHA256."],
     ["Seis prêmios: MVP, Muro, Cadeado, Franco-Atirador, Pedreiro e Sangue Frio.", "O líbero recebe peso extra em defesa e passes.", "Cartão compartilhável selado com HMAC-SHA256."],
+  ),
+  "timeout-chalkboard": la(
+    ["Reloj FIVB de 30 segundos con dos consignas priorizadas.", "Valida cada trazo dentro de la cancha de 9 x 18 m.", "Genera flechas y longitudes listas para la pizarra."],
+    ["30-second FIVB clock with two prioritised cues.", "Validates every stroke inside the 9 x 18 m court.", "Produces arrows and lengths ready for the board."],
+    ["Relógio FIVB de 30 segundos com duas orientações prioritárias.", "Valida cada traço dentro da quadra de 9 x 18 m.", "Gera setas e comprimentos prontos para a lousa."],
+  ),
+  "momentum-coach": la(
+    ["Índice de momentum calculado sobre las últimas seis pelotas.", "Cuenta break points y la racha actual del rival.", "Recomienda tiempo muerto a los 3 y urgencia a los 5."],
+    ["Momentum index computed over the last six rallies.", "Counts break points and the opponent's current run.", "Calls timeout at 3 and urgent action at 5."],
+    ["Índice de momentum calculado nas últimas seis bolas.", "Conta break points e a sequência atual do rival.", "Recomenda tempo aos 3 e urgência aos 5."],
+  ),
+  "captain-draft": la(
+    ["Orden serpiente A-B-B-A para equilibrar los turnos.", "Audita recepción, armado y ataque por equipo.", "Acepta de dos a cuatro capitanes y deja banco visible."],
+    ["Snake order A-B-B-A to balance the turns.", "Audits reception, setting and attack per team.", "Accepts two to four captains and shows the bench."],
+    ["Ordem serpente A-B-B-A para equilibrar os turnos.", "Audita recepção, levantamento e ataque por equipe.", "Aceita de dois a quatro capitães e mostra o banco."],
+  ),
+  "roster-pass": la(
+    ["Hasta 14 jugadores con dorsales únicos del 1 al 99.", "Máximo dos liberos y capitán distinto del libero.", "Emite un pase VOS-ROSTER verificable en mesa."],
+    ["Up to 14 players with unique shirts from 1 to 99.", "At most two liberos and a captain who is not the libero.", "Issues a VOS-ROSTER pass verifiable at the table."],
+    ["Até 14 jogadores com números únicos de 1 a 99.", "No máximo dois líberos e capitão diferente do líbero.", "Emite um passe VOS-ROSTER verificável na mesa."],
+  ),
+  "equipment-inspector": la(
+    ["Alturas oficiales: 2,43 m masculino y 2,24 m femenino.", "Tolera 2 cm entre cada extremo y el centro de la red.", "Convierte presión de 0,300-0,325 kgf/cm2 a PSI y kPa."],
+    ["Official heights: 2.43 m men and 2.24 m women.", "Tolerates 2 cm between each end and the net centre.", "Converts 0.300-0.325 kgf/cm2 pressure to PSI and kPa."],
+    ["Alturas oficiais: 2,43 m masculino e 2,24 m feminino.", "Tolera 2 cm entre cada extremo e o centro da rede.", "Converte pressão de 0,300-0,325 kgf/cm2 em PSI e kPa."],
+  ),
+  "match-poster": la(
+    ["Story 1080 x 1920 y feed cuadrado 1080 x 1080.", "Escapa nombres y escapa el SVG contra inyección.", "Incluye sello HMAC, MVP, sets y matriz de sala."],
+    ["1080 x 1920 story and 1080 x 1080 square feed.", "Escapes names and the SVG against injection.", "Includes HMAC seal, MVP, sets and room matrix."],
+    ["Story 1080 x 1920 e feed quadrado 1080 x 1080.", "Escapa nomes e o SVG contra injeção.", "Inclui selo HMAC, MVP, sets e matriz de sala."],
   ),
 };
 
