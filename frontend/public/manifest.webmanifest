@@ -1,0 +1,12 @@
+{
+  "name": "VolleyOS Global",
+  "short_name": "VolleyOS",
+  "description": "12 módulos offline-first para vóley: biomecánica, rotaciones, scouting, torneos, VAR y streaming.",
+  "start_url": "/es",
+  "display": "standalone",
+  "background_color": "#070709",
+  "theme_color": "#070709",
+  "lang": "es",
+  "categories": ["sports", "productivity"],
+  "icons": []
+}

@@ -23,3 +23,14 @@ Next: Sprint 1 (engines 1-6, Decimal-only TDD).
 - 199 tests green, ruff/mypy strict clean.
 
 Next: Sprint 4 (frontend + offline engine).
+
+## Sprint 4 ? Command Center frontend
+- TS mirrors of all 12 engines in `frontend/src/lib/local-engines.ts`; modules,
+  samples, i18n (ES/EN/PT), ephemeral localStorage vault with signed-style receipt.
+- `VolleyOSHub`: hero, profile filters, 12 interactive station cards (SVG court,
+  radar hex, heatmap, OBS preview), Cloud Pro pricing, FOSS/Cloud badge,
+  language switcher, privacy footer. `/overlay/tv` transparent OBS demo.
+- 19 vitest tests green; `tsc --noEmit`, `next build` (SSG es/en/pt) pass; 0 `: any`.
+- Root `/` renders the Spanish hub with canonical to `/es` (redirect() broke SSG).
+
+Next: Sprint 5 (legal pages per locale).
