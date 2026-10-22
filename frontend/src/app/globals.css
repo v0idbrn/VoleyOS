@@ -50,6 +50,35 @@ input[type="range"] {
   accent-color: #e11d48;
 }
 
+html.high-contrast body {
+  background-color: #000;
+  color: #fff;
+}
+
+html.high-contrast .text-white\/40,
+html.high-contrast .text-white\/50,
+html.high-contrast .text-white\/60,
+html.high-contrast .text-white\/65,
+html.high-contrast .text-white\/70 {
+  color: #e5e7eb !important;
+}
+
+html.high-contrast .bg-panel\/80,
+html.high-contrast .bg-obsidian\/60,
+html.high-contrast .bg-obsidian\/40 {
+  background-color: #000 !important;
+}
+
+html.high-contrast .station-card,
+html.high-contrast .border-white\/10 {
+  border-color: #ffffff80 !important;
+}
+
+html.high-contrast :focus-visible {
+  outline: 3px solid #facc15 !important;
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

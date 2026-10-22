@@ -11,6 +11,12 @@ import { STATIONS } from "@/components/stations";
 
 const FILTERS: Array<Profile | "all"> = ["all", "players", "coaches", "court", "referees", "fans", "tournaments"];
 const LOCALES: Locale[] = ["es", "en", "pt"];
+const ROLE_KEY = "volleyos.role";
+const CONTRAST_KEY = "volleyos.contrast";
+
+function isProfile(value: string | null): value is Profile {
+  return value !== null && (FILTERS as string[]).includes(value);
+}
 
 interface Plan {
   name: string;
@@ -59,6 +65,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [profile, setProfile] = useState<Profile | "all">("all");
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [contrast, setContrast] = useState(false);
+  const [checkout, setCheckout] = useState<Plan | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const target = buildTarget();
 
@@ -74,6 +82,22 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
         .includes(needle);
     });
   }, [locale, profile, query]);
+
+  useEffect(() => {
+    const storedRole = window.localStorage.getItem(ROLE_KEY);
+    if (isProfile(storedRole)) setProfile(storedRole);
+    setContrast(window.localStorage.getItem(CONTRAST_KEY) === "1");
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("high-contrast", contrast);
+    window.localStorage.setItem(CONTRAST_KEY, contrast ? "1" : "0");
+  }, [contrast]);
+
+  const chooseProfile = (value: Profile | "all"): void => {
+    setProfile(value);
+    window.localStorage.setItem(ROLE_KEY, value);
+  };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -123,7 +147,15 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
             <a className="hover:text-volt" href="#pricing">{copy.pricing}</a>
             <a className="hover:text-volt" href="https://github.com/v0idbrn/VoleyOS" target="_blank" rel="noreferrer">GitHub ↗</a>
           </nav>
-          <div className="ml-auto flex items-center gap-1" aria-label="Idioma">
+          <button
+            type="button"
+            aria-pressed={contrast}
+            onClick={() => setContrast((value) => !value)}
+            className={`ml-auto rounded border px-2 py-1 text-[10px] font-bold ${contrast ? "border-volt bg-volt text-obsidian" : "border-white/15 text-white/60 hover:text-white"}`}
+          >
+            {t(locale, "Alto contraste", "High contrast", "Alto contraste")}
+          </button>
+          <div className="flex items-center gap-1" aria-label="Idioma">
             {LOCALES.map((code) => (
               <a
                 key={code}
@@ -159,7 +191,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
           </div>
           <div className="grid grid-cols-2 gap-3 self-center">
             {[
-              { value: "18", label: t(locale, "módulos", "modules", "módulos") },
+              { value: "24", label: t(locale, "módulos", "modules", "módulos") },
               { value: "3", label: t(locale, "idiomas", "languages", "idiomas") },
               { value: "0", label: t(locale, "telemetría", "telemetry", "telemetria") },
               { value: "1", label: t(locale, "clic por reporte", "click per report", "clique por relatório") },
@@ -197,7 +229,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 type="button"
                 role="tab"
                 aria-selected={profile === filter}
-                onClick={() => setProfile(filter)}
+                onClick={() => chooseProfile(filter)}
                 className={`rounded-lg border px-3 py-1.5 text-[11px] font-bold transition ${
                   profile === filter ? "border-volt bg-volt/15 text-volt" : "border-white/10 text-white/55 hover:text-white"
                 }`}
@@ -240,12 +272,22 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                     <li key={feature}>✓ {feature}</li>
                   ))}
                 </ul>
-                <a
-                  href={paywallEnabled() ? "mailto:cloud@volleyos.app?subject=VolleyOS%20Cloud%20Pro" : "https://github.com/v0idbrn/VoleyOS/releases"}
-                  className={`mt-4 rounded-lg px-3 py-2 text-center text-[11px] font-black uppercase tracking-wider ${plan.highlight ? "bg-crimson text-white" : "border border-white/20 text-white/80 hover:border-volt hover:text-volt"}`}
-                >
-                  {paywallEnabled() ? copy.cloudPro : t(locale, "Descargar libre", "Download free", "Baixar livre")}
-                </a>
+                {paywallEnabled() ? (
+                  <button
+                    type="button"
+                    onClick={() => setCheckout(plan)}
+                    className={`mt-4 rounded-lg px-3 py-2 text-center text-[11px] font-black uppercase tracking-wider ${plan.highlight ? "bg-crimson text-white" : "border border-white/20 text-white/80 hover:border-volt hover:text-volt"}`}
+                  >
+                    {copy.cloudPro}
+                  </button>
+                ) : (
+                  <a
+                    href="https://github.com/v0idbrn/VoleyOS/releases"
+                    className={`mt-4 rounded-lg px-3 py-2 text-center text-[11px] font-black uppercase tracking-wider ${plan.highlight ? "bg-crimson text-white" : "border border-white/20 text-white/80 hover:border-volt hover:text-volt"}`}
+                  >
+                    {t(locale, "Descargar libre", "Download free", "Baixar livre")}
+                  </a>
+                )}
               </article>
             ))}
           </div>
@@ -276,6 +318,37 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
       </footer>
 
       <EphemeralVaultBar locale={locale} />
+      {checkout ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={t(locale, "Confirmar plan", "Confirm plan", "Confirmar plano")}
+          className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
+          onClick={() => setCheckout(null)}
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-panel p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-crimson">{copy.cloudPro}</p>
+            <h3 className="mt-1 text-xl font-black">{checkout.name}</h3>
+            <p className="mt-1 text-2xl font-black text-volt">{checkout.price} <span className="text-[10px] text-white/40">USD</span></p>
+            <p className="mt-2 text-[11px] text-white/60">{checkout.tagline[locale]}</p>
+            <ul className="mt-3 space-y-1 text-[11px] text-white/70">
+              {checkout.features[locale].map((feature) => <li key={feature}>· {feature}</li>)}
+            </ul>
+            <a
+              href={`mailto:cloud@volleyos.app?subject=${encodeURIComponent(`VolleyOS ${checkout.name}`)}`}
+              className="mt-4 block rounded-lg bg-crimson px-3 py-2 text-center text-[11px] font-black uppercase tracking-wider text-white"
+            >
+              {t(locale, "Reservar por email", "Book by email", "Reservar por email")}
+            </a>
+            <button type="button" className="mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-white hover:border-volt hover:text-volt" onClick={() => setCheckout(null)}>
+              {t(locale, "Cerrar", "Close", "Fechar")}
+            </button>
+            <p className="mt-2 text-[9px] text-white/35">
+              {t(locale, "Sin telemetría. La confirmación se firma con HMAC-SHA256 en el backend.", "No telemetry. Confirmation is HMAC-SHA256 signed by the backend.", "Sem telemetria. A confirmação é assinada com HMAC-SHA256 no backend.")}
+            </p>
+          </div>
+        </div>
+      ) : null}
       {toast ? (
         <div role="status" className="fixed bottom-16 left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 rounded-xl border border-emerald/40 bg-emerald/15 px-3 py-2 text-center text-[11px] font-semibold text-emerald backdrop-blur">
           {toast}

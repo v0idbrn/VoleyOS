@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { playWhistle } from "@/lib/court-audio";
 import { COPY, t } from "@/lib/i18n";
 import {
   FAN_QUESTIONS,
@@ -1240,6 +1241,7 @@ export function RefereeConsoleStation({ meta, locale, onSave }: StationProps) {
         <button type="button" className={BTN} onClick={() => add({ team: "A", player: 4, kind: "WARNING_YELLOW" })}>🟨🟥 A #4</button>
         <button type="button" className={BTN} onClick={() => add({ team: "B", kind: "DELAY_WARNING" })}>⏱ B demora</button>
         <button type="button" className={BTN} onClick={() => add({ team: "B", player: 7, kind: "EXPULSION_JOINT" })}>🟥 B #7</button>
+        <button type="button" className={BTN} onClick={() => playWhistle("double")}>🔊 {t(locale, "Silbato", "Whistle", "Apito")}</button>
       </div>
       <div className="mt-3 space-y-1">
         {report.sanctions.map((sanction) => (

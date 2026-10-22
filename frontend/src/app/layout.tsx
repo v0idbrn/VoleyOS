@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     template: "%s · VolleyOS",
   },
   description:
-    "12 módulos offline-first para vóley: biomecánica, rotaciones, scouting, torneos, VAR, playa y streaming OBS. ES/EN/PT, sin telemetría.",
+    "24 módulos offline-first para vóley: biomecánica, rotaciones, scouting, arbitraje, tribuna, torneos, salas en vivo y streaming OBS. ES/EN/PT, sin telemetría.",
   applicationName: "VolleyOS Global",
   authors: [{ name: "VolleyOS" }],
   keywords: ["vóley", "volleyball", "scouting", "rotaciones", "torneos", "FIVB", "offline"],
@@ -20,12 +20,12 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "VolleyOS", statusBarStyle: "black-translucent" },
   openGraph: {
     title: "VolleyOS Global",
-    description: "12 módulos de vóley en una app offline-first. Sin telemetría.",
+    description: "24 módulos de vóley en una app offline-first. Sin telemetría.",
     type: "website",
     locale: "es_ES",
     siteName: "VolleyOS Global",
   },
-  twitter: { card: "summary", title: "VolleyOS Global", description: "12 módulos de vóley, offline-first." },
+  twitter: { card: "summary", title: "VolleyOS Global", description: "24 módulos de vóley, offline-first." },
 };
 
 export const viewport: Viewport = {

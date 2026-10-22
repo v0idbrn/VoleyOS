@@ -23,7 +23,7 @@ interface Copy {
 
 export const COPY: Record<Locale, Copy> = {
   es: {
-    heroKicker: "18 módulos · 3 idiomas · 0 telemetría",
+    heroKicker: "24 módulos · 3 idiomas · 0 telemetría",
     heroTitle: "El sistema operativo del vóley mundial",
     heroSubtitle:
       "Biomecánica, táctica, arbitraje, torneos y streaming en una sola app. Offline-first para gimnasios sin señal y Cloud Pro para clubes que transmiten.",
@@ -38,7 +38,7 @@ export const COPY: Record<Locale, Copy> = {
     cloudPro: "Cloud Pro",
   },
   en: {
-    heroKicker: "18 modules · 3 languages · 0 telemetry",
+    heroKicker: "24 modules · 3 languages · 0 telemetry",
     heroTitle: "The operating system of world volleyball",
     heroSubtitle:
       "Biomechanics, tactics, refereeing, tournaments and streaming in one app. Offline-first for gyms with no signal, Cloud Pro for streaming clubs.",
@@ -53,7 +53,7 @@ export const COPY: Record<Locale, Copy> = {
     cloudPro: "Cloud Pro",
   },
   pt: {
-    heroKicker: "18 módulos · 3 idiomas · 0 telemetria",
+    heroKicker: "24 módulos · 3 idiomas · 0 telemetria",
     heroTitle: "O sistema operacional do vôlei mundial",
     heroSubtitle:
       "Biomecânica, tática, arbitragem, torneios e streaming em um só app. Offline-first para ginásios sem sinal e Cloud Pro para clubes que transmitem.",
