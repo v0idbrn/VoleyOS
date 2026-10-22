@@ -24,3 +24,6 @@ DEPLOY_CREDENTIALS.txt
 # OS
 .DS_Store
 Thumbs.db
+
+# Build artifacts
+frontend/tsconfig.tsbuildinfo
