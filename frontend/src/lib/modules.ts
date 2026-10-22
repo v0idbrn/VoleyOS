@@ -154,6 +154,78 @@ export const MODULES: ModuleMeta[] = [
       pt: "Carga aguda:crônica em Decimal com semáforo tendíneo.",
     },
   },
+  {
+    slug: "block-shadow",
+    number: 13,
+    icon: "🧱",
+    profiles: ["coaches", "players"],
+    name: { es: "Sombra de Bloqueo y Cobertura", en: "Block Shadow & Cover", pt: "Sombra de Bloqueio e Cobertura" },
+    tagline: {
+      es: "Cono de sombra en Decimal, defensores fuera del bloqueo y cancha cubierta.",
+      en: "Decimal shadow cone, defenders outside the block and court coverage.",
+      pt: "Cone de sombra em Decimal, defensores fora do bloqueio e cobertura da quadra.",
+    },
+  },
+  {
+    slug: "seam-radar",
+    number: 14,
+    icon: "📡",
+    profiles: ["coaches", "court"],
+    name: { es: "Radar de Costuras de Recepción", en: "Reception Seam Radar", pt: "Radar de Costuras de Recepção" },
+    tagline: {
+      es: "Dueño de la costura, prioridad y drill para cerrar el hueco entre receptores.",
+      en: "Seam owner, priority and drill to close the gap between receivers.",
+      pt: "Dono da costura, prioridade e drill para fechar o vão entre receptores.",
+    },
+  },
+  {
+    slug: "setter-iq",
+    number: 15,
+    icon: "🎯",
+    profiles: ["coaches", "players"],
+    name: { es: "Auditor de Imprevisibilidad del Armador", en: "Setter IQ Auditor", pt: "Auditor de Imprevisibilidade do Levantador" },
+    tagline: {
+      es: "Distribución R1-R6, índice 0-100 y sesgos por calidad de pase.",
+      en: "R1-R6 distribution, 0-100 index and pass-quality bias.",
+      pt: "Distribuição R1-R6, índice 0-100 e vieses por qualidade de passe.",
+    },
+  },
+  {
+    slug: "lineup-slip",
+    number: 16,
+    icon: "📋",
+    profiles: ["court", "coaches"],
+    name: { es: "Boleta FIVB I-VI", en: "FIVB Lineup Slip I-VI", pt: "Boleta FIVB I-VI" },
+    tagline: {
+      es: "Pares a 3 posiciones y ventana exacta del líbero por rotación.",
+      en: "Pairs three positions apart and the exact libero window per rotation.",
+      pt: "Pares a 3 posições e janela exata do líbero por rotação.",
+    },
+  },
+  {
+    slug: "integrity-seal",
+    number: 17,
+    icon: "🛡️",
+    profiles: ["tournaments", "court"],
+    name: { es: "Sello Criptográfico Anti-Trampa", en: "Integrity Seal", pt: "Selo Criptográfico Anti-Fraude" },
+    tagline: {
+      es: "HMAC-SHA256 sobre JSON canónico, hash público y verificación de actas.",
+      en: "HMAC-SHA256 over canonical JSON, public hash and match-sheet verification.",
+      pt: "HMAC-SHA256 sobre JSON canônico, hash público e verificação de súmulas.",
+    },
+  },
+  {
+    slug: "capsule-io",
+    number: 18,
+    icon: "💾",
+    profiles: ["players", "coaches", "tournaments"],
+    name: { es: "Cápsula Universal .volleyos", en: ".volleyos Capsule", pt: "Cápsula Universal .volleyos" },
+    tagline: {
+      es: "Exporta e importa pizarras, planteles y torneos con checksum SHA-256.",
+      en: "Export and import boards, rosters and tournaments with a SHA-256 checksum.",
+      pt: "Exporta e importa quadros, elencos e torneios com checksum SHA-256.",
+    },
+  },
 ];
 
 export const MODULE_BY_SLUG = new Map(MODULES.map((module) => [module.slug, module]));

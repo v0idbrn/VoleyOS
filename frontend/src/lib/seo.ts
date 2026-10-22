@@ -17,9 +17,9 @@ export const SECTION_LABELS: Record<SeoSection, Record<Locale, string>> = {
 
 export const SECTION_INTROS: Record<SeoSection, Record<Locale, string>> = {
   modules: {
-    es: "Doce estaciones offline que cubren cancha, cuerpo técnico, arbitraje y transmisión. Todas funcionan sin internet y sin cuentas.",
-    en: "Twelve offline stations covering the court, coaching staff, refereeing and streaming. All work without internet or accounts.",
-    pt: "Doze estações offline que cobrem quadra, comissão técnica, arbitragem e transmissão. Todas funcionam sem internet e sem contas.",
+    es: "Dieciocho estaciones offline que cubren cancha, cuerpo técnico, arbitraje y transmisión. Todas funcionan sin internet y sin cuentas.",
+    en: "Eighteen offline stations covering the court, coaching staff, refereeing and streaming. All work without internet or accounts.",
+    pt: "Dezoito estações offline que cobrem quadra, comissão técnica, arbitragem e transmissão. Todas funcionam sem internet e sem contas.",
   },
   positions: {
     es: "Roles, zonas y responsabilidades de cada posición del vóley indoor, con métricas que podés medir en VolleyOS.",
@@ -118,6 +118,36 @@ const MODULE_FACTS: Record<string, LArr> = {
     ["Carga aguda de 7 días contra crónica de 28.", "Zona óptima 0.8-1.3 y alerta sobre 1.5.", "Recomienda descarga ante fatiga acumulada."],
     ["7-day acute load against 28-day chronic load.", "Optimal zone 0.8-1.3 and alert above 1.5.", "Recommends deloading under accumulated fatigue."],
     ["Carga aguda de 7 dias contra crônica de 28.", "Zona ideal 0.8-1.3 e alerta acima de 1.5.", "Recomenda descarga sob fadiga acumulada."],
+  ),
+  "block-shadow": la(
+    ["Cono de sombra con área y cobertura calculadas en Decimal.", "Cada defensor se expulsa del cono o se marca fuera.", "La cobertura usa los 81 m² del campo propio."],
+    ["Shadow cone with area and coverage computed in Decimal.", "Every defender is ejected from the cone or flagged outside.", "Coverage uses the 81 m² own court."],
+    ["Cone de sombra com área e cobertura calculadas em Decimal.", "Cada defensor é expulso do cone ou marcado fora.", "A cobertura usa os 81 m² da quadra própria."],
+  ),
+  "seam-radar": la(
+    ["Detecta la costura entre los dos receptores más cercanos.", "Asigna dueño por ángulo de perfil y salida del atacante.", "Prioridad CRITICAL cuando la costura supera 260 cm."],
+    ["Finds the seam between the two closest receivers.", "Assigns an owner by profile angle and attacker release.", "CRITICAL priority when the seam exceeds 260 cm."],
+    ["Detecta a costura entre os dois receptores mais próximos.", "Atribui dono por ângulo de perfil e saída do atacante.", "Prioridade CRITICAL quando a costura passa de 260 cm."],
+  ),
+  "setter-iq": la(
+    ["HHI y dispersión normalizada de 0 a 100.", "Sesgo crítico cuando más del 65% de pases '+' van a una salida.", "Matriz R1-R6 de destinos y recomendaciones."],
+    ["HHI and normalised spread from 0 to 100.", "Critical bias when over 65% of '+' passes go to one target.", "R1-R6 target matrix with recommendations."],
+    ["HHI e dispersão normalizada de 0 a 100.", "Viés crítico quando mais de 65% dos passes '+' vão a uma saída.", "Matriz R1-R6 de destinos e recomendações."],
+  ),
+  "lineup-slip": la(
+    ["Boleta I-VI con pares separados exactamente tres posiciones.", "Ventana de líbero por rotación y zona trasera.", "Rechaza camisetas duplicadas, incluido el líbero."],
+    ["I-VI slip with pairs exactly three positions apart.", "Libero window per rotation and back-row zone.", "Rejects duplicate shirts, including the libero."],
+    ["Boleta I-VI com pares exatamente três posições separados.", "Janela de líbero por rotação e zona de fundo.", "Rejeita camisas duplicadas, incluindo o líbero."],
+  ),
+  "integrity-seal": la(
+    ["HMAC-SHA256 sobre JSON canónico con claves ordenadas.", "Hash público SHA-256 para auditar sin revelar el secreto.", "Verificación en tiempo constante y campos alterados."],
+    ["HMAC-SHA256 over canonical JSON with sorted keys.", "Public SHA-256 hash to audit without exposing the secret.", "Constant-time verification and changed-field detection."],
+    ["HMAC-SHA256 sobre JSON canônico com chaves ordenadas.", "Hash público SHA-256 para auditar sem revelar o segredo.", "Verificação em tempo constante e campos alterados."],
+  ),
+  "capsule-io": la(
+    ["Archivo .volleyos con formato y versión explícitos.", "Checksum SHA-256 del contenido exportado.", "La importación rechaza cualquier alteración del archivo."],
+    [".volleyos file with explicit format and version.", "SHA-256 checksum of the exported content.", "Import rejects any modified file."],
+    [".volleyos com formato e versão explícitos.", "Checksum SHA-256 do conteúdo exportado.", "A importação rejeita qualquer alteração do arquivo."],
   ),
 };
 

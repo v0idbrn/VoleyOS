@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { COPY, LOCALE_NAMES, t } from "@/lib/i18n";
 import { buildTarget, paywallEnabled, type Locale, type Profile } from "@/lib/local-engines";
@@ -57,13 +57,38 @@ const PLANS: Plan[] = [
 export function VolleyOSHub({ locale }: { locale: Locale }) {
   const copy = COPY[locale];
   const [profile, setProfile] = useState<Profile | "all">("all");
+  const [query, setQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const target = buildTarget();
 
-  const visible = useMemo(
-    () => (profile === "all" ? MODULES : MODULES.filter((module) => module.profiles.includes(profile))),
-    [profile],
-  );
+  const visible = useMemo(() => {
+    const needle = query.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    return MODULES.filter((module) => {
+      if (profile !== "all" && !module.profiles.includes(profile)) return false;
+      if (!needle) return true;
+      return `${module.name[locale]} ${module.tagline[locale]} ${module.slug}`
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .includes(needle);
+    });
+  }, [locale, profile, query]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+      if (event.key === "Escape" && document.activeElement === searchRef.current) {
+        setQuery("");
+        searchRef.current?.blur();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -134,7 +159,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
           </div>
           <div className="grid grid-cols-2 gap-3 self-center">
             {[
-              { value: "12", label: t(locale, "módulos", "modules", "módulos") },
+              { value: "18", label: t(locale, "módulos", "modules", "módulos") },
               { value: "3", label: t(locale, "idiomas", "languages", "idiomas") },
               { value: "0", label: t(locale, "telemetría", "telemetry", "telemetria") },
               { value: "1", label: t(locale, "clic por reporte", "click per report", "clique por relatório") },
@@ -156,6 +181,15 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
               {t(locale, "Todo corre en tu dispositivo. Probá cada estación con datos realistas.", "Everything runs on your device. Try each station with realistic data.", "Tudo roda no seu dispositivo. Teste cada estação com dados realistas.")}
             </p>
           </div>
+          <input
+            ref={searchRef}
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t(locale, "Buscar módulo (Ctrl+K)", "Search modules (Ctrl+K)", "Buscar módulo (Ctrl+K)")}
+            aria-label={t(locale, "Buscar módulo", "Search modules", "Buscar módulo")}
+            className="w-full rounded-lg border border-white/15 bg-obsidian px-3 py-1.5 text-xs text-white outline-none placeholder:text-white/35 focus:border-volt sm:w-56"
+          />
           <div className="flex flex-wrap gap-1" role="tablist" aria-label={copy.modules}>
             {FILTERS.map((filter) => (
               <button

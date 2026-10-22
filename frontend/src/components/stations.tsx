@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { COPY, t } from "@/lib/i18n";
 import {
@@ -10,11 +10,18 @@ import {
   awardIndoorPoint,
   balanceTeams,
   beachSwitchInterval,
+  buildLineupSlip,
+  buildSeal,
   buildVolleyCard,
   classifyTiming,
+  computeBlockShadow,
+  computeSeam,
+  computeSetterIQ,
   decideVar,
   defaultPositions,
+  exportCapsule,
   heatmap,
+  importCapsule,
   jumpLoad,
   newBeach,
   newScoreboard,
@@ -24,11 +31,19 @@ import {
   standings,
   tempoWindow,
   validateOverlap,
+  verifySeal,
   verticalJumpCm,
+  type AttackZone,
   type Axis,
+  type BlockScheme,
   type DailyJumps,
   type HeatCell,
+  type JsonValue,
+  type LineupNumbers,
   type Locale,
+  type SeamFormation,
+  type ServeType,
+  type SetDistribution,
   type SixAttributes,
   type TempoCode,
   type ZonePoint,
@@ -698,6 +713,477 @@ export function AcwrStation({ meta, locale, onSave }: StationProps) {
   );
 }
 
+/* 13 --------------------------------------------------------------------- */
+
+export function BlockShadowStation({ meta, locale, onSave }: StationProps) {
+  const [zone, setZone] = useState<AttackZone>("zone_4");
+  const [blockers, setBlockers] = useState(3);
+  const [scheme, setScheme] = useState<BlockScheme>("line");
+  const [depth, setDepth] = useState(0.55);
+  const report = computeBlockShadow({ attackZone: zone, blockers, scheme, blockDepth: depth });
+  const moved = report.defenders.filter((defender) => defender.movedCm > 0).length;
+
+  return (
+    <StationShell
+      meta={meta}
+      locale={locale}
+      rows={8}
+      onSave={onSave}
+      onExample={() => {
+        setZone("zone_4");
+        setBlockers(3);
+        setScheme("line");
+        setDepth(0.55);
+      }}
+    >
+      <div className="flex flex-wrap gap-1">
+        {(["zone_4", "zone_2", "pipe_6", "quick_3"] as AttackZone[]).map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setZone(value)}
+            className={`rounded-lg border px-2 py-1 text-[10px] font-bold ${zone === value ? "border-volt bg-volt/20 text-volt" : "border-white/10 text-white/50"}`}
+          >
+            {value.replace("_", " ")}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <label className="text-xs">
+          <span className={LABEL}>{t(locale, "Bloqueadores", "Blockers", "Bloqueadores")}</span>
+          <input className="mt-1 w-full accent-crimson" type="range" min={1} max={3} value={blockers} onChange={(event) => setBlockers(Number(event.target.value))} />
+        </label>
+        <label className="text-xs">
+          <span className={LABEL}>{t(locale, "Profundidad", "Depth", "Profundidade")}</span>
+          <input className="mt-1 w-full accent-crimson" type="range" min={0.2} max={2} step={0.05} value={depth} onChange={(event) => setDepth(Number(event.target.value))} />
+        </label>
+      </div>
+      <div className="mt-2 flex gap-1">
+        {(["line", "cross"] as BlockScheme[]).map((value) => (
+          <button key={value} type="button" onClick={() => setScheme(value)} className={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase ${scheme === value ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>
+            {value}
+          </button>
+        ))}
+      </div>
+      <svg viewBox="0 0 90 90" className="mt-3 h-44 w-full rounded-xl border border-white/10 bg-obsidian/60" role="img" aria-label={t(locale, "Cono de sombra del bloqueo", "Block shadow cone", "Cone de sombra do bloqueio")}>
+        <polygon points={report.shadowPolygon.map((point) => `${point.x * 10},${point.y * 10}`).join(" ")} fill="rgba(220,20,60,0.25)" stroke="#dc143c" strokeWidth="0.8" />
+        {report.defenders.map((defender) => (
+          <g key={defender.role}>
+            <circle cx={defender.x * 10} cy={defender.y * 10} r={defender.insideShadow ? 2.6 : 2} fill={defender.insideShadow ? "#dc143c" : "#2ee6a8"} />
+            <text x={defender.x * 10} y={defender.y * 10 - 3.4} fill="#fff" fontSize="3" textAnchor="middle">{defender.role}</text>
+          </g>
+        ))}
+      </svg>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <Metric label={t(locale, "Cobertura", "Coverage", "Cobertura")} value={`${report.coveragePct}%`} tone="text-volt" />
+        <Metric label={t(locale, "Área", "Area", "Área")} value={`${report.shadowAreaM2} m²`} />
+        <Metric label={t(locale, "Sin cubrir", "Uncovered", "Sem cobertura")} value={`${report.uncoveredWidthM} m`} />
+        <Metric label={t(locale, "Movidos", "Moved", "Movidos")} value={`${moved}/4`} tone={moved > 0 ? "text-emerald" : "text-crimson"} />
+      </div>
+    </StationShell>
+  );
+}
+
+/* 14 --------------------------------------------------------------------- */
+
+export function SeamRadarStation({ meta, locale, onSave }: StationProps) {
+  const [formation, setFormation] = useState<SeamFormation>("line3");
+  const [serveType, setServeType] = useState<ServeType>("jump_spin");
+  const [landingX, setLandingX] = useState(4.8);
+  const [landingY, setLandingY] = useState(5.6);
+  const report = useMemo(
+    () =>
+      computeSeam({
+        formation,
+        rotation: 2,
+        serveOrigin: "1",
+        serveType,
+        landingX,
+        landingY,
+        attackerReleaseAngle: 40,
+      }),
+    [formation, serveType, landingX, landingY],
+  );
+  const tone = report.priority === "CRITICAL" ? "text-crimson" : report.priority === "HIGH" ? "text-volt" : "text-emerald";
+
+  return (
+    <StationShell
+      meta={meta}
+      locale={locale}
+      rows={8}
+      onSave={onSave}
+      onExample={() => {
+        setFormation("line3");
+        setServeType("jump_spin");
+        setLandingX(4.8);
+        setLandingY(5.6);
+      }}
+    >
+      <div className="flex flex-wrap gap-1">
+        {(["line3", "line4"] as SeamFormation[]).map((value) => (
+          <button key={value} type="button" onClick={() => setFormation(value)} className={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase ${formation === value ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>
+            {value}
+          </button>
+        ))}
+        <select className="rounded-lg border border-white/15 bg-obsidian px-2 py-1 text-[10px] text-white" value={serveType} onChange={(event) => setServeType(event.target.value as ServeType)} aria-label={t(locale, "Tipo de saque", "Serve type", "Tipo de saque")}>
+          <option value="jump_spin">{t(locale, "Salto con efecto", "Jump spin", "Salto com efeito")}</option>
+          <option value="jump_float">{t(locale, "Salto flotante", "Jump float", "Salto flutuante")}</option>
+          <option value="short_drop">{t(locale, "Corto", "Short drop", "Curto")}</option>
+        </select>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <label className="text-xs">
+          <span className={LABEL}>X: {landingX.toFixed(1)} m</span>
+          <input className="mt-1 w-full accent-crimson" type="range" min={0} max={9} step={0.1} value={landingX} onChange={(event) => setLandingX(Number(event.target.value))} />
+        </label>
+        <label className="text-xs">
+          <span className={LABEL}>Y: {landingY.toFixed(1)} m</span>
+          <input className="mt-1 w-full accent-crimson" type="range" min={0} max={9} step={0.1} value={landingY} onChange={(event) => setLandingY(Number(event.target.value))} />
+        </label>
+      </div>
+      <svg viewBox="0 0 90 90" className="mt-3 h-44 w-full rounded-xl border border-white/10 bg-obsidian/60" role="img" aria-label={t(locale, "Radar de costuras", "Seam radar", "Radar de costuras")}>
+        <line x1={report.seamX * 10} y1={report.seamY * 10 - 4} x2={report.seamX * 10} y2={report.seamY * 10 + 4} stroke="#2ee6a8" strokeWidth="1" />
+        {report.receivers.map((receiver) => (
+          <g key={receiver.id}>
+            <circle cx={receiver.x * 10} cy={receiver.y * 10} r={receiver.id === report.primaryReceiver ? 2.8 : 2} fill={receiver.id === report.seamOwner ? "#dc143c" : "#2ee6a8"} />
+            <text x={receiver.x * 10} y={receiver.y * 10 - 3.4} fill="#fff" fontSize="3" textAnchor="middle">{receiver.id}</text>
+          </g>
+        ))}
+        <circle cx={landingX * 10} cy={landingY * 10} r={1.6} fill="#ffd60a" />
+      </svg>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <Metric label={t(locale, "Costura", "Seam gap", "Costura")} value={`${report.gapCm} cm`} />
+        <Metric label={t(locale, "Prioridad", "Priority", "Prioridade")} value={report.priority} tone={tone} />
+        <Metric label={t(locale, "Recibe", "Primary", "Recebe")} value={report.primaryReceiver} />
+        <Metric label={t(locale, "Cierra", "Owner", "Fecha")} value={report.seamOwner} tone="text-volt" />
+      </div>
+      <p className="mt-2 text-[11px] text-white/65">{report.drill}</p>
+    </StationShell>
+  );
+}
+
+/* 15 --------------------------------------------------------------------- */
+
+const SETTER_SAMPLE: SetDistribution[] = [
+  { rotation: 1, quality: "+", target: "Z4", count: 9 },
+  { rotation: 1, quality: "+", target: "Z3-Quick", count: 2 },
+  { rotation: 2, quality: "+", target: "Z4", count: 5 },
+  { rotation: 2, quality: "#", target: "Z2-Back", count: 4 },
+  { rotation: 2, quality: "!", target: "Pipe-Z6", count: 2 },
+  { rotation: 3, quality: "+", target: "Z4", count: 3 },
+  { rotation: 3, quality: "#", target: "Z3-Quick", count: 5 },
+  { rotation: 3, quality: "+", target: "Setter-Dump", count: 2 },
+  { rotation: 4, quality: "+", target: "Z2-Back", count: 6 },
+  { rotation: 4, quality: "#", target: "Z4", count: 3 },
+  { rotation: 5, quality: "+", target: "Pipe-Z6", count: 4 },
+  { rotation: 5, quality: "-", target: "Z4", count: 3 },
+  { rotation: 6, quality: "+", target: "Z4", count: 4 },
+  { rotation: 6, quality: "#", target: "Z3-Quick", count: 4 },
+  { rotation: 6, quality: "!", target: "Z2-Back", count: 2 },
+];
+
+const SETTER_PREDICTABLE: SetDistribution[] = [
+  { rotation: 1, quality: "+", target: "Z4", count: 12 },
+  { rotation: 2, quality: "+", target: "Z4", count: 11 },
+  { rotation: 3, quality: "+", target: "Z4", count: 10 },
+  { rotation: 4, quality: "+", target: "Z4", count: 9 },
+  { rotation: 5, quality: "+", target: "Z4", count: 10 },
+  { rotation: 6, quality: "+", target: "Z4", count: 8 },
+  { rotation: 5, quality: "#", target: "Z3-Quick", count: 2 },
+];
+
+export function SetterIQStation({ meta, locale, onSave }: StationProps) {
+  const [preset, setPreset] = useState<"balanced" | "predictable">("balanced");
+  const report = useMemo(
+    () => computeSetterIQ(preset === "balanced" ? SETTER_SAMPLE : SETTER_PREDICTABLE),
+    [preset],
+  );
+  const advice = report.bias
+    ? t(locale, `El rival puede cargar el bloqueo a ${report.bias}.`, `Opponents can load the block on ${report.bias}.`, `O adversário pode carregar o bloqueio em ${report.bias}.`)
+    : report.unpredictability < 45
+      ? t(locale, "Distribución predecible: abre Pipe y Back.", "Predictable distribution: open Pipe and Back.", "Distribuição previsível: abra Pipe e Back.")
+      : t(locale, "Distribución sana: mantén la dispersión.", "Healthy distribution: keep spreading the ball.", "Distribuição saudável: mantenha a dispersão.");
+  const maxCount = Math.max(...report.targets.map((target) => target.count), 1);
+
+  return (
+    <StationShell
+      meta={meta}
+      locale={locale}
+      rows={15}
+      onSave={onSave}
+      onExample={() => setPreset("balanced")}
+    >
+      <div className="flex gap-1">
+        {(["balanced", "predictable"] as const).map((value) => (
+          <button key={value} type="button" onClick={() => setPreset(value)} className={`rounded-lg border px-2 py-1 text-[10px] font-bold ${preset === value ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>
+            {value === "balanced" ? t(locale, "Equilibrado", "Balanced", "Equilibrado") : t(locale, "Predecible", "Predictable", "Previsível")}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <Metric label={t(locale, "IQ", "IQ", "IQ")} value={`${report.unpredictability}`} tone={report.unpredictability >= 45 ? "text-emerald" : "text-crimson"} />
+        <Metric label="HHI" value={`${report.hhi}`} />
+        <Metric label={t(locale, "Armados", "Sets", "Levantamentos")} value={`${report.totalSets}`} />
+      </div>
+      <div className="mt-3 space-y-1.5">
+        {report.targets.map((target) => (
+          <div key={target.target} className="flex items-center gap-2 text-[10px]">
+            <span className="w-20 shrink-0 font-semibold text-white/70">{target.target}</span>
+            <span className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
+              <span className="block h-full rounded-full bg-volt" style={{ width: `${(target.count / maxCount) * 100}%` }} />
+            </span>
+            <span className="w-12 text-right tabular-nums text-white/60">{target.sharePct}%</span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 rounded-lg border border-white/10 bg-obsidian/60 px-2 py-1 text-[10px] text-white/70">{advice}</p>
+    </StationShell>
+  );
+}
+
+/* 16 --------------------------------------------------------------------- */
+
+const SHIRT_DEFAULTS: LineupNumbers = { setter: 1, opposite: 11, outside1: 4, outside2: 7, middle1: 14, middle2: 18 };
+
+export function LineupSlipStation({ meta, locale, onSave }: StationProps) {
+  const [rotation, setRotation] = useState(1);
+  const [libero, setLibero] = useState(21);
+  const [shirts, setShirts] = useState<LineupNumbers>(SHIRT_DEFAULTS);
+  const roleLabels: Record<keyof LineupNumbers, string> = {
+    setter: t(locale, "Armador", "Setter", "Levantador"),
+    opposite: t(locale, "Opuesto", "Opposite", "Oposto"),
+    outside1: t(locale, "Punta 1", "Outside 1", "Ponteiro 1"),
+    outside2: t(locale, "Punta 2", "Outside 2", "Ponteiro 2"),
+    middle1: t(locale, "Central 1", "Middle 1", "Central 1"),
+    middle2: t(locale, "Central 2", "Middle 2", "Central 2"),
+  };
+  let report = null;
+  let error: string | null = null;
+  try {
+    report = buildLineupSlip({ ...shirts, rotationStart: rotation, libero });
+  } catch (caught) {
+    error = caught instanceof Error ? caught.message : "invalid lineup";
+  }
+  const zoneOrder = [4, 3, 2, 5, 6, 1];
+  const updateShirt = (role: keyof LineupNumbers, value: number): void => {
+    setShirts((current) => ({ ...current, [role]: value }));
+  };
+
+  return (
+    <StationShell
+      meta={meta}
+      locale={locale}
+      rows={7}
+      onSave={onSave}
+      onExample={() => {
+        setRotation(1);
+        setLibero(21);
+        setShirts(SHIRT_DEFAULTS);
+      }}
+    >
+      <label className="block text-xs">
+        <span className={LABEL}>{t(locale, "Rotación inicial", "Starting rotation", "Rotação inicial")}: R{rotation}</span>
+        <input className="mt-1 w-full accent-crimson" type="range" min={1} max={6} value={rotation} onChange={(event) => setRotation(Number(event.target.value))} />
+      </label>
+      <div className="mt-2 grid grid-cols-4 gap-1">
+        {(Object.keys(shirts) as Array<keyof LineupNumbers>).map((role) => (
+          <label key={role} className="text-[9px] text-white/60">
+            {roleLabels[role]}
+            <input className="mt-0.5 w-full rounded border border-white/15 bg-obsidian px-1 py-0.5 text-xs text-white" type="number" min={1} max={99} value={shirts[role]} onChange={(event) => updateShirt(role, Number(event.target.value))} />
+          </label>
+        ))}
+        <label className="text-[9px] text-white/60">
+          {t(locale, "Líbero", "Libero", "Líbero")}
+          <input className="mt-0.5 w-full rounded border border-white/15 bg-obsidian px-1 py-0.5 text-xs text-white" type="number" min={1} max={99} value={libero} onChange={(event) => setLibero(Number(event.target.value))} />
+        </label>
+      </div>
+      {error ? <p className="mt-2 rounded-lg bg-crimson/20 px-2 py-1 text-[10px] text-crimson">{error}</p> : null}
+      {report ? (
+        <>
+          <div className="mt-3 grid grid-cols-3 gap-1 text-center text-[10px]">
+            {zoneOrder.map((zone) => {
+              const slot = report.lineup.find((item) => item.zone === zone);
+              return (
+                <div key={zone} className="rounded-lg border border-white/10 bg-obsidian/60 p-1.5">
+                  <p className="text-[8px] uppercase tracking-wider text-white/40">{slot?.roman} · Z{zone}</p>
+                  <p className="text-base font-black text-volt">{slot?.number}</p>
+                  <p className="text-[8px] text-white/50">{slot ? roleLabels[slot.role] : ""}</p>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[10px] text-white/65">{report.message}</p>
+          <ul className="mt-1 space-y-0.5 text-[10px] text-emerald">
+            {report.liberoWindows.map((window) => <li key={window.rotation}>#{libero} → Z{window.zone} · {window.note}</li>)}
+          </ul>
+        </>
+      ) : null}
+    </StationShell>
+  );
+}
+
+/* 17 --------------------------------------------------------------------- */
+
+const SEAL_PAYLOAD: JsonValue = {
+  match_id: "ARG-BRA-2026-10-22",
+  set: 3,
+  score: { home: 26, away: 24 },
+  teams: ["Tiburones", "Condores"],
+};
+
+function parseJsonValue(text: string): JsonValue {
+  return JSON.parse(text) as JsonValue;
+}
+
+export function IntegritySealStation({ meta, locale, onSave }: StationProps) {
+  const [text, setText] = useState(() => JSON.stringify(SEAL_PAYLOAD, null, 2));
+  const [seal, setSeal] = useState<Awaited<ReturnType<typeof buildSeal>> | null>(null);
+  const [check, setCheck] = useState<Awaited<ReturnType<typeof verifySeal>> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    buildSeal(SEAL_PAYLOAD)
+      .then((report) => {
+        if (active) setSeal(report);
+      })
+      .catch(() => {
+        if (active) setError("Web Crypto no está disponible en este navegador.");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const sign = async (): Promise<void> => {
+    try {
+      const payload = parseJsonValue(text);
+      setSeal(await buildSeal(payload));
+      setCheck(null);
+      setError(null);
+    } catch {
+      setError(t(locale, "JSON inválido.", "Invalid JSON.", "JSON inválido."));
+    }
+  };
+
+  const verifyTampered = async (): Promise<void> => {
+    try {
+      const payload = parseJsonValue(text);
+      const current = seal ?? (await buildSeal(payload));
+      if (!seal) setSeal(current);
+      const altered = parseJsonValue(text.replace(/"home"\s*:\s*26/, '"home": 27'));
+      setCheck(await verifySeal(altered, current.seal, payload));
+      setError(null);
+    } catch {
+      setError(t(locale, "JSON inválido.", "Invalid JSON.", "JSON inválido."));
+    }
+  };
+
+  return (
+    <StationShell meta={meta} locale={locale} rows={3} onSave={onSave} onExample={() => { setText(JSON.stringify(SEAL_PAYLOAD, null, 2)); setCheck(null); void sign(); }}>
+      <textarea className={`${INPUT} h-32 font-mono text-[10px]`} value={text} onChange={(event) => setText(event.target.value)} aria-label={t(locale, "Acta JSON", "JSON match sheet", "Súmula JSON")} />
+      <div className="mt-2 flex flex-wrap gap-1">
+        <button type="button" className={BTN_PRIMARY} onClick={() => void sign()}>{t(locale, "Firmar acta", "Sign sheet", "Assinar súmula")}</button>
+        <button type="button" className={BTN} onClick={() => void verifyTampered()}>{t(locale, "Probar alteración", "Test tampering", "Testar alteração")}</button>
+      </div>
+      {error ? <p className="mt-2 text-[10px] text-crimson">{error}</p> : null}
+      {seal ? (
+        <div className="mt-2 space-y-1 rounded-lg border border-white/10 bg-obsidian/60 p-2 text-[10px]">
+          <p className="break-all font-mono text-volt">{seal.seal}</p>
+          <p className="break-all font-mono text-white/40">SHA-256 {seal.sha256.slice(0, 32)}…</p>
+          <p className="break-all font-mono text-white/30">{seal.canonical}</p>
+        </div>
+      ) : null}
+      {check ? (
+        <p className={`mt-2 rounded-lg px-2 py-1 text-[10px] font-bold ${check.tampered ? "bg-crimson/20 text-crimson" : "bg-emerald/20 text-emerald"}`}>
+          {check.message} {check.changedFields.length > 0 ? `(${check.changedFields.join(", ")})` : ""}
+        </p>
+      ) : null}
+    </StationShell>
+  );
+}
+
+/* 18 --------------------------------------------------------------------- */
+
+const CAPSULE_DATA: JsonValue = {
+  kind: "rotation_board",
+  team: "Tiburones",
+  rotation: 3,
+  lineup: { setter: 1, opposite: 11, outside1: 4, outside2: 7 },
+};
+
+export function CapsuleStation({ meta, locale, onSave }: StationProps) {
+  const [report, setReport] = useState<Awaited<ReturnType<typeof exportCapsule>> | null>(null);
+  const [text, setText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    exportCapsule("Pizarra 5-1 Tiburones", CAPSULE_DATA)
+      .then((capsule) => {
+        if (active) setReport(capsule);
+      })
+      .catch(() => {
+        if (active) setError("Web Crypto no está disponible en este navegador.");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const download = (): void => {
+    if (!report) return;
+    const blob = new Blob([report.capsule], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = report.filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const load = async (): Promise<void> => {
+    try {
+      setReport(await importCapsule(text));
+      setError(null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "invalid capsule");
+    }
+  };
+
+  return (
+    <StationShell
+      meta={meta}
+      locale={locale}
+      rows={1}
+      onSave={onSave}
+      onExample={() => {
+        setText("");
+        setError(null);
+        void exportCapsule("Pizarra 5-1 Tiburones", CAPSULE_DATA).then(setReport);
+      }}
+    >
+      {report ? (
+        <div className="grid grid-cols-2 gap-2">
+          <Metric label={t(locale, "Archivo", "File", "Arquivo")} value={report.filename} />
+          <Metric label={t(locale, "Bytes", "Bytes", "Bytes")} value={`${report.bytes}`} />
+          <div className="col-span-2 rounded-lg border border-white/10 bg-obsidian/60 p-2">
+            <p className="break-all font-mono text-[9px] text-emerald">{report.checksum}</p>
+          </div>
+        </div>
+      ) : null}
+      <div className="mt-2 flex flex-wrap gap-1">
+        <button type="button" className={BTN_PRIMARY} onClick={download}>{t(locale, "Descargar .volleyos", "Download .volleyos", "Baixar .volleyos")}</button>
+        <button type="button" className={BTN} onClick={() => void exportCapsule("Pizarra 5-1 Tiburones", CAPSULE_DATA).then(setReport)}>{t(locale, "Reexportar", "Re-export", "Reexportar")}</button>
+      </div>
+      <textarea className={`${INPUT} mt-2 h-20 font-mono text-[9px]`} value={text} placeholder={t(locale, "Pega una cápsula .volleyos aquí", "Paste a .volleyos capsule here", "Cole uma cápsula .volleyos aqui")} onChange={(event) => setText(event.target.value)} aria-label={t(locale, "Cápsula para importar", "Capsule to import", "Cápsula para importar")} />
+      <button type="button" className={`${BTN} mt-1`} onClick={() => void load()}>{t(locale, "Importar y verificar", "Import and verify", "Importar e verificar")}</button>
+      {error ? <p className="mt-2 text-[10px] text-crimson">{error}</p> : null}
+      {report?.action === "import" ? <p className="mt-1 text-[10px] text-emerald">{report.message}</p> : null}
+    </StationShell>
+  );
+}
+
 export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   biomechanics: BiomechanicsStation,
   rotation: RotationStation,
@@ -711,4 +1197,10 @@ export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   volleycard: VolleycardStation,
   tempo: TempoStation,
   acwr: AcwrStation,
+  "block-shadow": BlockShadowStation,
+  "seam-radar": SeamRadarStation,
+  "setter-iq": SetterIQStation,
+  "lineup-slip": LineupSlipStation,
+  "integrity-seal": IntegritySealStation,
+  "capsule-io": CapsuleStation,
 };

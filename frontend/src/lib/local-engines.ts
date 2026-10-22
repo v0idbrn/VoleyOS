@@ -908,3 +908,607 @@ export function round2(value: number): number {
 export function formatPct(value: number): string {
   return `${value.toFixed(2)}%`;
 }
+
+/* --------------------------------------------------------------- module 13 */
+
+export type AttackZone = "zone_4" | "zone_2" | "pipe_6" | "quick_3";
+export type BlockScheme = "line" | "cross";
+
+export interface BlockShadowInput {
+  attackZone: AttackZone;
+  blockers: number;
+  scheme: BlockScheme;
+  blockX?: number;
+  blockDepth: number;
+}
+
+export interface ShadowPoint {
+  x: number;
+  y: number;
+}
+
+export interface DefenderSpot extends ShadowPoint {
+  role: string;
+  movedCm: number;
+  insideShadow: boolean;
+}
+
+export interface BlockShadowReport {
+  attackZone: AttackZone;
+  scheme: BlockScheme;
+  blockers: number;
+  blockCenterX: number;
+  shadowPolygon: ShadowPoint[];
+  shadowAreaM2: number;
+  coveragePct: number;
+  defenders: DefenderSpot[];
+  uncoveredWidthM: number;
+  message: string;
+}
+
+const ATTACK_TARGET_X: Record<AttackZone, number> = { zone_4: 1.5, zone_2: 7.5, pipe_6: 4.5, quick_3: 3 };
+const DEFENDER_BASE: Record<string, [number, number]> = {
+  Z5: [1.6, 2.8],
+  Z6: [4.5, 5.4],
+  Z1: [7.4, 2.8],
+  FREE: [5.8, 1.6],
+};
+const COURT_WIDTH = 9;
+const HALF_COURT = 9;
+
+function polygonArea(points: Array<[number, number]>): number {
+  let total = 0;
+  points.forEach(([x1, y1], index) => {
+    const [x2, y2] = points[(index + 1) % points.length] as [number, number];
+    total += x1 * y2 - x2 * y1;
+  });
+  return Math.abs(total) / 2;
+}
+
+function insidePolygon(x: number, y: number, polygon: Array<[number, number]>): boolean {
+  let inside = false;
+  let j = polygon.length - 1;
+  polygon.forEach(([xi, yi], i) => {
+    const [xj, yj] = polygon[j] as [number, number];
+    if (yi > y !== yj > y) {
+      const edgeX = ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+      if (x < edgeX) inside = !inside;
+    }
+    j = i;
+  });
+  return inside;
+}
+
+function shadowHalfWidth(y: number, baseHalf: number, spread: number): number {
+  return baseHalf + (spread * y) / HALF_COURT;
+}
+
+function ejectFromShadow(x: number, centerX: number, baseHalf: number, spread: number): number {
+  const half = shadowHalfWidth(5, baseHalf, spread);
+  const left = Math.max(0.4, centerX - half - 0.4);
+  const right = Math.min(COURT_WIDTH - 0.4, centerX + half + 0.4);
+  if (x < centerX) return left;
+  return right;
+}
+
+export function computeBlockShadow(input: BlockShadowInput): BlockShadowReport {
+  const targetX = ATTACK_TARGET_X[input.attackZone];
+  let center: number;
+  if (input.blockX === undefined) {
+    const shift = input.scheme === "line" ? (targetX < 4.5 ? 0.6 : -0.6) : targetX < 4.5 ? -1.1 : 1.1;
+    center = Math.max(0.8, Math.min(COURT_WIDTH - 0.8, targetX + shift));
+  } else {
+    center = input.blockX;
+  }
+  const baseHalf = 0.45 * input.blockers;
+  const spread = (input.scheme === "line" ? 0.34 : 0.52) * input.blockers;
+  const farY = input.attackZone === "quick_3" ? 4.2 : 6.4;
+  const farHalf = shadowHalfWidth(farY, baseHalf, spread);
+  const polygon: Array<[number, number]> = [
+    [Math.max(0, center - baseHalf), input.blockDepth],
+    [Math.min(COURT_WIDTH, center + baseHalf), input.blockDepth],
+    [Math.min(COURT_WIDTH, center + farHalf), Math.min(HALF_COURT, farY)],
+    [Math.max(0, center - farHalf), Math.min(HALF_COURT, farY)],
+  ];
+  const area = round2(polygonArea(polygon));
+  const defenders = Object.entries(DEFENDER_BASE).map(([role, base]): DefenderSpot => {
+    let [x, y] = base;
+    let moved = 0;
+    if (insidePolygon(x, y, polygon)) {
+      const newX = ejectFromShadow(x, center, baseHalf, spread);
+      if (insidePolygon(newX, y, polygon)) {
+        y = Math.min(HALF_COURT - 0.4, farY + 0.6);
+      }
+      moved = round2(Math.abs(newX - x) * 100);
+      x = round2(newX);
+    }
+    return { role, x, y, movedCm: moved, insideShadow: insidePolygon(x, y, polygon) };
+  });
+  const coverage = round2((area / (COURT_WIDTH * HALF_COURT)) * 100);
+  return {
+    attackZone: input.attackZone,
+    scheme: input.scheme,
+    blockers: input.blockers,
+    blockCenterX: round2(center),
+    shadowPolygon: polygon.map(([x, y]) => ({ x: round2(x), y: round2(y) })),
+    shadowAreaM2: area,
+    coveragePct: coverage,
+    defenders,
+    uncoveredWidthM: round2(Math.max(0, COURT_WIDTH - baseHalf * 2)),
+    message: `Sombra de ${input.blockers} bloqueador(es) cubre ${coverage}% del campo propio.`,
+  };
+}
+
+/* --------------------------------------------------------------- module 14 */
+
+export type SeamFormation = "line3" | "line4";
+export type ServeType = "jump_spin" | "jump_float" | "short_drop";
+
+export interface SeamRadarInput {
+  formation: SeamFormation;
+  rotation: number;
+  serveOrigin: "1" | "5" | "6";
+  serveType: ServeType;
+  landingX: number;
+  landingY: number;
+  attackerReleaseAngle: number;
+}
+
+export interface ReceiverSpot extends ShadowPoint {
+  id: string;
+  zone: number;
+  distanceM: number;
+  profileDeg: number;
+}
+
+export interface SeamRadarReport {
+  formation: SeamFormation;
+  serveType: ServeType;
+  primaryReceiver: string;
+  seamOwner: string;
+  seamX: number;
+  seamY: number;
+  gapCm: number;
+  receivers: ReceiverSpot[];
+  drill: string;
+  priority: "CRITICAL" | "HIGH" | "NORMAL";
+  message: string;
+}
+
+function seamPositions(formation: SeamFormation): Array<[string, number, number, number]> {
+  if (formation === "line3") {
+    return [
+      ["R5", 5, 1.3, 6.2],
+      ["R6", 6, 4.5, 5.7],
+      ["R1", 1, 7.3, 6.2],
+    ];
+  }
+  return [
+    ["R5", 5, 1.1, 6.4],
+    ["R4", 4, 2.9, 4.9],
+    ["R6", 6, 4.7, 5.8],
+    ["R1", 1, 7.2, 5.9],
+  ];
+}
+
+function angleAt(a: ShadowPoint, b: ShadowPoint, c: ShadowPoint): number {
+  const v1 = { x: a.x - b.x, y: a.y - b.y };
+  const v2 = { x: c.x - b.x, y: c.y - b.y };
+  const n1 = Math.hypot(v1.x, v1.y);
+  const n2 = Math.hypot(v2.x, v2.y);
+  if (n1 === 0 || n2 === 0) return 0;
+  const cosine = Math.max(-1, Math.min(1, (v1.x * v2.x + v1.y * v2.y) / (n1 * n2)));
+  return round2((Math.acos(cosine) * 180) / Math.PI);
+}
+
+function seamDrill(serveType: ServeType, formation: SeamFormation, owner: string): string {
+  if (serveType === "short_drop") {
+    return `${owner} ataca la pelota corta y R6 cubre la costura central. Drill 3x10 cortas desde ${formation}.`;
+  }
+  if (serveType === "jump_float") {
+    return `${owner} toma la costura con perfil abierto; el vecino libera y llama la pelota. Drill 4x8 flotantes.`;
+  }
+  return `${owner} cierra la costura con plataforma firme y paso lateral. Drill 4x10 spin a la línea.`;
+}
+
+export function computeSeam(input: SeamRadarInput): SeamRadarReport {
+  const landing = { x: input.landingX, y: input.landingY };
+  const net = { x: 4.5, y: 0 };
+  const receivers = seamPositions(input.formation).map(([id, zone, x, y]): ReceiverSpot => ({
+    id,
+    zone,
+    x,
+    y,
+    distanceM: round2(Math.hypot(x - landing.x, y - landing.y)),
+    profileDeg: angleAt(landing, { x, y }, net),
+  }));
+  const ordered = [...receivers].sort((left, right) => left.distanceM - right.distanceM);
+  const primary = ordered[0] as ReceiverSpot;
+  const partner = ordered[1] as ReceiverSpot;
+  const seamX = round2((primary.x + partner.x) / 2);
+  const seamY = round2((primary.y + partner.y) / 2);
+  const gapCm = round2(Math.hypot(primary.x - partner.x, primary.y - partner.y) * 100);
+  const preferred = 45 + input.attackerReleaseAngle / 4;
+  const owner =
+    Math.abs(primary.profileDeg - preferred) <= Math.abs(partner.profileDeg - preferred) ? primary : partner;
+  const priority = gapCm > 260 ? "CRITICAL" : gapCm > 180 ? "HIGH" : "NORMAL";
+  return {
+    formation: input.formation,
+    serveType: input.serveType,
+    primaryReceiver: primary.id,
+    seamOwner: owner.id,
+    seamX,
+    seamY,
+    gapCm,
+    receivers,
+    drill: seamDrill(input.serveType, input.formation, owner.id),
+    priority,
+    message: `${primary.id} recibe, ${owner.id} cierra la costura de ${gapCm} cm ante ${input.serveType}.`,
+  };
+}
+
+/* --------------------------------------------------------------- module 15 */
+
+export const SET_TARGETS = ["Z4", "Z3-Quick", "Z2-Back", "Pipe-Z6", "Setter-Dump"] as const;
+export type SetTarget = (typeof SET_TARGETS)[number];
+export type SetQuality = "#" | "+" | "!" | "-";
+
+export interface SetDistribution {
+  rotation: number;
+  quality: SetQuality;
+  target: SetTarget;
+  count: number;
+}
+
+export interface TargetShare {
+  target: SetTarget;
+  count: number;
+  sharePct: number;
+}
+
+export interface SetterIQReport {
+  totalSets: number;
+  unpredictability: number;
+  hhi: number;
+  bias: SetTarget | null;
+  biasSharePct: number | null;
+  targets: TargetShare[];
+  byRotation: Record<string, Record<SetTarget, number>>;
+  recommendations: string[];
+  message: string;
+}
+
+export function computeSetterIQ(distributions: SetDistribution[]): SetterIQReport {
+  const total = distributions.reduce((sum, item) => sum + item.count, 0);
+  if (total === 0) throw new Error("at least one set is required");
+  const counts = Object.fromEntries(SET_TARGETS.map((target) => [target, 0])) as Record<SetTarget, number>;
+  const byRotation: Record<string, Record<SetTarget, number>> = {};
+  for (let rotation = 1; rotation <= 6; rotation += 1) {
+    byRotation[`R${rotation}`] = Object.fromEntries(SET_TARGETS.map((target) => [target, 0])) as Record<SetTarget, number>;
+  }
+  distributions.forEach((item) => {
+    counts[item.target] += item.count;
+    const rotation = byRotation[`R${item.rotation}`];
+    if (rotation) rotation[item.target] += item.count;
+  });
+  const shares = Object.fromEntries(
+    SET_TARGETS.map((target) => [target, counts[target] / total]),
+  ) as Record<SetTarget, number>;
+  const hhi = round2(SET_TARGETS.reduce((sum, target) => sum + shares[target] ** 2, 0) * 100);
+  const floor = 1 / SET_TARGETS.length;
+  const unpredictability = Math.max(0, Math.min(100, round2(((1 - hhi / 100) / (1 - floor)) * 100)));
+  const plus = distributions.filter((item) => item.quality === "+");
+  const plusTotal = plus.reduce((sum, item) => sum + item.count, 0);
+  let bias: SetTarget | null = null;
+  let biasSharePct: number | null = null;
+  if (plusTotal > 0) {
+    const plusCounts = Object.fromEntries(SET_TARGETS.map((target) => [target, 0])) as Record<SetTarget, number>;
+    plus.forEach((item) => {
+      plusCounts[item.target] += item.count;
+    });
+    const leader = SET_TARGETS.reduce((best, target) =>
+      plusCounts[target] > plusCounts[best] ? target : best,
+    );
+    const share = round2((plusCounts[leader] / plusTotal) * 100);
+    if (share > 65) {
+      bias = leader;
+      biasSharePct = share;
+    }
+  }
+  const targetRows = SET_TARGETS.map((target) => ({
+    target,
+    count: counts[target],
+    sharePct: round2(shares[target] * 100),
+  }));
+  const perRotation: Record<string, Record<SetTarget, number>> = {};
+  Object.entries(byRotation).forEach(([rotation, row]) => {
+    const rotationTotal = SET_TARGETS.reduce((sum, target) => sum + row[target], 0);
+    if (rotationTotal === 0) return;
+    perRotation[rotation] = Object.fromEntries(
+      SET_TARGETS.map((target) => [target, round2((row[target] / rotationTotal) * 100)]),
+    ) as Record<SetTarget, number>;
+  });
+  const recommendations: string[] = [];
+  if (unpredictability < 45) recommendations.push("Distribución predecible: entrena Pipe y Setter-Dump con pase '+'.");
+  if (bias) recommendations.push(`El rival puede cargar el bloqueo a ${bias}: ${biasSharePct}% de los pases '+' van allí.`);
+  if (targetRows.filter((row) => row.count === 0).length >= 2) {
+    recommendations.push("Dos salidas sin uso: introduce Quick y Back para abrir el bloqueo.");
+  }
+  if (recommendations.length === 0) recommendations.push("Distribución sana: mantén la dispersión y revisa por rotación.");
+  return {
+    totalSets: total,
+    unpredictability,
+    hhi,
+    bias,
+    biasSharePct,
+    targets: targetRows,
+    byRotation: perRotation,
+    recommendations,
+    message: `Índice de imprevisibilidad ${unpredictability}/100 con ${total} armados.`,
+  };
+}
+
+/* --------------------------------------------------------------- module 16 */
+
+export const LINEUP_ROLES = ["setter", "outside1", "middle1", "opposite", "outside2", "middle2"] as const;
+export type LineupRole = (typeof LINEUP_ROLES)[number];
+export type LineupNumbers = Record<LineupRole, number>;
+
+export interface LineupSlipInput extends LineupNumbers {
+  rotationStart: number;
+  libero: number;
+}
+
+export interface LineupSlot {
+  roman: string;
+  zone: number;
+  role: LineupRole;
+  number: number;
+  row: "front" | "back";
+}
+
+export interface LiberoWindow {
+  rotation: number;
+  zone: number;
+  middleNumber: number;
+  note: string;
+}
+
+export interface LineupSlipReport {
+  rotationStart: number;
+  lineup: LineupSlot[];
+  serviceOrder: number[];
+  checks: string[];
+  valid: true;
+  liberoEntry: LiberoWindow;
+  liberoWindows: LiberoWindow[];
+  message: string;
+}
+
+const ROMAN = ["I", "II", "III", "IV", "V", "VI"];
+const PAIRS: Array<[LineupRole, LineupRole]> = [
+  ["setter", "opposite"],
+  ["outside1", "outside2"],
+  ["middle1", "middle2"],
+];
+
+export function buildLineupSlip(input: LineupSlipInput): LineupSlipReport {
+  const shirts = [input.setter, input.opposite, input.outside1, input.outside2, input.middle1, input.middle2, input.libero];
+  if (new Set(shirts).size !== shirts.length) throw new Error("shirt numbers must be unique, including the libero");
+  const base = LINEUP_ROLES.map((role) => input[role]);
+  const shift = input.rotationStart - 1;
+  const shifted = shift > 0 ? [...base.slice(-shift), ...base.slice(0, 6 - shift)] : base;
+  const lineup = shifted.map((number, index): LineupSlot => {
+    const zone = index + 1;
+    return {
+      roman: ROMAN[index] as string,
+      zone,
+      role: LINEUP_ROLES[index] as LineupRole,
+      number,
+      row: zone >= 2 && zone <= 4 ? "front" : "back",
+    };
+  });
+  const checks = PAIRS.map(([left, right]) => {
+    const gap = Math.abs(shifted.indexOf(input[left]) - shifted.indexOf(input[right]));
+    if (gap !== 3) throw new Error(`${left}/${right} must be exactly three service positions apart`);
+    return `${left}/${right}: 3 posiciones exactas`;
+  });
+  const liberoWindows = lineup
+    .filter((slot) => (slot.role === "middle1" || slot.role === "middle2") && [1, 5, 6].includes(slot.zone))
+    .map((slot): LiberoWindow => ({
+      rotation: slot.zone,
+      zone: slot.zone,
+      middleNumber: slot.number,
+      note: `Líbero #${input.libero} entra por central #${slot.number} en Z${slot.zone} antes del saque.`,
+    }));
+  if (liberoWindows.length === 0) throw new Error("this rotation leaves both middles in the front row; the libero cannot enter");
+  return {
+    rotationStart: input.rotationStart,
+    lineup,
+    serviceOrder: lineup.map((slot) => slot.number),
+    checks,
+    valid: true,
+    liberoEntry: liberoWindows[0] as LiberoWindow,
+    liberoWindows,
+    message: `Boleta I-VI válida para arrancar en R${input.rotationStart}.`,
+  };
+}
+
+/* --------------------------------------------------------------- module 17 */
+
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+export interface SealReport {
+  seal: string;
+  sha256: string;
+  canonical: string;
+  message: string;
+}
+
+export interface VerifySealReport {
+  tampered: boolean;
+  expectedSeal: string;
+  providedSeal: string;
+  changedFields: string[];
+  message: string;
+}
+
+export const INTEGRITY_SEAL_SECRET = "volleyos-integrity-dev";
+
+export function canonicalJson(value: JsonValue): string {
+  if (Array.isArray(value)) return `[${value.map((item) => canonicalJson(item)).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const entries = Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key] as JsonValue)}`);
+    return `{${entries.join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function bytesToHex(buffer: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function hmacSha256(message: string, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  return bytesToHex(await crypto.subtle.sign("HMAC", key, encoder.encode(message)));
+}
+
+async function sha256(message: string): Promise<string> {
+  return bytesToHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(message)));
+}
+
+export async function buildSeal(payload: JsonValue): Promise<SealReport> {
+  const canonical = canonicalJson(payload);
+  const digest = await hmacSha256(canonical, INTEGRITY_SEAL_SECRET);
+  return {
+    seal: `VOS-SEAL-${digest.slice(0, 32).toUpperCase()}`,
+    sha256: await sha256(canonical),
+    canonical,
+    message: "Sello HMAC-SHA256 emitido sobre JSON canónico ordenado.",
+  };
+}
+
+function changedFields(original: JsonValue, current: JsonValue, prefix = ""): string[] {
+  if (
+    original !== null &&
+    current !== null &&
+    typeof original === "object" &&
+    typeof current === "object" &&
+    !Array.isArray(original) &&
+    !Array.isArray(current)
+  ) {
+    const keys = new Set([...Object.keys(original), ...Object.keys(current)]);
+    return Array.from(keys)
+      .sort()
+      .flatMap((key) => {
+        const path = prefix ? `${prefix}.${key}` : key;
+        if (!(key in original) || !(key in current)) return [path];
+        return changedFields(original[key] as JsonValue, current[key] as JsonValue, path);
+      });
+  }
+  return JSON.stringify(original) === JSON.stringify(current) ? [] : [prefix || "payload"];
+}
+
+export async function verifySeal(
+  payload: JsonValue,
+  seal: string,
+  original?: JsonValue,
+): Promise<VerifySealReport> {
+  const report = await buildSeal(payload);
+  const provided = seal.trim().toUpperCase();
+  const tampered = report.seal !== provided;
+  const changed = original === undefined ? [] : changedFields(original, payload);
+  return {
+    tampered,
+    expectedSeal: report.seal,
+    providedSeal: provided,
+    changedFields: tampered && changed.length === 0 ? ["payload"] : changed,
+    message: tampered ? "Acta alterada: el sello no coincide." : "Sello válido: el acta conserva su integridad.",
+  };
+}
+
+/* --------------------------------------------------------------- module 18 */
+
+export const CAPSULE_VERSION = 2;
+export const CAPSULE_KEYS = ["format", "version", "created_at", "title", "checksum", "data"] as const;
+
+export interface CapsuleReport {
+  action: "export" | "import";
+  filename: string;
+  capsule: string;
+  checksum: string;
+  bytes: number;
+  title: string;
+  data: JsonValue;
+  message: string;
+}
+
+function capsuleFilename(title: string): string {
+  const slug = title.trim().replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
+  return `${slug || "volleyos"}.volleyos`;
+}
+
+export async function exportCapsule(title: string, data: JsonValue): Promise<CapsuleReport> {
+  const checksum = await sha256(canonicalJson(data));
+  const envelope: JsonValue = {
+    format: "volleyos.capsule",
+    version: CAPSULE_VERSION,
+    created_at: new Date().toISOString(),
+    title,
+    checksum,
+    data,
+  };
+  const capsule = canonicalJson(envelope);
+  return {
+    action: "export",
+    filename: capsuleFilename(title),
+    capsule,
+    checksum,
+    bytes: new TextEncoder().encode(capsule).length,
+    title,
+    data,
+    message: "Cápsula .volleyos sellada con SHA-256. Compártela offline.",
+  };
+}
+
+export async function importCapsule(text: string): Promise<CapsuleReport> {
+  let envelope: JsonValue;
+  try {
+    envelope = JSON.parse(text) as JsonValue;
+  } catch {
+    throw new Error("capsule is not valid JSON");
+  }
+  if (envelope === null || typeof envelope !== "object" || Array.isArray(envelope)) {
+    throw new Error("capsule must be a JSON object");
+  }
+  const keys = Object.keys(envelope).sort().join(",");
+  if (keys !== [...CAPSULE_KEYS].sort().join(",")) throw new Error("capsule envelope has missing or unknown fields");
+  if (envelope.format !== "volleyos.capsule") throw new Error("unsupported capsule format");
+  if (envelope.version !== CAPSULE_VERSION) throw new Error("unsupported capsule version");
+  const data = envelope.data;
+  if (data === undefined || data === null || typeof data !== "object") throw new Error("capsule data must be an object");
+  const checksum = await sha256(canonicalJson(data));
+  if (checksum !== envelope.checksum) throw new Error("capsule checksum mismatch: file was modified");
+  const title = typeof envelope.title === "string" ? envelope.title : "VolleyOS Capsule";
+  return {
+    action: "import",
+    filename: capsuleFilename(title),
+    capsule: text,
+    checksum,
+    bytes: new TextEncoder().encode(text).length,
+    title,
+    data,
+    message: "Cápsula importada y verificada: checksum SHA-256 válido.",
+  };
+}
