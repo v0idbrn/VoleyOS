@@ -1,0 +1,26 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+out/
+coverage/
+
+# Secrets / local
+.env
+.env.local
+.env.production.local
+DEPLOY_CREDENTIALS.txt
+.tmp/
+*.xlsx
+
+# OS
+.DS_Store
+Thumbs.db
