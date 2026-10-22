@@ -1,4 +1,4 @@
-"""Single dispatcher for the 24 engines, shared by API, demo and health probe."""
+"""Single dispatcher for the 30 engines, shared by API, demo and health probe."""
 
 from __future__ import annotations
 
@@ -14,7 +14,9 @@ from app.services.beach_engine import award_point as beach_point
 from app.services.biomechanics import PoseSequence, analyze_sequence
 from app.services.block_shadow import BlockShadowRequest, compute_block_shadow
 from app.services.capsule_io import CapsuleRequest, run_capsule
+from app.services.captain_draft import DraftRequest, snake_draft
 from app.services.court_split import CourtSplitRequest, split_costs
+from app.services.equipment_inspector import EquipmentRequest, inspect_equipment
 from app.services.fan_companion import FanRequest, fan_report
 from app.services.integrity_seal import (
     SealRequest,
@@ -24,6 +26,8 @@ from app.services.integrity_seal import (
 )
 from app.services.jump_load_monitor import DailyJump, jump_load
 from app.services.lineup_slip import LineupSlipRequest, build_lineup_slip
+from app.services.match_poster import MatchPosterRequest, build_match_poster
+from app.services.momentum_coach import MomentumRequest, analyze_momentum
 from app.services.mvp_awards import MvpRequest, award_mvp
 from app.services.obs_overlay import build_overlay
 from app.services.pickup_balancer import (
@@ -34,6 +38,7 @@ from app.services.pickup_balancer import (
 )
 from app.services.pocket_var import analyze_play, toss_coin, whistle
 from app.services.referee_console import RefereeRequest, referee_report
+from app.services.roster_pass import RosterRequest, build_roster_pass
 from app.services.rotation_validator import (
     default_positions,
     formation_for_rotation,
@@ -60,6 +65,7 @@ from app.services.seam_radar import SeamRadarRequest, compute_seam
 from app.services.setter_iq import SetterIQRequest, compute_setter_iq
 from app.services.setter_signals import SetterSignalRequest, build_signal_sheet
 from app.services.substitution_tracker import SubstitutionRequest, track_substitutions
+from app.services.timeout_chalkboard import ChalkboardRequest, build_chalkboard
 from app.services.tournament_engine import (
     MatchResult,
     playoff_bracket,
@@ -272,6 +278,57 @@ MODULES: tuple[ModuleInfo, ...] = (
         profile="players",
         profiles=["players", "tournaments"],
         description="MVP, Muro, Candado, Francotirador y tarjeta sellada para compartir.",
+    ),
+    ModuleInfo(
+        slug="timeout-chalkboard",
+        name="Pizarra de Tiempo Muerto",
+        name_en="Timeout Chalkboard",
+        profile="tournaments",
+        profiles=["tournaments"],
+        description="Dos consignas tácticas, 30 segundos FIVB y trazos validados en 9x18 m.",
+    ),
+    ModuleInfo(
+        slug="momentum-coach",
+        name="Coach de Momentum y Rachas",
+        name_en="Momentum Coach",
+        profile="tournaments",
+        profiles=["tournaments"],
+        description="Break points, racha rival y rotación de mayor presión en tiempo real.",
+    ),
+    ModuleInfo(
+        slug="captain-draft",
+        name="Draft Serpiente de Capitanes",
+        name_en="Snake Captain Draft",
+        profile="tournaments",
+        profiles=["tournaments"],
+        description="Orden A-B-B-A, equipos parejos y auditoría por departamento.",
+    ),
+    ModuleInfo(
+        slug="roster-pass",
+        name="Pase Verificable de Plantel",
+        name_en="Roster Pass",
+        profile="referees",
+        profiles=["referees"],
+        description="Hasta 14 jugadores, dos liberos y pase VOS-ROSTER sellado para mesa.",
+    ),
+    ModuleInfo(
+        slug="equipment-inspector",
+        name="Inspector de Red y Balón",
+        name_en="Equipment Inspector",
+        profile="referees",
+        profiles=["referees"],
+        description=(
+            "Alturas oficiales, tolerancia de 2 cm y presión de balón en "
+            "kgf/cm2, PSI y kPa."
+        ),
+    ),
+    ModuleInfo(
+        slug="match-poster",
+        name="Poster SVG de Partido",
+        name_en="SVG Match Poster",
+        profile="fans",
+        profiles=["fans"],
+        description="Story 9:16 y feed 1:1 con sets, MVP, sello HMAC y código de sala.",
     ),
 )
 
@@ -541,6 +598,30 @@ def _run_mvp_awards(payload: dict[str, Any]) -> dict[str, Any]:
     return _dump(award_mvp(MvpRequest.model_validate(payload)))
 
 
+def _run_timeout_chalkboard(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_chalkboard(ChalkboardRequest.model_validate(payload)))
+
+
+def _run_momentum_coach(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(analyze_momentum(MomentumRequest.model_validate(payload)))
+
+
+def _run_captain_draft(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(snake_draft(DraftRequest.model_validate(payload)))
+
+
+def _run_roster_pass(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_roster_pass(RosterRequest.model_validate(payload)))
+
+
+def _run_equipment_inspector(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(inspect_equipment(EquipmentRequest.model_validate(payload)))
+
+
+def _run_match_poster(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_match_poster(MatchPosterRequest.model_validate(payload)))
+
+
 RUNNERS = {
     "biomechanics": _run_biomechanics,
     "rotation": _run_rotation,
@@ -566,6 +647,12 @@ RUNNERS = {
     "fan-companion": _run_fan_companion,
     "setter-signals": _run_setter_signals,
     "mvp-awards": _run_mvp_awards,
+    "timeout-chalkboard": _run_timeout_chalkboard,
+    "momentum-coach": _run_momentum_coach,
+    "captain-draft": _run_captain_draft,
+    "roster-pass": _run_roster_pass,
+    "equipment-inspector": _run_equipment_inspector,
+    "match-poster": _run_match_poster,
 }
 
 

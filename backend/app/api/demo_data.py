@@ -34,6 +34,12 @@ MODULE_SLUGS = (
     "fan-companion",
     "setter-signals",
     "mvp-awards",
+    "timeout-chalkboard",
+    "momentum-coach",
+    "captain-draft",
+    "roster-pass",
+    "equipment-inspector",
+    "match-poster",
 )
 
 
@@ -649,6 +655,100 @@ def mvp_awards_demo() -> dict[str, Any]:
     }
 
 
+def timeout_chalkboard_demo() -> dict[str, Any]:
+    return {
+        "reason": "stop_serve_run",
+        "rotation": 4,
+        "score_a": 18,
+        "score_b": 21,
+        "serving": "B",
+        "strokes": [
+            {
+                "points": [
+                    {"x": "1", "y": "1"},
+                    {"x": "4", "y": "6"},
+                    {"x": "6", "y": "12"},
+                ]
+            },
+            {"points": [{"x": "6", "y": "14"}, {"x": "8", "y": "17"}]},
+        ],
+    }
+
+
+def momentum_coach_demo() -> dict[str, Any]:
+    return {
+        "team": "A",
+        "rally_winner_history": ["A", "A", "B", "B", "B"],
+        "rotation_history": [1, 2, 3, 3, 3],
+    }
+
+
+def captain_draft_demo() -> dict[str, Any]:
+    return {
+        "captains": ["Tiburones", "Condores"],
+        "players": [
+            {"name": "Sofia", "role": "setter", "level": "5"},
+            {"name": "Valentina", "role": "outside", "level": "5"},
+            {"name": "Micaela", "role": "middle", "level": "5"},
+            {"name": "Carla", "role": "opposite", "level": "4"},
+            {"name": "Renata", "role": "libero", "level": "4"},
+            {"name": "Julieta", "role": "outside", "level": "4"},
+            {"name": "Martina", "role": "middle", "level": "3"},
+            {"name": "Lucia", "role": "setter", "level": "3"},
+            {"name": "Paula", "role": "outside", "level": "3"},
+            {"name": "Ines", "role": "libero", "level": "2"},
+        ],
+    }
+
+
+def roster_pass_demo() -> dict[str, Any]:
+    return {
+        "team": "Tiburones",
+        "tournament": "Copa Verano",
+        "players": [
+            {"name": "Sofia", "number": 1, "role": "setter", "is_captain": True},
+            {"name": "Valentina", "number": 4, "role": "outside"},
+            {"name": "Micaela", "number": 7, "role": "outside"},
+            {"name": "Renata", "number": 9, "role": "middle"},
+            {"name": "Carla", "number": 11, "role": "opposite"},
+            {"name": "Julieta", "number": 14, "role": "middle"},
+            {"name": "Martina", "number": 21, "role": "libero", "is_libero": True},
+            {"name": "Lucia", "number": 22, "role": "libero", "is_libero": True},
+        ],
+    }
+
+
+def equipment_inspector_demo() -> dict[str, Any]:
+    return {
+        "category": "men_indoor",
+        "center_height_cm": "243",
+        "side_a_height_cm": "243",
+        "side_b_height_cm": "242",
+        "ball_pressure_kgf_cm2": "0.310",
+        "surface": "indoor",
+    }
+
+
+def match_poster_demo() -> dict[str, Any]:
+    return {
+        "home_team": "Tiburones",
+        "away_team": "Condores",
+        "sets_home": 3,
+        "sets_away": 1,
+        "periods": [
+            {"home": 25, "away": 21},
+            {"home": 22, "away": 25},
+            {"home": 25, "away": 19},
+            {"home": 25, "away": 23},
+        ],
+        "tournament": "Copa Verano",
+        "mvp": "Valentina",
+        "room_id": "TIB-2026",
+        "theme": "obsidian",
+        "format": "story",
+    }
+
+
 DEMOS = {
     "biomechanics": biomechanics_demo,
     "rotation": rotation_demo,
@@ -674,4 +774,10 @@ DEMOS = {
     "fan-companion": fan_companion_demo,
     "setter-signals": setter_signals_demo,
     "mvp-awards": mvp_awards_demo,
+    "timeout-chalkboard": timeout_chalkboard_demo,
+    "momentum-coach": momentum_coach_demo,
+    "captain-draft": captain_draft_demo,
+    "roster-pass": roster_pass_demo,
+    "equipment-inspector": equipment_inspector_demo,
+    "match-poster": match_poster_demo,
 }
