@@ -18,6 +18,12 @@ run_local.bat
 ```
 
 Backend on `http://localhost:8000`, frontend on `http://localhost:3000`.
+API docs at `http://localhost:8000/docs`; app at `http://localhost:3000/es/`.
+
+```bash
+# Docker (API + web)
+docker compose up --build
+```
 
 ## Modules
 
@@ -36,6 +42,15 @@ Backend on `http://localhost:8000`, frontend on `http://localhost:3000`.
 | 11 | Attack tempo trainer | `tempo` |
 | 12 | ACWR jump-load monitor | `acwr` |
 
+## API surface
+
+- `GET /api/v1/health/deep` - 12-engine health.
+- `GET /api/v1/catalog/modules` - modules, samples and pricing.
+- `POST /api/v1/modules/{slug}/run` and `/demo` - run an engine.
+- `POST /api/v1/jobs` -> `GET /jobs/{id}/preview` -> signed payment webhook ->
+  `GET /jobs/{id}/download?format=xlsx|csv` (402 until paid).
+- `DELETE /api/v1/jobs/{id}` - destroy data and return a signed UTC receipt.
+
 ## Development gates
 
 ```bash
@@ -45,4 +60,15 @@ cd backend && .venv\Scripts\python -m mypy --strict app
 cd frontend && npm run typecheck && npm run test && npm run build
 ```
 
-See `docs/HANDOFF.md`, `docs/QA_REPORT.md` and `docs/LAUNCH_PLAYBOOK.md`.
+## Documentation
+
+- `docs/HANDOFF.md` - sprint log and current state.
+- `docs/QA_REPORT.md` - gates, E2E evidence and known limits.
+- `docs/LAUNCH_PLAYBOOK.md` - deploy, domain, payments, rollback.
+- `docs/FDROID_SUBMISSION_GUIDE.md` - offline Android distribution.
+- `docs/openapi.json` - generated API contract.
+
+## Status
+
+v1.0.0: 202 backend tests, 25 frontend tests, 140 static pages, 22/22 live E2E.
+Cloud export uses an HMAC webhook; wire a checkout provider before charging.

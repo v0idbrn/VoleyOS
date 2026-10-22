@@ -66,4 +66,18 @@
 - Docker images not built locally: Docker Desktop Linux engine was stopped.
   `docker compose config` validates; build before publishing.
 
-Next: Sprint 9 (launch playbook, README, GitHub push, v1.0.0 tag).
+## Sprint 9 - launch
+- `docs/LAUNCH_PLAYBOOK.md`: preflight, Docker/Render deploy, DNS, Stripe HMAC
+  bridge, F-Droid, privacy checks, launch checklist, rollback, monitoring.
+- `README.md`: Docker quick start, API surface, docs index and v1.0.0 status.
+- Skip link to stations for keyboard users; focus-visible styles preserved.
+- Final gates: 202 backend tests, 25 frontend tests, 140 static pages.
+- Published to https://github.com/v0idbrn/VoleyOS and tagged `v1.0.0`.
+
+## Current state
+- 12 Decimal engines + TS mirrors, FastAPI API with HMAC paywall, 3-locale
+  Command Center, 140 SSG pages, PWA, F-Droid metadata, Docker/Render/CI, E2E.
+- Known limits: in-memory jobs, no auth/rate limit, no live checkout provider,
+  Cloud export UI not wired to the job API, Docker images unbuilt locally.
+
+Next: wire checkout + API export UI, then Redis/SQLite job store and auth.
