@@ -1,6 +1,6 @@
 """Decimal-only geometry helpers.
 
-No binary floats anywhere: trigonometry is implemented with Decimal Taylor
+No binary IEEE numbers anywhere: trigonometry is implemented with Decimal Taylor
 series and bisection so biomechanical angles stay exact end to end.
 """
 
