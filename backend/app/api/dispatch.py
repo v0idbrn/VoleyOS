@@ -1,4 +1,4 @@
-"""Single dispatcher for the 12 engines, shared by API, demo and health probe."""
+"""Single dispatcher for the 24 engines, shared by API, demo and health probe."""
 
 from __future__ import annotations
 
@@ -14,6 +14,8 @@ from app.services.beach_engine import award_point as beach_point
 from app.services.biomechanics import PoseSequence, analyze_sequence
 from app.services.block_shadow import BlockShadowRequest, compute_block_shadow
 from app.services.capsule_io import CapsuleRequest, run_capsule
+from app.services.court_split import CourtSplitRequest, split_costs
+from app.services.fan_companion import FanRequest, fan_report
 from app.services.integrity_seal import (
     SealRequest,
     VerifySealRequest,
@@ -22,6 +24,7 @@ from app.services.integrity_seal import (
 )
 from app.services.jump_load_monitor import DailyJump, jump_load
 from app.services.lineup_slip import LineupSlipRequest, build_lineup_slip
+from app.services.mvp_awards import MvpRequest, award_mvp
 from app.services.obs_overlay import build_overlay
 from app.services.pickup_balancer import (
     PickupPlayer,
@@ -30,6 +33,7 @@ from app.services.pickup_balancer import (
     next_challenger,
 )
 from app.services.pocket_var import analyze_play, toss_coin, whistle
+from app.services.referee_console import RefereeRequest, referee_report
 from app.services.rotation_validator import (
     default_positions,
     formation_for_rotation,
@@ -54,6 +58,8 @@ from app.services.scouting_engine import (
 )
 from app.services.seam_radar import SeamRadarRequest, compute_seam
 from app.services.setter_iq import SetterIQRequest, compute_setter_iq
+from app.services.setter_signals import SetterSignalRequest, build_signal_sheet
+from app.services.substitution_tracker import SubstitutionRequest, track_substitutions
 from app.services.tournament_engine import (
     MatchResult,
     playoff_bracket,
@@ -218,6 +224,54 @@ MODULES: tuple[ModuleInfo, ...] = (
         profile="players",
         profiles=["players", "coaches", "tournaments"],
         description="Exporta e importa pizarras, planteles y torneos con checksum SHA-256.",
+    ),
+    ModuleInfo(
+        slug="referee-console",
+        name="Consola Oficial de Arbitro",
+        name_en="FIVB Referee Console",
+        profile="court",
+        profiles=["court", "tournaments"],
+        description="Tarjetas FIVB, escalamiento automatico y relojes de 8s/30s.",
+    ),
+    ModuleInfo(
+        slug="substitution-tracker",
+        name="Control de las 6 Sustituciones",
+        name_en="Six-Substitution Tracker",
+        profile="court",
+        profiles=["court", "coaches"],
+        description="Valida cambios, reingresos y pares por posicion en tiempo real.",
+    ),
+    ModuleInfo(
+        slug="court-split",
+        name="La Vaquita y Finanzas de Torneo",
+        name_en="Court Split & Tournament Finance",
+        profile="tournaments",
+        profiles=["tournaments", "players"],
+        description="Reparte cancha y tercer tiempo al centavo y calcula break-even.",
+    ),
+    ModuleInfo(
+        slug="fan-companion",
+        name="Modo Tribuna y Senas Arbitrales",
+        name_en="Fan Companion & Referee Signals",
+        profile="tournaments",
+        profiles=["tournaments", "players", "court"],
+        description="Decodifica gestos FIVB, trivia y explicaciones en ES/EN/PT.",
+    ),
+    ModuleInfo(
+        slug="setter-signals",
+        name="Senas Ocultas del Armador",
+        name_en="Setter Back Signals",
+        profile="players",
+        profiles=["players", "coaches"],
+        description="Diccionario de senas, deteccion de colisiones y hoja de codigos.",
+    ),
+    ModuleInfo(
+        slug="mvp-awards",
+        name="Premios MVP y Tercer Tiempo",
+        name_en="MVP & Third-Half Awards",
+        profile="players",
+        profiles=["players", "tournaments"],
+        description="MVP, Muro, Candado, Francotirador y tarjeta sellada para compartir.",
     ),
 )
 
@@ -463,6 +517,30 @@ def _run_capsule(payload: dict[str, Any]) -> dict[str, Any]:
     return _dump(run_capsule(CapsuleRequest.model_validate(payload)))
 
 
+def _run_referee_console(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(referee_report(RefereeRequest.model_validate(payload)))
+
+
+def _run_substitution_tracker(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(track_substitutions(SubstitutionRequest.model_validate(payload)))
+
+
+def _run_court_split(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(split_costs(CourtSplitRequest.model_validate(payload)))
+
+
+def _run_fan_companion(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(fan_report(FanRequest.model_validate(payload)))
+
+
+def _run_setter_signals(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_signal_sheet(SetterSignalRequest.model_validate(payload)))
+
+
+def _run_mvp_awards(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(award_mvp(MvpRequest.model_validate(payload)))
+
+
 RUNNERS = {
     "biomechanics": _run_biomechanics,
     "rotation": _run_rotation,
@@ -482,6 +560,12 @@ RUNNERS = {
     "lineup-slip": _run_lineup_slip,
     "integrity-seal": _run_integrity_seal,
     "capsule-io": _run_capsule,
+    "referee-console": _run_referee_console,
+    "substitution-tracker": _run_substitution_tracker,
+    "court-split": _run_court_split,
+    "fan-companion": _run_fan_companion,
+    "setter-signals": _run_setter_signals,
+    "mvp-awards": _run_mvp_awards,
 }
 
 

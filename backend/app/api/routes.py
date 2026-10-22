@@ -108,7 +108,7 @@ def catalog_modules() -> dict[str, Any]:
     return {
         "count": len(MODULES),
         "modules": [module.model_dump(mode="json") for module in MODULES],
-        "profiles": ["players", "coaches", "court", "tournaments"],
+        "profiles": ["players", "coaches", "court", "referees", "tournaments", "fans"],
         "pricing": list(PRICING),
         "build_targets": ["cloud", "fdroid"],
     }

@@ -28,6 +28,12 @@ MODULE_SLUGS = (
     "lineup-slip",
     "integrity-seal",
     "capsule-io",
+    "referee-console",
+    "substitution-tracker",
+    "court-split",
+    "fan-companion",
+    "setter-signals",
+    "mvp-awards",
 )
 
 
@@ -552,6 +558,97 @@ def capsule_io_demo() -> dict[str, Any]:
         },
     }
 
+def referee_console_demo() -> dict[str, Any]:
+    return {
+        "serving": "A",
+        "score_a": 22,
+        "score_b": 20,
+        "events": [
+            {"team": "A", "player": 7, "kind": "WARNING_YELLOW"},
+            {"team": "A", "player": 7, "kind": "WARNING_YELLOW"},
+            {"team": "B", "kind": "DELAY_WARNING"},
+        ],
+    }
+
+
+def substitution_tracker_demo() -> dict[str, Any]:
+    return {
+        "set_number": 2,
+        "substitutions": [
+            {"team": "A", "out_number": 7, "in_number": 12, "position": 4},
+            {"team": "B", "out_number": 3, "in_number": 15, "position": 2},
+            {"team": "A", "out_number": 12, "in_number": 7, "position": 4},
+        ],
+    }
+
+
+def court_split_demo() -> dict[str, Any]:
+    return {
+        "mode": "pickup",
+        "court_cost": "80",
+        "extras_cost": "10",
+        "third_half_cost": "10",
+        "payment_alias": "volleyos.mp",
+        "payment_holder": "Tesoreria Tiburones",
+        "attendees": [
+            {"name": "Sofia", "deposit": "10"},
+            {"name": "Camila"},
+            {"name": "Valentina", "discount_pct": "50"},
+            {"name": "Micaela"},
+            {"name": "Julieta"},
+            {"name": "Renata"},
+        ],
+    }
+
+
+def fan_companion_demo() -> dict[str, Any]:
+    return {"action": "decode", "gesture": "four_fingers"}
+
+
+def setter_signals_demo() -> dict[str, Any]:
+    return {
+        "team": "Tiburones",
+        "setter_name": "Sofia",
+        "assignments": [
+            {"gesture": "index_finger", "play": "A"},
+            {"gesture": "two_fingers", "play": "B/Shoot"},
+            {"gesture": "three_fingers", "play": "C/7"},
+            {"gesture": "fist", "play": "D/Atras"},
+            {"gesture": "open_hand", "play": "Pipe"},
+            {"gesture": "pinky", "play": "Doble (Cruce)"},
+        ],
+    }
+
+
+def mvp_awards_demo() -> dict[str, Any]:
+    return {
+        "match": "Tiburones 3-1 Condores",
+        "players": [
+            {
+                "name": "Valentina",
+                "team": "Tiburones",
+                "points": 24,
+                "blocks": 2,
+                "aces": 3,
+                "digs": 5,
+                "votes": 8,
+                "pressure_points": 5,
+            },
+            {
+                "name": "Micaela",
+                "team": "Tiburones",
+                "points": 12,
+                "blocks": 6,
+                "digs": 3,
+                "votes": 2,
+            },
+            {"name": "Carla", "team": "Condores", "points": 9, "aces": 4, "digs": 2},
+            {"name": "Renata", "team": "Tiburones", "points": 2, "digs": 18, "is_libero": True},
+            {"name": "Sofia", "team": "Tiburones", "assists": 32},
+        ],
+    }
+
+
 DEMOS = {
     "biomechanics": biomechanics_demo,
     "rotation": rotation_demo,
@@ -571,4 +668,10 @@ DEMOS = {
     "lineup-slip": lineup_slip_demo,
     "integrity-seal": integrity_seal_demo,
     "capsule-io": capsule_io_demo,
+    "referee-console": referee_console_demo,
+    "substitution-tracker": substitution_tracker_demo,
+    "court-split": court_split_demo,
+    "fan-companion": fan_companion_demo,
+    "setter-signals": setter_signals_demo,
+    "mvp-awards": mvp_awards_demo,
 }
