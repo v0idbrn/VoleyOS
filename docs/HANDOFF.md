@@ -33,7 +33,18 @@ Next: Sprint 4 (frontend + offline engine).
 - 19 vitest tests green; `tsc --noEmit`, `next build` (SSG es/en/pt) pass; 0 `: any`.
 - Root `/` renders the Spanish hub with canonical to `/es` (redirect() broke SSG).
 
-Next: Sprint 7 (SEO content routes).
+Next: Sprint 8 (deploy, Docker, E2E).
+
+## Sprint 7 ? SEO content layer
+- 34 curated entries (12 modules, 6 positions, 4 rotation systems, 6 alternatives,
+  6 tools) ? 3 locales = 102 detail pages + 15 section indexes.
+- `/[locale]/[section]/[slug]` with Article + FAQPage JSON-LD, breadcrumbs,
+  canonical + hreflang, shared steps/FAQ, internal links.
+- `sitemap.xml` (133 URLs) and `robots.txt`; overlay excluded from indexing.
+- 25 vitest tests green; `next build` emits 140 static pages.
+- Deliberate cut: no 180-page glossary permutation to avoid thin/duplicate SEO.
+
+Next: Sprint 8 (deploy, Docker, E2E).
 
 ## Sprint 6 ? F-Droid, PWA, store metadata
 - PWA: 192/512/maskable icons + apple touch + favicon, installable manifest with
@@ -42,7 +53,18 @@ Next: Sprint 7 (SEO content routes).
   metadata (title/description/changelog) in en-US, es-ES, pt-BR, FUNDING.yml.
 - 23 vitest tests green; `next build` 21 static pages.
 
-Next: Sprint 7 (SEO content routes).
+Next: Sprint 8 (deploy, Docker, E2E).
+
+## Sprint 7 ? SEO content layer
+- 34 curated entries (12 modules, 6 positions, 4 rotation systems, 6 alternatives,
+  6 tools) ? 3 locales = 102 detail pages + 15 section indexes.
+- `/[locale]/[section]/[slug]` with Article + FAQPage JSON-LD, breadcrumbs,
+  canonical + hreflang, shared steps/FAQ, internal links.
+- `sitemap.xml` (133 URLs) and `robots.txt`; overlay excluded from indexing.
+- 25 vitest tests green; `next build` emits 140 static pages.
+- Deliberate cut: no 180-page glossary permutation to avoid thin/duplicate SEO.
+
+Next: Sprint 8 (deploy, Docker, E2E).
 
 ## Sprint 5 ? legal pages
 - `/es|en|pt/legal/{terms,privacy,disclaimer,trademarks}` (12 SSG routes).
@@ -50,7 +72,18 @@ Next: Sprint 7 (SEO content routes).
   FIVB/VAR/health disclaimers and third-party trademark attribution.
 - 21 vitest tests green; `next build` generates 20 static pages.
 
-Next: Sprint 7 (SEO content routes).
+Next: Sprint 8 (deploy, Docker, E2E).
+
+## Sprint 7 ? SEO content layer
+- 34 curated entries (12 modules, 6 positions, 4 rotation systems, 6 alternatives,
+  6 tools) ? 3 locales = 102 detail pages + 15 section indexes.
+- `/[locale]/[section]/[slug]` with Article + FAQPage JSON-LD, breadcrumbs,
+  canonical + hreflang, shared steps/FAQ, internal links.
+- `sitemap.xml` (133 URLs) and `robots.txt`; overlay excluded from indexing.
+- 25 vitest tests green; `next build` emits 140 static pages.
+- Deliberate cut: no 180-page glossary permutation to avoid thin/duplicate SEO.
+
+Next: Sprint 8 (deploy, Docker, E2E).
 
 ## Sprint 6 ? F-Droid, PWA, store metadata
 - PWA: 192/512/maskable icons + apple touch + favicon, installable manifest with
@@ -59,4 +92,15 @@ Next: Sprint 7 (SEO content routes).
   metadata (title/description/changelog) in en-US, es-ES, pt-BR, FUNDING.yml.
 - 23 vitest tests green; `next build` 21 static pages.
 
-Next: Sprint 7 (SEO content routes).
+Next: Sprint 8 (deploy, Docker, E2E).
+
+## Sprint 7 ? SEO content layer
+- 34 curated entries (12 modules, 6 positions, 4 rotation systems, 6 alternatives,
+  6 tools) ? 3 locales = 102 detail pages + 15 section indexes.
+- `/[locale]/[section]/[slug]` with Article + FAQPage JSON-LD, breadcrumbs,
+  canonical + hreflang, shared steps/FAQ, internal links.
+- `sitemap.xml` (133 URLs) and `robots.txt`; overlay excluded from indexing.
+- 25 vitest tests green; `next build` emits 140 static pages.
+- Deliberate cut: no 180-page glossary permutation to avoid thin/duplicate SEO.
+
+Next: Sprint 8 (deploy, Docker, E2E).

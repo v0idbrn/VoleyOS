@@ -216,6 +216,14 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
       </section>
 
       <footer className="mx-auto max-w-6xl px-4 py-8 text-[11px] text-white/40">
+        <div className="mb-4 flex flex-wrap gap-x-3 gap-y-1">
+          <span className="font-bold uppercase tracking-wider text-white/60">{t(locale, "Gu?as", "Guides", "Guias")}</span>
+          <a className="hover:text-volt" href={`/${locale}/modules`}>{t(locale, "M?dulos", "Modules", "M?dulos")}</a>
+          <a className="hover:text-volt" href={`/${locale}/positions`}>{t(locale, "Posiciones", "Positions", "Posi??es")}</a>
+          <a className="hover:text-volt" href={`/${locale}/rotations`}>{t(locale, "Rotaciones", "Rotations", "Rota??es")}</a>
+          <a className="hover:text-volt" href={`/${locale}/alternatives`}>{t(locale, "Alternativas", "Alternatives", "Alternativas")}</a>
+          <a className="hover:text-volt" href={`/${locale}/tools`}>{t(locale, "Herramientas", "Tools", "Ferramentas")}</a>
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p>© {new Date().getFullYear()} VolleyOS Global · AGPL-3.0-or-later · {t(locale, "hecho para canchas reales", "built for real courts", "feito para quadras reais")}</p>
           <p className="flex gap-3">
