@@ -11,6 +11,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from app.security import protect_cell
+
 CellValue: TypeAlias = str | int | Decimal
 Row: TypeAlias = dict[str, CellValue]
 
@@ -65,7 +67,7 @@ def export_xlsx(
     row_index = 5
     for key, value in summary.items():
         summary_sheet.cell(row=row_index, column=1, value=key)
-        target = summary_sheet.cell(row=row_index, column=2, value=value)
+        target = summary_sheet.cell(row=row_index, column=2, value=protect_cell(value))
         if isinstance(value, Decimal):
             target.number_format = "0.00"
         elif isinstance(value, int):
@@ -84,14 +86,14 @@ def export_xlsx(
 
     detail = workbook.create_sheet("Detalle")
     for column, header in enumerate(headers, start=1):
-        cell = detail.cell(row=1, column=column, value=header)
+        cell = detail.cell(row=1, column=column, value=protect_cell(header))
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = HEADER_FILL
         cell.alignment = Alignment(horizontal="center")
     for row_number, row in enumerate(rows, start=2):
         for column, header in enumerate(headers, start=1):
             value = row[header]
-            cell = detail.cell(row=row_number, column=column, value=value)
+            cell = detail.cell(row=row_number, column=column, value=protect_cell(value))
             if isinstance(value, Decimal):
                 cell.number_format = "0.00"
             elif isinstance(value, int):
@@ -111,8 +113,14 @@ def export_csv(rows: list[Row]) -> bytes:
         raise ValueError("at least one row is required")
     headers = list(rows[0].keys())
     buffer = StringIO()
-    writer = csv.DictWriter(buffer, fieldnames=headers, lineterminator="\n")
+    safe_headers = [str(protect_cell(header)) for header in headers]
+    writer = csv.DictWriter(buffer, fieldnames=safe_headers, lineterminator="\n")
     writer.writeheader()
     for row in rows:
-        writer.writerow({header: row[header] for header in headers})
+        writer.writerow(
+            {
+                safe: protect_cell(row[header])
+                for safe, header in zip(safe_headers, headers, strict=True)
+            }
+        )
     return buffer.getvalue().encode("utf-8")

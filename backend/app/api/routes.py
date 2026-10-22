@@ -8,7 +8,7 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.api.demo_data import DEMOS, MODULE_SLUGS
 from app.api.dispatch import MODULES, run_module
@@ -22,7 +22,9 @@ from app.api.store import (
     utc_now,
     verify_signature,
 )
+from app.security import sanitize_value
 from app.services.excel_exporter import export_csv, export_xlsx
+from app.services.integrity_seal import VerifySealRequest, verify_seal
 
 router = APIRouter()
 
@@ -54,11 +56,13 @@ PRICING = (
 
 
 class JobCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     module: str
     title: str = Field(min_length=1, max_length=80)
     kind: str = "report"
-    summary: dict[str, Any] = {}
-    rows: list[dict[str, Any]] = []
+    summary: dict[str, Any] = Field(default_factory=dict)
+    rows: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def _job_or_404(job_id: str) -> Job:
@@ -146,11 +150,21 @@ def health_deep() -> dict[str, Any]:
 
 @router.post("/jobs")
 def create(job: JobCreate) -> dict[str, Any]:
+    if job.module not in MODULE_SLUGS:
+        raise HTTPException(status_code=422, detail=f"unknown module: {job.module}")
+    summary = sanitize_value(job.summary)
+    rows = sanitize_value(job.rows)
     try:
-        record = create_job(job.module, job.title, job.summary, job.rows, job.kind)
+        record = create_job(job.module, str(sanitize_value(job.title)), summary, rows, job.kind)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     return {"job": record.model_dump(mode="json")}
+
+
+@router.post("/security/verify-seal")
+def security_verify_seal(request: VerifySealRequest) -> dict[str, Any]:
+    report = verify_seal(request.payload, request.seal, request.original)
+    return report.model_dump(mode="json")
 
 
 @router.get("/jobs/{job_id}/preview")

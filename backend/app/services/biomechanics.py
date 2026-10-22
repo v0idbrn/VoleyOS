@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.services.mathx import angle_at, round2, signed_angle_from_vertical
+from app.services.rules import validate_vertical_jump
 
 GRAVITY = Decimal("9.81")
 FRAME_NAMES = {
@@ -26,17 +27,23 @@ DRILLS = {
 
 
 class Point(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     x: Decimal
     y: Decimal
 
 
 class PoseFrame(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     phase: str
     t_ms: int = Field(ge=0)
     joints: dict[str, Point]
 
 
 class PoseSequence(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     frames: list[PoseFrame] = Field(min_length=1)
     takeoff_ms: int | None = Field(default=None, ge=0)
     landing_ms: int | None = Field(default=None, ge=0)
@@ -66,6 +73,7 @@ def vertical_jump_cm(takeoff_ms: int, landing_ms: int) -> Decimal:
         raise ValueError("landing_ms must be greater than takeoff_ms")
     seconds = Decimal(landing_ms - takeoff_ms) / Decimal(1000)
     height = (Decimal(1) / Decimal(8)) * GRAVITY * seconds * seconds * Decimal(100)
+    validate_vertical_jump(height)
     return round2(height)
 
 

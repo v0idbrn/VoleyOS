@@ -6,7 +6,7 @@ import re
 import unicodedata
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.services.mathx import ZERO, round2
 
@@ -63,6 +63,8 @@ def _normalize(text: str) -> str:
 
 
 class ScoutEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     player: int = Field(ge=0)
     skill: str = "attack"
     rotation: int = Field(default=1, ge=1, le=6)

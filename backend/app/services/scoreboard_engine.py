@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 FRONT_ROW = {2, 3, 4}
 BACK_ROW = {1, 5, 6}
 
 
 class Player(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     number: int = Field(ge=1, le=99)
     name: str = ""
 
 
 class MatchState(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     team_a: str
     team_b: str
     best_of: int = 3

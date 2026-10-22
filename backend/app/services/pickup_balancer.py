@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.services.mathx import round2
 
@@ -23,6 +23,8 @@ ROLES = {
 
 
 class PickupPlayer(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     name: str
     role: str = "universal"
     level: int = Field(ge=1, le=5)

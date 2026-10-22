@@ -7,11 +7,21 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.security import sanitize_value
 from app.services.attack_tempo import classify_timing, tempo_plan, tempo_window
 from app.services.beach_engine import BeachState, new_beach_match
 from app.services.beach_engine import award_point as beach_point
 from app.services.biomechanics import PoseSequence, analyze_sequence
+from app.services.block_shadow import BlockShadowRequest, compute_block_shadow
+from app.services.capsule_io import CapsuleRequest, run_capsule
+from app.services.integrity_seal import (
+    SealRequest,
+    VerifySealRequest,
+    build_seal,
+    verify_seal,
+)
 from app.services.jump_load_monitor import DailyJump, jump_load
+from app.services.lineup_slip import LineupSlipRequest, build_lineup_slip
 from app.services.obs_overlay import build_overlay
 from app.services.pickup_balancer import (
     PickupPlayer,
@@ -42,6 +52,8 @@ from app.services.scouting_engine import (
     parse_play,
     scouting_report,
 )
+from app.services.seam_radar import SeamRadarRequest, compute_seam
+from app.services.setter_iq import SetterIQRequest, compute_setter_iq
 from app.services.tournament_engine import (
     MatchResult,
     playoff_bracket,
@@ -158,6 +170,54 @@ MODULES: tuple[ModuleInfo, ...] = (
         profile="coaches",
         profiles=["coaches", "players"],
         description="Carga aguda:crónica en Decimal con semáforo tendinoso.",
+    ),
+    ModuleInfo(
+        slug="block-shadow",
+        name="Sombra de Bloqueo y Cobertura",
+        name_en="Block Shadow & Cover",
+        profile="coaches",
+        profiles=["coaches", "players"],
+        description="Cono de sombra, defensores fuera del bloqueo y porcentaje de cancha cubierta.",
+    ),
+    ModuleInfo(
+        slug="seam-radar",
+        name="Radar de Costuras de Recepcion",
+        name_en="Reception Seam Radar",
+        profile="coaches",
+        profiles=["coaches", "court"],
+        description="Dueno de la costura, prioridad y drill para cerrar el hueco entre receptores.",
+    ),
+    ModuleInfo(
+        slug="setter-iq",
+        name="Auditor de Imprevisibilidad del Armador",
+        name_en="Setter IQ Auditor",
+        profile="coaches",
+        profiles=["coaches", "players"],
+        description="Distribucion R1-R6, indice 0-100 y sesgos criticos por calidad de pase.",
+    ),
+    ModuleInfo(
+        slug="lineup-slip",
+        name="Boleta de Formacion I-VI",
+        name_en="FIVB Lineup Slip I-VI",
+        profile="court",
+        profiles=["court", "coaches"],
+        description="Boleta oficial I-VI, pares a 3 posiciones y ventana exacta del libero.",
+    ),
+    ModuleInfo(
+        slug="integrity-seal",
+        name="Sello Criptografico Anti-Trampa",
+        name_en="Integrity Seal",
+        profile="tournaments",
+        profiles=["tournaments", "court"],
+        description="HMAC-SHA256 sobre JSON canonico, hash publico y verificacion de actas.",
+    ),
+    ModuleInfo(
+        slug="capsule-io",
+        name="Capsula Universal .volleyos",
+        name_en=".volleyos Capsule",
+        profile="players",
+        profiles=["players", "coaches", "tournaments"],
+        description="Exporta e importa pizarras, planteles y torneos con checksum SHA-256.",
     ),
 )
 
@@ -376,6 +436,33 @@ def _run_acwr(payload: dict[str, Any]) -> dict[str, Any]:
     return _dump(jump_load(days, str(reference) if reference else None))
 
 
+def _run_block_shadow(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(compute_block_shadow(BlockShadowRequest.model_validate(payload)))
+
+
+def _run_seam_radar(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(compute_seam(SeamRadarRequest.model_validate(payload)))
+
+
+def _run_setter_iq(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(compute_setter_iq(SetterIQRequest.model_validate(payload)))
+
+
+def _run_lineup_slip(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_lineup_slip(LineupSlipRequest.model_validate(payload)))
+
+
+def _run_integrity_seal(payload: dict[str, Any]) -> dict[str, Any]:
+    if str(payload.get("action", "sign")) == "verify":
+        request = VerifySealRequest.model_validate(payload)
+        return _dump(verify_seal(request.payload, request.seal, request.original))
+    return _dump(build_seal(SealRequest.model_validate(payload).payload))
+
+
+def _run_capsule(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(run_capsule(CapsuleRequest.model_validate(payload)))
+
+
 RUNNERS = {
     "biomechanics": _run_biomechanics,
     "rotation": _run_rotation,
@@ -389,6 +476,12 @@ RUNNERS = {
     "volleycard": _run_volleycard,
     "tempo": _run_tempo,
     "acwr": _run_acwr,
+    "block-shadow": _run_block_shadow,
+    "seam-radar": _run_seam_radar,
+    "setter-iq": _run_setter_iq,
+    "lineup-slip": _run_lineup_slip,
+    "integrity-seal": _run_integrity_seal,
+    "capsule-io": _run_capsule,
 }
 
 
@@ -396,4 +489,4 @@ def run_module(slug: str, payload: dict[str, Any]) -> dict[str, Any]:
     runner = RUNNERS.get(slug)
     if runner is None:
         raise KeyError(f"unknown module: {slug}")
-    return runner(payload)
+    return runner(sanitize_value(payload))

@@ -5,17 +5,21 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.services.mathx import ZERO, round2
 
 
 class Team(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     name: str
     club: str = ""
 
 
 class MatchResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     home: str
     away: str
     home_sets: int = Field(ge=0, le=3)

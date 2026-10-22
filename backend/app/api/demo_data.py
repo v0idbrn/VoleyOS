@@ -22,6 +22,12 @@ MODULE_SLUGS = (
     "volleycard",
     "tempo",
     "acwr",
+    "block-shadow",
+    "seam-radar",
+    "setter-iq",
+    "lineup-slip",
+    "integrity-seal",
+    "capsule-io",
 )
 
 
@@ -463,6 +469,89 @@ def acwr_demo() -> dict[str, Any]:
     return {"days": days, "reference_date": end.isoformat()}
 
 
+
+
+def block_shadow_demo() -> dict[str, Any]:
+    return {
+        "attack_zone": "zone_4",
+        "blockers": 3,
+        "scheme": "line",
+        "block_x": "1.90",
+        "block_depth": "0.55",
+    }
+
+
+def seam_radar_demo() -> dict[str, Any]:
+    return {
+        "formation": "line3",
+        "rotation": 2,
+        "serve_origin": "1",
+        "serve_type": "jump_spin",
+        "landing_x": "4.80",
+        "landing_y": "5.60",
+        "attacker_release_angle": "40",
+    }
+
+
+def setter_iq_demo() -> dict[str, Any]:
+    return {
+        "distributions": [
+            {"rotation": 1, "quality": "+", "target": "Z4", "count": 9},
+            {"rotation": 1, "quality": "+", "target": "Z3-Quick", "count": 2},
+            {"rotation": 2, "quality": "+", "target": "Z4", "count": 5},
+            {"rotation": 2, "quality": "#", "target": "Z2-Back", "count": 4},
+            {"rotation": 2, "quality": "!", "target": "Pipe-Z6", "count": 2},
+            {"rotation": 3, "quality": "+", "target": "Z4", "count": 3},
+            {"rotation": 3, "quality": "#", "target": "Z3-Quick", "count": 5},
+            {"rotation": 3, "quality": "+", "target": "Setter-Dump", "count": 2},
+            {"rotation": 4, "quality": "+", "target": "Z2-Back", "count": 6},
+            {"rotation": 4, "quality": "#", "target": "Z4", "count": 3},
+            {"rotation": 5, "quality": "+", "target": "Pipe-Z6", "count": 4},
+            {"rotation": 5, "quality": "-", "target": "Z4", "count": 3},
+            {"rotation": 6, "quality": "+", "target": "Z4", "count": 4},
+            {"rotation": 6, "quality": "#", "target": "Z3-Quick", "count": 4},
+            {"rotation": 6, "quality": "!", "target": "Z2-Back", "count": 2},
+        ]
+    }
+
+
+def lineup_slip_demo() -> dict[str, Any]:
+    return {
+        "rotation_start": 1,
+        "setter": 1,
+        "opposite": 11,
+        "outside1": 4,
+        "outside2": 7,
+        "middle1": 14,
+        "middle2": 18,
+        "libero": 21,
+    }
+
+
+def integrity_seal_demo() -> dict[str, Any]:
+    return {
+        "action": "sign",
+        "payload": {
+            "match_id": "ARG-BRA-2026-10-22",
+            "set": 3,
+            "score": {"home": 26, "away": 24},
+            "teams": ["Tiburones", "Condores"],
+        },
+    }
+
+
+def capsule_io_demo() -> dict[str, Any]:
+    return {
+        "action": "export",
+        "title": "Pizarra 5-1 Tiburones",
+        "data": {
+            "kind": "rotation_board",
+            "team": "Tiburones",
+            "rotation": 3,
+            "lineup": {"setter": 1, "opposite": 11, "outside1": 4, "outside2": 7},
+        },
+    }
+
 DEMOS = {
     "biomechanics": biomechanics_demo,
     "rotation": rotation_demo,
@@ -476,4 +565,10 @@ DEMOS = {
     "volleycard": volleycard_demo,
     "tempo": tempo_demo,
     "acwr": acwr_demo,
+    "block-shadow": block_shadow_demo,
+    "seam-radar": seam_radar_demo,
+    "setter-iq": setter_iq_demo,
+    "lineup-slip": lineup_slip_demo,
+    "integrity-seal": integrity_seal_demo,
+    "capsule-io": capsule_io_demo,
 }

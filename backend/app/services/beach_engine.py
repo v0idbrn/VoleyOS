@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class BeachTeam(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     name: str
     players: list[str] = Field(min_length=2, max_length=2)
     sets: int = 0
@@ -14,6 +16,8 @@ class BeachTeam(BaseModel):
 
 
 class BeachState(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     team_a: BeachTeam
     team_b: BeachTeam
     best_of: int = 3

@@ -5,12 +5,14 @@ from __future__ import annotations
 from datetime import date, timedelta
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.services.mathx import round2
 
 
 class DailyJump(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     date: str
     jumps: int = Field(ge=0)
 

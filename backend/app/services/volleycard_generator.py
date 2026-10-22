@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.services.mathx import round2
 
@@ -32,6 +32,8 @@ ARCHETYPES = {
 
 
 class SixAttributes(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     attack: int = Field(ge=0, le=100)
     reception: int = Field(ge=0, le=100)
     serve: int = Field(ge=0, le=100)
@@ -41,11 +43,13 @@ class SixAttributes(BaseModel):
 
 
 class VolleyCardRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     name: str = Field(min_length=1, max_length=40)
     position: str = "universal"
     height_cm: Decimal = Field(gt=Decimal(100), lt=Decimal(260))
     standing_reach_cm: Decimal = Field(gt=Decimal(100), lt=Decimal(330))
-    jump_cm: Decimal = Field(ge=Decimal(0), le=Decimal(160))
+    jump_cm: Decimal = Field(ge=Decimal(0), le=Decimal(150))
     attributes: SixAttributes
 
 

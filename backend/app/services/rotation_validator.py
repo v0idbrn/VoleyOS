@@ -5,9 +5,10 @@ from __future__ import annotations
 from decimal import Decimal
 from itertools import pairwise
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.services.mathx import ZERO
+from app.services.rules import validate_half_court_cm
 
 FRONT_ROW = (4, 3, 2)
 BACK_ROW = (5, 6, 1)
@@ -18,9 +19,16 @@ MARGIN = Decimal(10)
 
 
 class CourtPosition(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     zone: int = Field(ge=1, le=6)
     x: Decimal
     y: Decimal
+
+    @model_validator(mode="after")
+    def _inside_court(self) -> CourtPosition:
+        validate_half_court_cm(self.x, self.y)
+        return self
 
 
 class OverlapFault(BaseModel):
@@ -81,6 +89,8 @@ def validate_overlap(
     positions: dict[int, tuple[Decimal, Decimal]],
     rotation: int | None = None,
 ) -> OverlapReport:
+    for x, y in positions.values():
+        validate_half_court_cm(x, y)
     missing = [zone for zone in range(1, 7) if zone not in positions]
     if missing:
         raise ValueError(f"missing zones: {missing}")
