@@ -33,7 +33,16 @@ Next: Sprint 4 (frontend + offline engine).
 - 19 vitest tests green; `tsc --noEmit`, `next build` (SSG es/en/pt) pass; 0 `: any`.
 - Root `/` renders the Spanish hub with canonical to `/es` (redirect() broke SSG).
 
-Next: Sprint 6 (F-Droid, PWA, store metadata).
+Next: Sprint 7 (SEO content routes).
+
+## Sprint 6 ? F-Droid, PWA, store metadata
+- PWA: 192/512/maskable icons + apple touch + favicon, installable manifest with
+  shortcuts, offline service worker (shell precache, API bypass), auto-register.
+- F-Droid: `.fdroid.yml` template, `docs/FDROID_SUBMISSION_GUIDE.md`, fastlane
+  metadata (title/description/changelog) in en-US, es-ES, pt-BR, FUNDING.yml.
+- 23 vitest tests green; `next build` 21 static pages.
+
+Next: Sprint 7 (SEO content routes).
 
 ## Sprint 5 ? legal pages
 - `/es|en|pt/legal/{terms,privacy,disclaimer,trademarks}` (12 SSG routes).
@@ -41,4 +50,13 @@ Next: Sprint 6 (F-Droid, PWA, store metadata).
   FIVB/VAR/health disclaimers and third-party trademark attribution.
 - 21 vitest tests green; `next build` generates 20 static pages.
 
-Next: Sprint 6 (F-Droid, PWA, store metadata).
+Next: Sprint 7 (SEO content routes).
+
+## Sprint 6 ? F-Droid, PWA, store metadata
+- PWA: 192/512/maskable icons + apple touch + favicon, installable manifest with
+  shortcuts, offline service worker (shell precache, API bypass), auto-register.
+- F-Droid: `.fdroid.yml` template, `docs/FDROID_SUBMISSION_GUIDE.md`, fastlane
+  metadata (title/description/changelog) in en-US, es-ES, pt-BR, FUNDING.yml.
+- 23 vitest tests green; `next build` 21 static pages.
+
+Next: Sprint 7 (SEO content routes).

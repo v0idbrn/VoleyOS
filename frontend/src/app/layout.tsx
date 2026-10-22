@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 
 import "./globals.css";
 
+import { PwaRegister } from "@/components/PwaRegister";
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://volleyos.app"),
   title: {
@@ -14,6 +16,8 @@ export const metadata: Metadata = {
   authors: [{ name: "VolleyOS" }],
   keywords: ["vóley", "volleyball", "scouting", "rotaciones", "torneos", "FIVB", "offline"],
   manifest: "/manifest.webmanifest",
+  icons: { icon: "/favicon.ico", apple: "/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "VolleyOS", statusBarStyle: "black-translucent" },
   openGraph: {
     title: "VolleyOS Global",
     description: "12 módulos de vóley en una app offline-first. Sin telemetría.",
@@ -34,7 +38,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="es">
-      <body className="min-h-screen antialiased">{children}</body>
+      <body className="min-h-screen antialiased">
+        <PwaRegister />
+        {children}
+      </body>
     </html>
   );
 }

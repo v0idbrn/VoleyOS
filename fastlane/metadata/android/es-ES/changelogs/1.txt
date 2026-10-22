@@ -1,0 +1,4 @@
+v1.0.0
+- Primera versión F-Droid: 12 módulos de vóley offline.
+- Interfaz trilingüe (ES/EN/PT), bóveda efímera y overlay OBS.
+- Sin telemetría, sin cuentas, sin SDKs propietarios.

@@ -1,0 +1,27 @@
+VolleyOS es el sistema operativo offline-first del vóley. Doce módulos que funcionan en un gimnasio sin señal, en celular, tablet o notebook.
+
+QUÉ INCLUYE
+• Laboratorio 5 Fotogramas: medí salto y mecánica de remate con física, no con intuición.
+• Pizarra 5-1: validá cada rotación R1-R6 contra la regla FIVB de solapamiento al golpe de saque.
+• Scouting en 3 Clics: escribí o dictá la jugada y obtené side-out por rotación y mapa de calor 3x3.
+• Marcador en Vivo: puntos indoor con rotación automática y lógica de sets y partido.
+• Torneo: tablas con puntos 3-2-1-0 y coeficientes de sets y tantos.
+• Armado de Equipos: equipos parejos con un armador cada uno y cola de rey de la cancha.
+• Overlay OBS: fuente de navegador transparente con banners de set point y match point.
+• VAR de Bolsillo: chequeos de reglas en lenguaje claro con citas FIVB y sorteo inicial.
+• Playa: puntuación 21/15, cambios de lado cada 7/5 puntos y control de saque.
+• Volleycards: radar hexagonal con alcance de remate y bloqueo.
+• Tempo de Ataque: ventanas de 1° tiempo, 2°, pipe y 3° en milisegundos.
+• Monitor ACWR: carga aguda:crónica de saltos con zonas de fatiga y riesgo.
+
+HECHO PARA CANCHAS REALES
+• 100% offline. Sin cuentas, sin publicidad, sin telemetría.
+• Español, inglés y portugués.
+• Bóveda efímera: los reportes quedan en tu almacenamiento local y se destruyen con un toque, con recibo UTC.
+• Exportes Excel con nota de auditoría en cada cálculo.
+• Software libre AGPL-3.0-or-later. Sin SDKs propietarios.
+
+CLOUD PRO (OPCIONAL)
+Clubes que transmiten u organizan ligas pueden comprar pases por evento para torneos multi-cancha, overlays con marca propia, API y webhooks de pago firmados con HMAC. La app gratuita nunca se bloquea.
+
+VolleyOS no reemplaza al árbitro oficial ni al médico. Las decisiones de VAR y rotación son orientativas; la biomecánica y la carga son educativas.

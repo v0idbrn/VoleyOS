@@ -1,0 +1,4 @@
+v1.0.0
+- First F-Droid release: 12 offline volleyball modules.
+- Trilingual UI (ES/EN/PT), ephemeral vault and OBS overlay.
+- No telemetry, no accounts, no proprietary SDKs.

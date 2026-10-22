@@ -1,0 +1,27 @@
+VolleyOS is the offline-first operating system for volleyball. Twelve modules that work in a gym with no signal, on a phone, tablet or laptop.
+
+WHAT YOU GET
+• 5-Frame Lab: measure jump height and attack mechanics with physics, not guesswork.
+• 5-1 Board: validate every rotation R1-R6 against the FIVB overlap rule at serve contact.
+• 3-Click Scouting: type or dictate a play, get side-out by rotation and a 3x3 heatmap.
+• Live Scoreboard: indoor scoring with automatic rotation and set/match logic.
+• Tournament: standings with 3-2-1-0 points and set/point ratios.
+• Pickup Balancer: fair teams with one setter each, plus king-of-the-court queue.
+• OBS Overlay: transparent browser source with set point and match point banners.
+• Pocket VAR: plain-language rule checks with FIVB citations and a coin toss.
+• Beach: 21/15 scoring, side switches every 7/5 points, server tracking.
+• Volleycards: hexagonal player radar with spike and block reach.
+• Attack Tempo: 1st, 2nd, pipe and 3rd tempo windows in milliseconds.
+• ACWR Monitor: acute:chronic jump load with fatigue and injury-risk zones.
+
+BUILT FOR REAL COURTS
+• 100% offline. No accounts, no ads, no telemetry.
+• Spanish, English and Portuguese.
+• Ephemeral vault: reports stay in local storage and can be destroyed with one tap, with a UTC receipt.
+• Excel exports with an audit note for every calculation.
+• Free software under AGPL-3.0-or-later. No proprietary SDKs.
+
+CLOUD PRO (OPTIONAL)
+Clubs that stream or run leagues can buy one-time event passes for multi-court tournaments, white-label overlays, API access and HMAC-signed payment webhooks. The free app is never locked.
+
+VolleyOS does not replace the official referee or a doctor. VAR and rotation checks are advisory; biomechanics and load metrics are educational.
