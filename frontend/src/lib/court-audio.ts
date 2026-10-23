@@ -20,6 +20,40 @@ export function whistleDurationMs(kind: WhistleKind): number {
   return WHISTLE_PLANS[kind].reduce((total, step) => total + step.durationMs + step.gapMs, 0);
 }
 
+export type ArenaCue = "MONSTER_BLOCK" | "SUPER_SPIKE" | "ACE_SIREN" | "VIDEO_CHALLENGE_SUSPENSE" | "SET_POINT_HEARTBEAT";
+
+export const ARENA_CUE_PLANS: Record<ArenaCue, { frequencies: number[]; durationsMs: number[]; waveform: OscillatorType }> = {
+  MONSTER_BLOCK: { frequencies: [110, 82, 55], durationsMs: [180, 180, 260], waveform: "square" },
+  SUPER_SPIKE: { frequencies: [330, 440, 660], durationsMs: [120, 120, 200], waveform: "sawtooth" },
+  ACE_SIREN: { frequencies: [660, 880, 1320], durationsMs: [150, 150, 300], waveform: "sine" },
+  VIDEO_CHALLENGE_SUSPENSE: { frequencies: [220, 220, 220], durationsMs: [220, 220, 440], waveform: "triangle" },
+  SET_POINT_HEARTBEAT: { frequencies: [60, 55, 60], durationsMs: [180, 120, 260], waveform: "sine" },
+};
+
+export function playArenaCue(cue: ArenaCue, volume = 0.5): boolean {
+  const audio = audioContext();
+  if (!audio) return false;
+  void audio.resume();
+  const plan = ARENA_CUE_PLANS[cue];
+  let cursor = audio.currentTime;
+  plan.frequencies.forEach((frequency, index) => {
+    const duration = (plan.durationsMs[index] ?? 180) / 1000;
+    const oscillator = audio.createOscillator();
+    const gain = audio.createGain();
+    oscillator.type = plan.waveform;
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0, cursor);
+    gain.gain.linearRampToValueAtTime(volume, cursor + 0.012);
+    gain.gain.linearRampToValueAtTime(0, cursor + duration);
+    oscillator.connect(gain);
+    gain.connect(audio.destination);
+    oscillator.start(cursor);
+    oscillator.stop(cursor + duration);
+    cursor += duration;
+  });
+  return true;
+}
+
 type AudioContextClass = new () => AudioContext;
 type AudioWindow = Window & { webkitAudioContext?: AudioContextClass };
 

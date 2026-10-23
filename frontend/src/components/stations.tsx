@@ -58,6 +58,18 @@ import {
   matchupMatrix,
   planPractice,
   serveRadar,
+  analyzeAerodynamics,
+  analyzeSystem,
+  buildAdaptiveRulebook,
+  buildArenaCue,
+  buildClipPlan,
+  buildQrSync,
+  buildRecruitingDossier,
+  buildTreasury,
+  calculateElo,
+  readDeception,
+  translateSlang,
+  validateHouseRules,
   type AttackZone,
   type Axis,
   type BlockScheme,
@@ -2158,6 +2170,51 @@ export function PlayerCareerStation({ meta, locale, onSave }: StationProps) {
   );
 }
 
+export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
+  const [report, setReport] = useState<Record<string, unknown> | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const load = async (): Promise<void> => {
+      const previews: Record<string, () => Record<string, unknown> | Promise<Record<string, unknown>>> = {
+        "ball-aerodynamics": () => analyzeAerodynamics({ speedKmh: 68, spinRps: 0.8, launchAngleDeg: 12, impactHeightM: 2.1 }) as unknown as Record<string, unknown>,
+        "rally-clipper": () => buildClipPlan({ playerNumber: 7, minDurationSec: 3, rallies: [{ startSec: 0, endSec: 4.5, playerNumber: 7, skill: "spike", outcome: "kill" }, { startSec: 5.5, endSec: 10, playerNumber: 7, skill: "ace", outcome: "ace" }] }) as unknown as Record<string, unknown>,
+        "recruiting-dossier": () => buildRecruitingDossier({ graduationYear: 2028, position: "outside", heightCm: 188, reachOneHandCm: 245, reachTwoHandCm: 248, verticalJumpCm: 78, attackReachCm: 323, kills: 280, attackEfficiencyPct: 46 }) as unknown as Promise<Record<string, unknown>>,
+        "system-transition": () => analyzeSystem({ setters: 2, pureHitters: 5, transitionReadGrade: 8, rotation: 1 }) as unknown as Record<string, unknown>,
+        "deception-reader": () => readDeception({ approachSpeedKmh: 19, elbowHeightCm: 172, ballFrontOffsetCm: 8, setterFrontZoneJump: true, blockersCommitted: 2 }) as unknown as Record<string, unknown>,
+        "inclusive-adaptive": () => buildAdaptiveRulebook({ mode: "sitting", sex: "male", players: 6 }) as unknown as Record<string, unknown>,
+        "elo-ranking": () => calculateElo({ teamARating: 1820, teamBRating: 1760, kWeight: 40, result: "3-1" }) as unknown as Record<string, unknown>,
+        "team-treasury": () => buildTreasury({ jerseyCostTotal: 360, monthlyFeePerPlayer: 12.5, months: 3, ballFund: 90, registrationFee: 60, players: [{ name: "Valentina", paid: 80 }, { name: "Carla", paid: 45 }] }) as unknown as Record<string, unknown>,
+        "house-rules": () => validateHouseRules({ format: "mixed_6v6", teamAGenders: ["M", "F", "M", "F", "M", "F"], teamBGenders: ["F", "M", "F", "M", "F", "M"], benchOrder: ["Ana"], scoreA: 14, scoreB: 14 }) as unknown as Record<string, unknown>,
+        "arena-dj": () => buildArenaCue({ event: "MONSTER_BLOCK" }) as unknown as Record<string, unknown>,
+        "court-slang": () => translateSlang({ term: "pipe", origin: "AR" }) as unknown as Record<string, unknown>,
+        "qr-sync": () => buildQrSync({ kind: "match", payload: { home: "Tiburones", score_a: 24 }, matrixSize: 21 }) as unknown as Promise<Record<string, unknown>>,
+      };
+      const preview = previews[meta.slug];
+      if (!preview) return;
+      const value = await preview();
+      if (alive) setReport(value);
+    };
+    void load();
+    return () => { alive = false; };
+  }, [meta.slug]);
+  return (
+    <StationShell meta={meta} locale={locale} rows={2} onSave={onSave} onExample={() => setReport(null)}>
+      {report ? (
+        <div className="grid gap-1 text-[11px]">
+          {Object.entries(report).filter(([key]) => key !== "svg" && key !== "rallies" && key !== "selected").map(([key, value]) => (
+            <span key={key} className="flex justify-between gap-3 rounded bg-white/5 px-2 py-1">
+              <span className="text-white/55">{key}</span>
+              <span className="truncate text-right text-white/85">{typeof value === "object" ? JSON.stringify(value) : String(value)}</span>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[11px] text-white/55">{t(locale, "Calculando...", "Computing...", "Calculando...")}</p>
+      )}
+    </StationShell>
+  );
+}
+
 export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   biomechanics: BiomechanicsStation,
   rotation: RotationStation,
@@ -2195,4 +2252,16 @@ export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   "practice-planner": PracticePlannerStation,
   "play-by-play": PlayByPlayStation,
   "player-career": PlayerCareerStation,
+  "ball-aerodynamics": EnginePreviewStation,
+  "rally-clipper": EnginePreviewStation,
+  "recruiting-dossier": EnginePreviewStation,
+  "system-transition": EnginePreviewStation,
+  "deception-reader": EnginePreviewStation,
+  "inclusive-adaptive": EnginePreviewStation,
+  "elo-ranking": EnginePreviewStation,
+  "team-treasury": EnginePreviewStation,
+  "house-rules": EnginePreviewStation,
+  "arena-dj": EnginePreviewStation,
+  "court-slang": EnginePreviewStation,
+  "qr-sync": EnginePreviewStation,
 };

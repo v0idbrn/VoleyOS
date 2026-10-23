@@ -913,6 +913,10 @@ export function round3(value: number): number {
   return Math.round((value + Number.EPSILON) * 1000) / 1000;
 }
 
+export function round4(value: number): number {
+  return Math.round((value + Number.EPSILON) * 10000) / 10000;
+}
+
 export function formatPct(value: number): string {
   return `${value.toFixed(2)}%`;
 }
@@ -3538,5 +3542,473 @@ export function buildCareerReport(input: {
     gapToNext: round1(gap),
     bottleneck,
     message: `${input.player}: indice ${evolutionIndex}/100. Cuello: ${bottleneck}.`,
+  };
+}
+
+/* --------------------------------------------------------------- modules 37-48 */
+
+export type AeroRegime = "FLYING_FLOAT_CRISIS" | "MAGNUS_DESCENT" | "STABLE_DRIVE";
+
+export function analyzeAerodynamics(input: {
+  speedKmh: number;
+  spinRps: number;
+  launchAngleDeg: number;
+  impactHeightM: number;
+}): {
+  reynoldsNumber: number;
+  regime: AeroRegime;
+  lateralDeviationCm: number;
+  verticalDropCm: number;
+  landingDistanceM: number;
+  landsInCourt: boolean;
+  message: string;
+} {
+  if (input.speedKmh < 52 || input.speedKmh > 140) throw new Error("speed outside 52-140 km/h");
+  if (input.spinRps < 0 || input.spinRps > 15) throw new Error("spin outside 0-15 rps");
+  const speedMps = input.speedKmh / 3.6;
+  const reynoldsNumber = Math.round((speedMps * 0.21) / 0.000015);
+  const regime: AeroRegime =
+    input.speedKmh >= 52 && input.speedKmh <= 74 && input.spinRps <= 1.2
+      ? "FLYING_FLOAT_CRISIS"
+      : input.spinRps >= 5
+        ? "MAGNUS_DESCENT"
+        : "STABLE_DRIVE";
+  const angle = (input.launchAngleDeg * Math.PI) / 180;
+  const horizontal = speedMps * Math.cos(angle);
+  const vertical = speedMps * Math.sin(angle);
+  const flight = (vertical + Math.sqrt(vertical * vertical + 2 * 9.81 * input.impactHeightM)) / 9.81;
+  const landing = horizontal * flight;
+  const lateral =
+    regime === "FLYING_FLOAT_CRISIS"
+      ? 8 + (74 - input.speedKmh) * 0.9 + (1.2 - input.spinRps) * 6
+      : regime === "MAGNUS_DESCENT"
+        ? input.spinRps * 3
+        : (140 - input.speedKmh) * 0.05;
+  const drop = 0.5 * 9.81 * flight * flight * 100 + (regime === "MAGNUS_DESCENT" ? input.spinRps * 4 : 0);
+  return {
+    reynoldsNumber,
+    regime,
+    lateralDeviationCm: round2(lateral),
+    verticalDropCm: round2(drop),
+    landingDistanceM: round2(landing),
+    landsInCourt: landing > 0 && landing <= 18,
+    message: `${regime} con Re=${reynoldsNumber}; desvio ${round2(lateral)} cm.`,
+  };
+}
+
+export type ClipSkill = "spike" | "block" | "ace" | "dig";
+export interface RallyClip {
+  startSec: number;
+  endSec: number;
+  playerNumber: number;
+  skill: ClipSkill;
+  outcome: string;
+}
+
+export function buildClipPlan(input: {
+  rallies: RallyClip[];
+  playerNumber: number;
+  minDurationSec: number;
+}): {
+  selected: RallyClip[];
+  netPlaySec: number;
+  deadTimeSec: number;
+  netPlayPct: number;
+  chapters: string[];
+  ffmpegCommand: string;
+  edl: string[];
+  message: string;
+} {
+  if (input.rallies.length === 0) throw new Error("at least one rally required");
+  for (const rally of input.rallies) {
+    if (rally.endSec <= rally.startSec) throw new Error("end must be after start");
+  }
+  const selected = input.rallies.filter(
+    (rally) => rally.playerNumber === input.playerNumber && rally.endSec - rally.startSec >= input.minDurationSec,
+  );
+  const start = Math.min(...input.rallies.map((rally) => rally.startSec));
+  const end = Math.max(...input.rallies.map((rally) => rally.endSec));
+  const span = Math.max(0, end - start);
+  const net = selected.reduce((total, rally) => total + rally.endSec - rally.startSec, 0);
+  const mmss = (seconds: number): string => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+  const chapters: string[] = [];
+  let chapterCursor = 0;
+  selected.forEach((rally, index) => {
+    if (index === 0) chapters.push("00:00");
+    else chapters.push(mmss(chapterCursor));
+    chapterCursor += rally.endSec - rally.startSec;
+  });
+  const commands: string[] = [];
+  const edl: string[] = [];
+  let edlCursor = 0;
+  selected.forEach((rally, index) => {
+    commands.push(`ffmpeg -ss ${round2(rally.startSec)} -to ${round2(rally.endSec)} -i input.mp4 -c copy clip_${String(index + 1).padStart(3, "0")}.mp4`);
+    const from = mmss(edlCursor);
+    edlCursor += rally.endSec - rally.startSec;
+    edl.push(`${String(index + 1).padStart(3, "0")}  ${from} ${mmss(edlCursor)}  V  C  ${rally.playerNumber} ${rally.skill}`);
+  });
+  return {
+    selected,
+    netPlaySec: round2(net),
+    deadTimeSec: round2(Math.max(0, span - net)),
+    netPlayPct: span > 0 ? round2((net / span) * 100) : 0,
+    chapters,
+    ffmpegCommand: commands.join("\n"),
+    edl,
+    message: `${selected.length} jugadas del jugador ${input.playerNumber}; ${round2(net)} s netos.`,
+  };
+}
+
+export interface RecruitInput {
+  graduationYear: number;
+  position: "outside" | "opposite" | "middle" | "setter" | "libero";
+  heightCm: number;
+  reachOneHandCm: number;
+  reachTwoHandCm: number;
+  verticalJumpCm: number;
+  attackReachCm: number;
+  kills: number;
+  attackEfficiencyPct: number;
+}
+
+export async function buildRecruitingDossier(input: RecruitInput): Promise<{
+  score: number;
+  tier: "DIV_I" | "DIV_II" | "NATIONAL" | "U21";
+  strengths: string[];
+  gaps: string[];
+  seal: string;
+  message: string;
+}> {
+  if (input.graduationYear < 2026 || input.graduationYear > 2032) throw new Error("graduation year outside 2026-2032");
+  if (input.heightCm < 150 || input.heightCm > 220) throw new Error("height outside 150-220 cm");
+  const norm = (value: number, low: number, high: number): number => Math.max(0, Math.min(100, ((value - low) / (high - low)) * 100));
+  const score = Math.round(
+    norm(input.heightCm, 150, 220) * 0.15 +
+      norm(input.attackReachCm, 250, 380) * 0.25 +
+      norm(input.verticalJumpCm, 20, 120) * 0.2 +
+      Math.max(0, Math.min(100, input.attackEfficiencyPct)) * 0.25 +
+      norm(input.kills, 0, 500) * 0.15,
+  );
+  const tier = score >= 85 ? "NATIONAL" : score >= 70 ? "DIV_I" : score >= 55 ? "DIV_II" : "U21";
+  const strengths: string[] = [];
+  const gaps: string[] = [];
+  if (input.heightCm >= 190) strengths.push("Altura de elite para bloqueo y ataque.");
+  if (input.verticalJumpCm >= 80) strengths.push("Salto explosivo con buen tiempo de ataque.");
+  if (input.attackEfficiencyPct >= 45) strengths.push("Eficiencia de ataque superior a la media.");
+  if (input.kills >= 250) strengths.push("Volumen de puntos probado.");
+  if (input.heightCm < 180) gaps.push("Altura limitada: proyectar a defensa y recepcion.");
+  if (input.verticalJumpCm < 50) gaps.push("Salto bajo: plan de fuerza y pliometria.");
+  if (input.attackEfficiencyPct < 25) gaps.push("Eficiencia baja: revisar seleccion de golpe.");
+  if (!strengths.length) strengths.push("Perfil equilibrado sin rasgo dominante.");
+  if (!gaps.length) gaps.push("Sin brechas criticas.");
+  const digest = await hmacSha256(canonicalJson(input as unknown as JsonValue), INTEGRITY_SEAL_SECRET);
+  const seal = `VOS-SEAL-${digest.slice(0, 16).toUpperCase()}`;
+  return { score, tier, strengths, gaps, seal, message: `Dossier ${tier} ${score}/100; sello ${seal}.` };
+}
+
+export type SystemName = "4-2" | "6-2" | "5-1";
+
+export function analyzeSystem(input: {
+  setters: number;
+  pureHitters: number;
+  transitionReadGrade: number;
+  rotation: number;
+}): {
+  systems: Array<{ name: SystemName; frontAttackersByRotation: number[]; description: string }>;
+  recommended: SystemName;
+  infiltrationMap: Record<string, string>;
+  message: string;
+} {
+  if (input.setters < 0 || input.setters > 2) throw new Error("setters outside 0-2");
+  if (input.transitionReadGrade < 1 || input.transitionReadGrade > 10) throw new Error("read grade outside 1-10");
+  let recommended: SystemName = input.setters >= 1 && input.pureHitters >= 4 ? "5-1" : input.setters >= 2 && input.pureHitters >= 3 ? "6-2" : "4-2";
+  if (input.transitionReadGrade <= 4) recommended = input.setters >= 2 ? "6-2" : "4-2";
+  const systems: Array<{ name: SystemName; frontAttackersByRotation: number[]; description: string }> = [
+    { name: "4-2", frontAttackersByRotation: [2, 2, 2, 2, 2, 2], description: "Dos armadores alternan delantera y zaga." },
+    { name: "6-2", frontAttackersByRotation: [3, 3, 3, 3, 3, 3], description: "Armador zaguero penetra; tres atacantes al frente." },
+    { name: "5-1", frontAttackersByRotation: [3, 3, 3, 2, 2, 2], description: "Armador fijo; tres atacantes en R1-R3." },
+  ];
+  const infiltrationMap: Record<string, string> = {};
+  for (let index = 0; index < 6; index += 1) {
+    infiltrationMap[`R${index + 1}`] = `${recommended}: ${systems.find((system) => system.name === recommended)?.description ?? ""}`;
+  }
+  return { systems, recommended, infiltrationMap, message: `Sistema recomendado ${recommended}.` };
+}
+
+export function readDeception(input: {
+  approachSpeedKmh: number;
+  elbowHeightCm: number;
+  ballFrontOffsetCm: number;
+  setterFrontZoneJump: boolean;
+  blockersCommitted: number;
+}): {
+  hardSwingPct: number;
+  offSpeedTipPct: number;
+  setterDumpPct: number;
+  primaryDefender: "left_back" | "middle_back" | "right_back" | "libero";
+  message: string;
+} {
+  const norm = (value: number, low: number, high: number): number => ((value - low) / (high - low)) * 100;
+  const speed = norm(input.approachSpeedKmh, 5, 30);
+  const elbow = norm(input.elbowHeightCm, 80, 220);
+  const offset = norm(input.ballFrontOffsetCm, -40, 40);
+  const blockers = input.blockersCommitted;
+  const hard = 35 + speed * 0.3 + elbow * 0.1 + offset * 0.1;
+  const tip = 25 + (100 - elbow) * 0.1 + blockers * 4 + (100 - offset) * 0.05;
+  const dump = 5 + (input.setterFrontZoneJump ? 10 : 0) + blockers * 4 + (100 - speed) * 0.05;
+  const total = hard + tip + dump;
+  const hardPct = round1(Math.max(0, Math.min(100, (hard / total) * 100)));
+  const tipPct = round1(Math.max(0, Math.min(100, (tip / total) * 100)));
+  const dumpPct = round1(100 - hardPct - tipPct);
+  const primaryDefender =
+    input.setterFrontZoneJump && blockers <= 1
+      ? "libero"
+      : input.ballFrontOffsetCm < -10
+        ? "left_back"
+        : input.ballFrontOffsetCm > 10
+          ? "right_back"
+          : "middle_back";
+  return { hardSwingPct: hardPct, offSpeedTipPct: tipPct, setterDumpPct: dumpPct, primaryDefender, message: `Swing ${hardPct}% / tip ${tipPct}% / dump ${dumpPct}%.` };
+}
+
+export type AdaptiveMode = "mini_2v2" | "mini_3v3" | "mini_4v4" | "sitting";
+
+export function buildAdaptiveRulebook(input: {
+  mode: AdaptiveMode;
+  sex: "male" | "female";
+  players: number;
+}): {
+  mode: AdaptiveMode;
+  courtLengthM: number;
+  courtWidthM: number;
+  netHeightM: number;
+  attackLineM: number | null;
+  minPlayers: number;
+  maxPlayers: number;
+  servingLegal: boolean;
+  blockServeLegal: boolean;
+  pelvisContactRequired: boolean;
+  rules: string[];
+  message: string;
+} {
+  if (input.players < 2 || input.players > 12) throw new Error("players outside 2-12");
+  if (input.mode === "sitting") {
+    const netHeightM = input.sex === "male" ? 1.15 : 1.05;
+    return {
+      mode: input.mode,
+      courtLengthM: 10,
+      courtWidthM: 6,
+      netHeightM,
+      attackLineM: 2,
+      minPlayers: 2,
+      maxPlayers: 6,
+      servingLegal: true,
+      blockServeLegal: false,
+      pelvisContactRequired: true,
+      rules: ["Contacto de pelvis con el suelo.", "Bloqueo del saque prohibido.", "Linea de ataque a 2.00 m."],
+      message: `Sitting: 10.00 x 6.00 m, red ${netHeightM} m.`,
+    };
+  }
+  const court = input.mode === "mini_4v4" ? [14, 7, 2.1, 4, 8] : input.mode === "mini_3v3" ? [12, 6, 2.05, 3, 6] : [9, 4.5, 2, 2, 4];
+  return {
+    mode: input.mode,
+    courtLengthM: court[0] ?? 9,
+    courtWidthM: court[1] ?? 4.5,
+    netHeightM: court[2] ?? 2,
+    attackLineM: null,
+    minPlayers: court[3] ?? 2,
+    maxPlayers: court[4] ?? 4,
+    servingLegal: true,
+    blockServeLegal: false,
+    pelvisContactRequired: false,
+    rules: ["Saque bajo el hombro.", "Rotacion obligatoria.", "Todos atacan y rotan."],
+    message: `${input.mode}: ${court[0]} x ${court[1]} m.`,
+  };
+}
+
+export type EloResult = "3-0" | "3-1" | "3-2" | "2-3" | "1-3" | "0-3";
+
+export function calculateElo(input: {
+  teamARating: number;
+  teamBRating: number;
+  kWeight: number;
+  result: EloResult;
+}): { expectedA: number; scoreA: number; marginFactor: number; deltaA: number; deltaB: number; message: string } {
+  const ratio = Math.pow(10, (input.teamBRating - input.teamARating) / 400);
+  const expectedA = round4(1 / (1 + ratio));
+  const scoreA = input.result.startsWith("3") ? 1 : input.result.startsWith("0") ? 0 : 0.5;
+  const marginFactor = input.result === "3-0" || input.result === "0-3" ? 1 : input.result === "3-1" || input.result === "1-3" ? 0.9 : 0.8;
+  const deltaA = round2(input.kWeight * marginFactor * (scoreA - expectedA));
+  return { expectedA, scoreA, marginFactor, deltaA, deltaB: -deltaA, message: `Elo A ${deltaA > 0 ? "+" : ""}${deltaA}.` };
+}
+
+export function buildTreasury(input: {
+  jerseyCostTotal: number;
+  monthlyFeePerPlayer: number;
+  months: number;
+  ballFund: number;
+  registrationFee: number;
+  players: Array<{ name: string; paid: number }>;
+}): {
+  perPlayer: Array<{ name: string; due: number; paid: number; balance: number; status: "PAID_IN_FULL" | "PARTIAL_DEBT" | "CREDIT_FAVOR" }>;
+  totalDue: number;
+  totalPaid: number;
+  collectionPct: number;
+  whatsappText: string;
+  excelRows: string[][];
+  message: string;
+} {
+  if (input.players.length < 2) throw new Error("at least two players required");
+  const count = input.players.length;
+  const due = round2(input.jerseyCostTotal / count + input.monthlyFeePerPlayer * input.months + (input.ballFund + input.registrationFee) / count);
+  const perPlayer = input.players.map((player) => {
+    const paid = round2(player.paid);
+    const balance = round2(due - paid);
+    const status: "PAID_IN_FULL" | "PARTIAL_DEBT" | "CREDIT_FAVOR" = balance === 0 ? "PAID_IN_FULL" : balance > 0 ? "PARTIAL_DEBT" : "CREDIT_FAVOR";
+    return { name: player.name, due, paid, balance, status };
+  });
+  const totalDue = round2(perPlayer.reduce((total, player) => total + player.due, 0));
+  const totalPaid = round2(perPlayer.reduce((total, player) => total + player.paid, 0));
+  const collectionPct = totalDue > 0 ? round2((totalPaid / totalDue) * 100) : 0;
+  return {
+    perPlayer,
+    totalDue,
+    totalPaid,
+    collectionPct,
+    whatsappText: `TESORERIA VOLLEYOS\n${perPlayer.map((player) => `${player.name}: ${player.balance}`).join("\n")}\nRecaudacion ${collectionPct}%`,
+    excelRows: [["Jugador", "Cuota", "Pagado", "Saldo", "Estado"], ...perPlayer.map((player) => [player.name, String(player.due), String(player.paid), String(player.balance), player.status])],
+    message: `${totalPaid} de ${totalDue} recaudado (${collectionPct}%).`,
+  };
+}
+
+export function validateHouseRules(input: {
+  format: "mixed_6v6" | "relojito" | "short_sets";
+  teamAGenders: Array<"M" | "F">;
+  teamBGenders: Array<"M" | "F">;
+  benchOrder: string[];
+  scoreA: number;
+  scoreB: number;
+}): {
+  valid: boolean;
+  violations: string[];
+  rotationPlan: string[];
+  targetScore: number;
+  goldenPointRequired: boolean;
+  minContactsPerGender: number;
+  message: string;
+} {
+  const violations: string[] = [];
+  let minContactsPerGender = 0;
+  if (input.format === "mixed_6v6") {
+    minContactsPerGender = 2;
+    for (const [label, genders] of [["A", input.teamAGenders], ["B", input.teamBGenders]] as const) {
+      if (genders.length !== 6) violations.push(`Equipo ${label}: seis jugadores.`);
+      if (genders.filter((gender) => gender === "M").length < 2 || genders.filter((gender) => gender === "F").length < 2) {
+        violations.push(`Equipo ${label}: minimo 2 M y 2 F.`);
+      }
+    }
+  }
+  if (input.format === "relojito" && (input.teamAGenders.length < 7 || input.teamAGenders.length > 10)) {
+    violations.push("Relojito: roster de 7 a 10.");
+  }
+  const rotationPlan = Array.from({ length: 6 }, (_, index) => `Z6->${input.benchOrder[index % Math.max(1, input.benchOrder.length)] ?? `ROT${index + 1}`}`);
+  return {
+    valid: violations.length === 0,
+    violations,
+    rotationPlan,
+    targetScore: input.format === "short_sets" ? 15 : 25,
+    goldenPointRequired: input.format === "short_sets" && input.scoreA === 14 && input.scoreB === 14,
+    minContactsPerGender,
+    message: violations.length === 0 ? "Reglas validas." : `${violations.length} violaciones.`,
+  };
+}
+
+export type ArenaEvent = "MONSTER_BLOCK" | "SUPER_SPIKE" | "ACE_SIREN" | "VIDEO_CHALLENGE_SUSPENSE" | "SET_POINT_HEARTBEAT";
+
+export function buildArenaCue(input: { event: ArenaEvent }): {
+  event: ArenaEvent;
+  frequenciesHz: number[];
+  durationsMs: number[];
+  waveform: "square" | "sawtooth" | "sine" | "triangle";
+  visualBannerText: Record<"es" | "en" | "pt", string>;
+  intensity: number;
+  message: string;
+} {
+  const table: Record<ArenaEvent, { frequenciesHz: number[]; durationsMs: number[]; waveform: "square" | "sawtooth" | "sine" | "triangle"; visualBannerText: Record<"es" | "en" | "pt", string>; intensity: number }> = {
+    MONSTER_BLOCK: { frequenciesHz: [110, 82, 55], durationsMs: [180, 180, 260], waveform: "square", visualBannerText: { es: "MURO TOTAL", en: "WALL OF STEEL", pt: "MURO TOTAL" }, intensity: 5 },
+    SUPER_SPIKE: { frequenciesHz: [330, 440, 660], durationsMs: [120, 120, 200], waveform: "sawtooth", visualBannerText: { es: "REVISA EL TECHO", en: "CHECK THE ROOF", pt: "OLHA O TETO" }, intensity: 4 },
+    ACE_SIREN: { frequenciesHz: [660, 880, 1320], durationsMs: [150, 150, 300], waveform: "sine", visualBannerText: { es: "ACE DIRECTO", en: "ACE INCOMING", pt: "ACE DIRETO" }, intensity: 4 },
+    VIDEO_CHALLENGE_SUSPENSE: { frequenciesHz: [220, 220, 220], durationsMs: [220, 220, 440], waveform: "triangle", visualBannerText: { es: "OJO DE HALCON", en: "HAWK EYE REVIEW", pt: "OLHO DE FALCAO" }, intensity: 3 },
+    SET_POINT_HEARTBEAT: { frequenciesHz: [60, 55, 60], durationsMs: [180, 120, 260], waveform: "sine", visualBannerText: { es: "BALON DE SET", en: "SET POINT", pt: "BOLA DE SET" }, intensity: 5 },
+  };
+  return { ...table[input.event], event: input.event, message: `Cue ${input.event}.` };
+}
+
+const SLANG_TERMS: Record<string, { translations: Record<string, string>; technicalMeaning: string; usageExample: string; relatedTerms: string[] }> = {
+  mate: { translations: { AR: "mate", ES: "remate", MX: "mate", BR: "mate", US: "kill" }, technicalMeaning: "Remate que cierra el punto.", usageExample: "Que mate!", relatedTerms: ["remate", "ace"] },
+  pase: { translations: { AR: "pase", ES: "pase", MX: "pase", BR: "passe", US: "pass" }, technicalMeaning: "Primer contacto al armador.", usageExample: "Pase perfecto.", relatedTerms: ["recepcion", "armador"] },
+  remate: { translations: { AR: "remate", ES: "remate", MX: "remate", BR: "cortada", US: "spike" }, technicalMeaning: "Ataque aereo sobre la red.", usageExample: "Remate cruzado.", relatedTerms: ["mate", "bloqueo"] },
+  bloqueo: { translations: { AR: "bloqueo", ES: "bloqueo", MX: "bloqueo", BR: "bloqueio", US: "block" }, technicalMeaning: "Defensa en la red.", usageExample: "Buen bloqueo.", relatedTerms: ["defensa", "tool"] },
+  armador: { translations: { AR: "armador", ES: "colocador", MX: "armador", BR: "levantador", US: "setter" }, technicalMeaning: "Organiza el ataque.", usageExample: "El armador abrio la red.", relatedTerms: ["pase", "pipe"] },
+  punta: { translations: { AR: "punta", ES: "receptor", MX: "punta", BR: "ponteiro", US: "outside hitter" }, technicalMeaning: "Atacante de zona 4.", usageExample: "El punta ataco la linea.", relatedTerms: ["remate", "pase"] },
+  pipe: { translations: { AR: "pipe", ES: "pipe", MX: "pipe", BR: "pipe", US: "pipe" }, technicalMeaning: "Ataque de zaguero por zona 6.", usageExample: "Pipe en transicion.", relatedTerms: ["armador", "remate"] },
+  tool: { translations: { AR: "mano afuera", ES: "mano y afuera", MX: "mano afuera", BR: "explorar bloqueio", US: "tool" }, technicalMeaning: "Usar el bloqueo para salir fuera.", usageExample: "Pidio el tool.", relatedTerms: ["remate", "bloqueo"] },
+};
+
+export function translateSlang(input: { term: string; origin: "AR" | "ES" | "MX" | "BR" | "US" }): {
+  term: string;
+  origin: string;
+  translations: Record<string, string>;
+  technicalMeaning: string;
+  usageExample: string;
+  relatedTerms: string[];
+  message: string;
+} {
+  const entry = SLANG_TERMS[input.term.trim().toLowerCase()];
+  if (!entry) throw new Error(`termino no soportado: ${input.term}`);
+  return { term: input.term, origin: input.origin, ...entry, message: `${input.term} traducido AR/ES/MX/BR/US.` };
+}
+
+export async function buildQrSync(input: {
+  kind: "match" | "rotation" | "player";
+  payload: Record<string, string | number | boolean>;
+  matrixSize: 21 | 29;
+}): Promise<{
+  token: string;
+  signature: string;
+  checksum: string;
+  matrixSize: number;
+  svg: string;
+  byteLength: number;
+  message: string;
+}> {
+  const keys = Object.keys(input.payload);
+  if (keys.length > 30) throw new Error("payload exceeds 30 keys");
+  const canonical = canonicalJson(input.payload as JsonValue);
+  const signature = (await hmacSha256(canonical, INTEGRITY_SEAL_SECRET)).slice(0, 12);
+  const checksum = await sha256(canonical);
+  const token = btoa(`${canonical}|${signature}`).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  const size = input.matrixSize;
+  const seed = await sha256(`${canonical}|${signature}`);
+  const cells: string[] = [];
+  for (let row = 0; row < size; row += 1) {
+    for (let col = 0; col < size; col += 1) {
+      const finder = (row < 7 && col < 7) || (row < 7 && col >= size - 7) || (row >= size - 7 && col < 7);
+      const localRow = row < 7 ? row : row - (size - 7);
+      const localCol = col < 7 ? col : col - (size - 7);
+      const finderOn = finder && (localRow === 0 || localRow === 6 || localCol === 0 || localCol === 6 || (localRow >= 2 && localRow <= 4 && localCol >= 2 && localCol <= 4));
+      const bit = finderOn || (!finder && parseInt(seed[(row * size + col) % seed.length] ?? "0", 16) % 2 === 0);
+      if (bit) cells.push(`<rect x="${16 + col * 8}" y="${16 + row * 8}" width="8" height="8"/>`);
+    }
+  }
+  const pixels = size * 8 + 32;
+  return {
+    token,
+    signature,
+    checksum,
+    matrixSize: size,
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${pixels}" height="${pixels}" viewBox="0 0 ${pixels} ${pixels}" role="img"><title>VolleyOS QR sync</title><rect width="${pixels}" height="${pixels}" fill="#fff"/><g fill="#000">${cells.join("")}</g></svg>`,
+    byteLength: token.length,
+    message: `QR ${input.kind} ${size}x${size} firmado HMAC.`,
   };
 }

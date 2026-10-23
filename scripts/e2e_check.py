@@ -66,11 +66,11 @@ def api_checks() -> None:
 
     status, _, body = call("GET", f"{API}/api/v1/health/deep")
     health = json.loads(body) if status == 200 else {}
-    check("api.health_deep", status == 200 and health.get("status") == "ok" and health.get("count") == 36)
+    check("api.health_deep", status == 200 and health.get("status") == "ok" and health.get("count") == 48)
 
     status, _, body = call("GET", f"{API}/api/v1/catalog/modules")
     catalog = json.loads(body) if status == 200 else {}
-    check("api.catalog", status == 200 and catalog.get("count") == 36 and len(catalog.get("pricing", [])) == 3)
+    check("api.catalog", status == 200 and catalog.get("count") == 48 and len(catalog.get("pricing", [])) == 3)
 
     status, _, body = call("POST", f"{API}/api/v1/modules/biomechanics/demo", {})
     demo = json.loads(body) if status == 200 else {}
@@ -87,9 +87,12 @@ def api_checks() -> None:
         "setter-signals", "mvp-awards", "timeout-chalkboard", "momentum-coach",
         "captain-draft", "roster-pass", "equipment-inspector", "match-poster",
         "serve-radar", "matchup-matrix", "blockout-lab", "practice-planner", "play-by-play", "player-career",
+        "ball-aerodynamics", "rally-clipper", "recruiting-dossier", "system-transition",
+        "deception-reader", "inclusive-adaptive", "elo-ranking", "team-treasury",
+        "house-rules", "arena-dj", "court-slang", "qr-sync",
     ]
     demos = {slug: call("POST", f"{API}/api/v1/modules/{slug}/demo", {})[0] for slug in slugs}
-    check("api.demo_all_36", all(code == 200 for code in demos.values()), str(demos))
+    check("api.demo_all_48", all(code == 200 for code in demos.values()), str(demos))
 
     status, _, body = call(
         "POST",
@@ -224,7 +227,7 @@ def web_checks() -> None:
     check("web.pt_home", status == 200 and b"Esta\xc3\xa7\xc3\xb5es" in body)
 
     status, _, body = call("GET", f"{WEB}/es/")
-    check("web.thirty_six_modules", status == 200 and body.count(b'id="station-') >= 36)
+    check("web.forty_eight_modules", status == 200 and body.count(b'id="station-') >= 48)
 
     status, _, body = call("GET", f"{WEB}/es/legal/privacy/")
     check("web.legal", status == 200 and b"privacidad" in body.lower())
@@ -233,7 +236,7 @@ def web_checks() -> None:
     check("web.overlay_noindex", status == 200 and b"noindex" in body)
 
     status, _, body = call("GET", f"{WEB}/sitemap.xml")
-    check("web.sitemap", status == 200 and body.count(b"<url>") >= 205, f"{body.count(b'<url>')} urls")
+    check("web.sitemap", status == 200 and body.count(b"<url>") >= 241, f"{body.count(b'<url>')} urls")
 
     status, _, body = call("GET", f"{WEB}/robots.txt")
     check("web.robots", status == 200 and b"sitemap.xml" in body)

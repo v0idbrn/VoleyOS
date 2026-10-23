@@ -1,0 +1,4 @@
+- Twelve new engines: aerodynamics lab, highlight clipper, recruiting dossier, system simulator, deception reader, adaptive rulebook, Elo ranking, team treasury, house rules, Arena DJ, court slang and QR sync.
+- Pinned favorites, profile dock and a 48-module hub in ES, EN and PT.
+- Signed universal APK built by GitHub Actions.
+- 48 modules, 74 frontend tests and 440+ backend tests.

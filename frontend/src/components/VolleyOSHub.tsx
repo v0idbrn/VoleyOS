@@ -7,6 +7,7 @@ import { buildTarget, paywallEnabled, type Locale, type Profile } from "@/lib/lo
 import { MODULES, PROFILE_LABELS } from "@/lib/modules";
 import { addVaultEntry } from "@/lib/vault";
 import { announceScoreTTS, requestCourtWakeLock, triggerCourtHaptics } from "@/lib/court-ux";
+import { playArenaCue, type ArenaCue } from "@/lib/court-audio";
 import { EphemeralVaultBar } from "@/components/EphemeralVaultBar";
 import { STATIONS } from "@/components/stations";
 
@@ -14,6 +15,8 @@ const FILTERS: Array<Profile | "all"> = ["all", "players", "coaches", "court", "
 const LOCALES: Locale[] = ["es", "en", "pt"];
 const ROLE_KEY = "volleyos.role";
 const CONTRAST_KEY = "volleyos.contrast";
+const PIN_KEY = "volleyos.pins";
+const ARENA_CUES: ArenaCue[] = ["MONSTER_BLOCK", "SUPER_SPIKE", "ACE_SIREN", "VIDEO_CHALLENGE_SUSPENSE", "SET_POINT_HEARTBEAT"];
 
 function isProfile(value: string | null): value is Profile {
   return value !== null && (FILTERS as string[]).includes(value);
@@ -71,6 +74,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [awake, setAwake] = useState(false);
   const [view, setView] = useState<"bento" | "list">("bento");
   const [checkout, setCheckout] = useState<Plan | null>(null);
+  const [pinned, setPinned] = useState<string[]>([]);
+  const [cue, setCue] = useState<ArenaCue>("MONSTER_BLOCK");
   const searchRef = useRef<HTMLInputElement>(null);
   const target = buildTarget();
 
@@ -87,16 +92,29 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     });
   }, [locale, profile, query]);
 
+  const ordered = useMemo(() => [...visible].sort((left, right) => Number(pinned.includes(right.slug)) - Number(pinned.includes(left.slug))), [visible, pinned]);
+
   useEffect(() => {
     const storedRole = window.localStorage.getItem(ROLE_KEY);
     if (isProfile(storedRole)) setProfile(storedRole);
     setContrast(window.localStorage.getItem(CONTRAST_KEY) === "1");
+    try {
+      const storedPins = JSON.parse(window.localStorage.getItem(PIN_KEY) ?? "[]") as unknown;
+      if (Array.isArray(storedPins)) setPinned(storedPins.filter((value): value is string => typeof value === "string"));
+    } catch { setPinned([]); }
   }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("high-contrast", contrast);
     window.localStorage.setItem(CONTRAST_KEY, contrast ? "1" : "0");
   }, [contrast]);
+
+  const togglePin = (slug: string): void => {
+    const next = pinned.includes(slug) ? pinned.filter((value) => value !== slug) : [...pinned, slug];
+    setPinned(next);
+    window.localStorage.setItem(PIN_KEY, JSON.stringify(next));
+    triggerCourtHaptics(30);
+  };
 
   const chooseProfile = (value: Profile | "all"): void => {
     setProfile(value);
@@ -209,7 +227,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
 
       <div className="border-b border-white/10 bg-panel/60">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-2 text-[10px] font-bold uppercase tracking-wider">
-          <span className="rounded-full border border-emerald/40 bg-emerald/10 px-2 py-1 text-emerald">36/36 engines local</span>
+          <span className="rounded-full border border-emerald/40 bg-emerald/10 px-2 py-1 text-emerald">48/48 engines local</span>
           <button
             type="button"
             aria-pressed={awake}
@@ -311,11 +329,49 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
             ))}
           </div>
         </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-panel/50 px-3 py-2" aria-label={t(locale, "Arena DJ", "Arena DJ", "Arena DJ")}>
+          <span className="text-[10px] font-black uppercase tracking-wider text-crimson">Arena DJ</span>
+          {ARENA_CUES.map((value) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={cue === value}
+              onClick={() => { setCue(value); playArenaCue(value); triggerCourtHaptics(20); }}
+              className={`rounded-lg border px-2 py-1 text-[10px] font-bold ${cue === value ? "border-volt bg-volt text-obsidian" : "border-white/15 text-white/60 hover:text-white"}`}
+            >
+              {value.replaceAll("_", " ")}
+            </button>
+          ))}
+        </div>
+        {pinned.length > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center gap-1 text-[10px] text-white/50">
+            <span className="font-bold uppercase tracking-wider">{t(locale, "Fijados", "Pinned", "Fixados")}:</span>
+            {pinned.map((slug) => (
+              <button key={slug} type="button" onClick={() => togglePin(slug)} className="rounded-full border border-volt/40 bg-volt/10 px-2 py-0.5 text-volt">
+                {MODULES.find((module) => module.slug === slug)?.name[locale] ?? slug} x
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         <div className={view === "bento" ? "mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3" : "mt-6 grid gap-3"}>
-          {visible.map((meta) => {
+          {ordered.map((meta) => {
             const Station = STATIONS[meta.slug];
             if (!Station) return null;
-            return <Station key={meta.slug} meta={meta} locale={locale} onSave={handleSave} />;
+            return (
+              <div key={meta.slug} className="relative">
+                <button
+                  type="button"
+                  aria-pressed={pinned.includes(meta.slug)}
+                  aria-label={`${t(locale, "Fijar", "Pin", "Fixar")} ${meta.name[locale]}`}
+                  onClick={() => togglePin(meta.slug)}
+                  className={`absolute right-3 top-3 z-10 grid h-7 w-7 place-items-center rounded-full border text-xs ${pinned.includes(meta.slug) ? "border-volt bg-volt text-obsidian" : "border-white/20 bg-obsidian/80 text-white/50 hover:text-volt"}`}
+                >
+                  {pinned.includes(meta.slug) ? "*" : "+"}
+                </button>
+                <Station meta={meta} locale={locale} onSave={handleSave} />
+              </div>
+            );
           })}
         </div>
       </section>

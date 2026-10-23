@@ -10,7 +10,7 @@
 Signed universal APK built by GitHub Actions on every `v*` tag. Android 7.0+ (minSdk 24), trilingual, offline-first, no accounts and no telemetry.
 
 
-The volleyball operating system: 36 modules for players, coaches, referees, fans, organisers and clubs. Offline-first FOSS (F-Droid ready) + optional Cloud Pro, with persistent live rooms.
+The volleyball operating system: 48 modules for players, coaches, referees, fans, organisers and clubs. Offline-first FOSS (F-Droid ready) + optional Cloud Pro, with persistent live rooms.
 - Backend: Python 3.13+ / FastAPI / Pydantic v2 / Decimal-only maths.
 - Frontend: Next.js App Router / TypeScript strict / Tailwind / Zod.
 - Security: CSP, rate limiting, 256 KiB body cap, XSS and formula-injection
@@ -76,10 +76,22 @@ docker compose up --build
 | 34 | Practice planner + timed blocks | `practice-planner` |
 | 35 | Play-by-play narrator ES/EN/PT | `play-by-play` |
 | 36 | Player career passport + bottleneck | `player-career` |
+| 37 | Magnus aerodynamics lab + float drag crisis | `ball-aerodynamics` |
+| 38 | Rally highlight clipper + FFmpeg/EDL | `rally-clipper` |
+| 39 | Recruiting dossier + HMAC seal | `recruiting-dossier` |
+| 40 | 4-2 / 6-2 / 5-1 transition simulator | `system-transition` |
+| 41 | Deception reader + defender assignment | `deception-reader` |
+| 42 | Mini and sitting volleyball rulebook | `inclusive-adaptive` |
+| 43 | FIVB Elo ranking + margin factor | `elo-ranking` |
+| 44 | Team treasury + WhatsApp/Excel export | `team-treasury` |
+| 45 | House rules, relojito and golden point | `house-rules` |
+| 46 | Arena DJ + WebAudio stadium cues | `arena-dj` |
+| 47 | Court slang AR/ES/MX/BR/US | `court-slang` |
+| 48 | Air-gapped QR sync + HMAC matrix | `qr-sync` |
 
 ## API surface
 
-- `GET /api/v1/health/deep` - 36-engine health and version.
+- `GET /api/v1/health/deep` - 48-engine health and version.
 - `GET /api/v1/catalog/modules` - modules, samples, profiles and pricing.
 - `POST /api/v1/modules/{slug}/run` and `/demo` - run an engine.
 - `POST /api/v1/security/verify-seal` - verify a signed match sheet.
@@ -114,7 +126,7 @@ cd frontend && npm run typecheck && npm run test && npm run build
 
 ## Status
 
-v5.0.0: 36 modules, 370 backend tests, 62 frontend tests, SQLite WAL live rooms,
+v5.0.0: 48 modules, 370 backend tests, 62 frontend tests, SQLite WAL live rooms,
 six role profiles, scoreboard undo/redo and keyboard hotkeys, timeout chalkboard,
 snake draft, equipment checks, SVG match posters, trilingual UI and docs, and
 live E2E for modules, live rooms, security, paywall and header policy.

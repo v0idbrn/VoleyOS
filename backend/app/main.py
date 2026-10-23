@@ -12,16 +12,19 @@ from app.security import SecurityShieldMiddleware
 
 app = FastAPI(
     title="VolleyOS Global API",
-    version="5.0.0",
+    version="6.0.0",
     description=(
-        "36 volleyball engines: biomechanics, rotations, scouting, scoreboards, "
+        "48 volleyball engines: biomechanics, rotations, scouting, scoreboards, "
         "tournaments, pickup, OBS overlay, pocket VAR, beach, volleycards, tempo, "
         "ACWR, block shadow, seams, setter IQ, lineup slips, integrity seals, "
         "offline capsules, referee cards, substitutions, court split, fan signals, "
         "setter playbooks, MVP awards, timeout chalkboards, momentum coaching, "
         "snake captain drafts, roster passes, equipment inspection, SVG posters, "
         "serve radar, matchup matrices, block-out labs, practice planning, "
-        "play-by-play narration and player career passports. "
+        "play-by-play narration, player career passports, aerodynamics, rally "
+        "clipping, recruiting dossiers, system transitions, deception reading, "
+        "inclusive adaptive volleyball, ELO ranking, team treasury, house rules, "
+        "arena DJ cues, court slang and air-gapped QR sync. "
         "Decimal-only maths, no telemetry."
     ),
     contact={"name": "VolleyOS Global", "url": "https://github.com/v0idbrn/VoleyOS"},
@@ -66,7 +69,7 @@ app.include_router(router, prefix="/api/v1")
 def root() -> dict[str, str]:
     return {
         "name": "VolleyOS Global",
-        "version": "3.0.0",
+        "version": "6.0.0",
         "license": "AGPL-3.0-or-later",
         "docs": "/docs",
         "openapi": "/openapi.json",

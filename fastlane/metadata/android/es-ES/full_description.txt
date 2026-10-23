@@ -1,4 +1,4 @@
-VolleyOS es el sistema operativo offline-first del vóley. Treinta y seis módulos que funcionan en un gimnasio sin señal, en celular, tablet o notebook.
+VolleyOS es el sistema operativo offline-first del vóley. Cuarenta y ocho módulos que funcionan en un gimnasio sin señal, en celular, tablet o notebook.
 
 QUÉ INCLUYE
 • Laboratorio 5 Fotogramas: medí salto y mecánica de remate con física, no con intuición.

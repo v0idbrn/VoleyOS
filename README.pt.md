@@ -10,7 +10,7 @@
 APK universal assinado pelo GitHub Actions em cada tag `v*`. Android 7.0+ (minSdk 24), trilingue, offline-first, sem contas e sem telemetria.
 
 
-O sistema operacional do volei: 36 modulos para jogadores, treinadores, arbitros, torcida, organizadores e clubes. FOSS offline-first (pronto para F-Droid) + Cloud Pro opcional, com salas ao vivo persistentes.
+O sistema operacional do volei: 48 modulos para jogadores, treinadores, arbitros, torcida, organizadores e clubes. FOSS offline-first (pronto para F-Droid) + Cloud Pro opcional, com salas ao vivo persistentes.
 - Backend: Python 3.13+ / FastAPI / Pydantic v2 / matemática apenas com Decimal.
 - Frontend: Next.js App Router / TypeScript estrito / Tailwind / Zod.
 - Segurança: CSP, limite de requisições, teto de 256 KiB, saneamento de XSS e
@@ -76,10 +76,22 @@ docker compose up --build
 | 34 | Practice planner + timed blocks | `practice-planner` |
 | 35 | Play-by-play narrator ES/EN/PT | `play-by-play` |
 | 36 | Player career passport + bottleneck | `player-career` |
+| 37 | Laboratorio aerodinamico Magnus + crise de arrasto | `ball-aerodynamics` |
+| 38 | Cortador de highlights + FFmpeg/EDL | `rally-clipper` |
+| 39 | Dossie de recrutamento + selo HMAC | `recruiting-dossier` |
+| 40 | Simulador de transicao 4-2 / 6-2 / 5-1 | `system-transition` |
+| 41 | Leitor de engano + defensor designado | `deception-reader` |
+| 42 | Mini-volei e volei sentado | `inclusive-adaptive` |
+| 43 | Ranking ELO FIVB + fator de margem | `elo-ranking` |
+| 44 | Tesouraria do time + WhatsApp/Excel | `team-treasury` |
+| 45 | Regras da casa, reloginho e golden point | `house-rules` |
+| 46 | Arena DJ + cues WebAudio de estadio | `arena-dj` |
+| 47 | Girias mundiais AR/ES/MX/BR/US | `court-slang` |
+| 48 | Sincronizacao QR air-gapped + HMAC | `qr-sync` |
 
 ## Superfície da API
 
-- `GET /api/v1/health/deep` - saúde dos 36 motores e versão.
+- `GET /api/v1/health/deep` - saúde dos 48 motores e versão.
 - `GET /api/v1/catalog/modules` - módulos, exemplos, perfis e preços.
 - `POST /api/v1/modules/{slug}/run` e `/demo` - executar um motor.
 - `POST /api/v1/security/verify-seal` - verificar uma súmula assinada.
@@ -114,7 +126,7 @@ cd frontend && npm run typecheck && npm run test && npm run build
 
 ## Estado
 
-v5.0.0: 36 módulos, 370 testes backend, 62 testes frontend, salas ao vivo
+v5.0.0: 48 módulos, 370 testes backend, 62 testes frontend, salas ao vivo
 SQLite WAL, seis perfis de papel, desfazer/refazer e atalhos no placar, quadro de
 tempo técnico, draft serpentino, inspeção de equipamento, pôsteres SVG, UI e
 documentação trilíngues, e E2E ao vivo para módulos, salas, segurança, paywall e

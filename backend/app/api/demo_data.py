@@ -46,6 +46,18 @@ MODULE_SLUGS = (
     "practice-planner",
     "play-by-play",
     "player-career",
+    "ball-aerodynamics",
+    "rally-clipper",
+    "recruiting-dossier",
+    "system-transition",
+    "deception-reader",
+    "inclusive-adaptive",
+    "elo-ranking",
+    "team-treasury",
+    "house-rules",
+    "arena-dj",
+    "court-slang",
+    "qr-sync",
 )
 
 
@@ -866,6 +878,154 @@ def player_career_demo() -> dict[str, Any]:
     }
 
 
+def ball_aerodynamics_demo() -> dict[str, Any]:
+    return {
+        "speed_kmh": "68",
+        "spin_rps": "0.8",
+        "launch_angle_deg": "12",
+        "impact_height_m": "2.1",
+    }
+
+
+def rally_clipper_demo() -> dict[str, Any]:
+    return {
+        "player_number": 7,
+        "min_duration_sec": "3",
+        "rallies": [
+            {
+                "start_sec": "0",
+                "end_sec": "4.5",
+                "player_number": 7,
+                "skill": "spike",
+                "outcome": "kill",
+            },
+            {
+                "start_sec": "4.5",
+                "end_sec": "5.5",
+                "player_number": 4,
+                "skill": "dig",
+                "outcome": "transition",
+            },
+            {
+                "start_sec": "5.5",
+                "end_sec": "10.0",
+                "player_number": 7,
+                "skill": "ace",
+                "outcome": "ace",
+            },
+            {
+                "start_sec": "10.0",
+                "end_sec": "13.2",
+                "player_number": 9,
+                "skill": "block",
+                "outcome": "stuff",
+            },
+            {
+                "start_sec": "13.2",
+                "end_sec": "18.0",
+                "player_number": 7,
+                "skill": "spike",
+                "outcome": "kill",
+            },
+        ],
+    }
+
+
+def recruiting_dossier_demo() -> dict[str, Any]:
+    return {
+        "graduation_year": 2028,
+        "position": "outside",
+        "height_cm": "188",
+        "reach_one_hand_cm": "245",
+        "reach_two_hand_cm": "248",
+        "vertical_jump_cm": "78",
+        "attack_reach_cm": "323",
+        "kills": 280,
+        "attack_efficiency_pct": "46",
+    }
+
+
+def system_transition_demo() -> dict[str, Any]:
+    return {
+        "setters": 2,
+        "pure_hitters": 5,
+        "transition_read_grade": 8,
+        "rotation": 1,
+    }
+
+
+def deception_reader_demo() -> dict[str, Any]:
+    return {
+        "approach_speed_kmh": "19",
+        "elbow_height_cm": "172",
+        "ball_front_offset_cm": "8",
+        "setter_front_zone_jump": True,
+        "blockers_committed": 2,
+    }
+
+
+def inclusive_adaptive_demo() -> dict[str, Any]:
+    return {"mode": "sitting", "sex": "male", "players": 6}
+
+
+def elo_ranking_demo() -> dict[str, Any]:
+    return {
+        "team_a_rating": "1820",
+        "team_b_rating": "1760",
+        "k_weight": "40",
+        "result": "3-1",
+    }
+
+
+def team_treasury_demo() -> dict[str, Any]:
+    return {
+        "jersey_cost_total": "360.00",
+        "monthly_fee_per_player": "12.50",
+        "months": 3,
+        "ball_fund": "90.00",
+        "registration_fee": "60.00",
+        "players": [
+            {"name": "Valentina", "paid": "80.00"},
+            {"name": "Carla", "paid": "45.00"},
+            {"name": "Sofia", "paid": "120.00"},
+            {"name": "Renata", "paid": "0.00"},
+        ],
+    }
+
+
+def house_rules_demo() -> dict[str, Any]:
+    return {
+        "format": "mixed_6v6",
+        "team_a_genders": ["M", "F", "M", "F", "M", "F"],
+        "team_b_genders": ["F", "M", "F", "M", "F", "M"],
+        "bench_order": ["Ana", "Beto", "Caro", "Dani"],
+        "score_a": 14,
+        "score_b": 14,
+    }
+
+
+def arena_dj_demo() -> dict[str, Any]:
+    return {"event": "MONSTER_BLOCK"}
+
+
+def court_slang_demo() -> dict[str, Any]:
+    return {"term": "pipe", "origin": "AR"}
+
+
+def qr_sync_demo() -> dict[str, Any]:
+    return {
+        "kind": "match",
+        "payload": {
+            "home": "Tiburones",
+            "away": "Condores",
+            "set": 3,
+            "score_a": 24,
+            "score_b": 23,
+        },
+        "matrix_size": 29,
+    }
+
+
 DEMOS = {
     "biomechanics": biomechanics_demo,
     "rotation": rotation_demo,
@@ -903,4 +1063,16 @@ DEMOS = {
     "practice-planner": practice_planner_demo,
     "play-by-play": play_by_play_demo,
     "player-career": player_career_demo,
+    "ball-aerodynamics": ball_aerodynamics_demo,
+    "rally-clipper": rally_clipper_demo,
+    "recruiting-dossier": recruiting_dossier_demo,
+    "system-transition": system_transition_demo,
+    "deception-reader": deception_reader_demo,
+    "inclusive-adaptive": inclusive_adaptive_demo,
+    "elo-ranking": elo_ranking_demo,
+    "team-treasury": team_treasury_demo,
+    "house-rules": house_rules_demo,
+    "arena-dj": arena_dj_demo,
+    "court-slang": court_slang_demo,
+    "qr-sync": qr_sync_demo,
 }

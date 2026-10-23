@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "volleyos-backend"
-version = "5.0.0"
+version = "6.0.0"
 description = "VolleyOS Global - volleyball operating system (AGPL-3.0-or-later)"
 readme = { text = "VolleyOS Global backend: 24 Decimal-only volleyball engines and a FastAPI API (AGPL-3.0-or-later).", content-type = "text/markdown" }
 requires-python = ">=3.11"

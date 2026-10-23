@@ -17,9 +17,9 @@ export const SECTION_LABELS: Record<SeoSection, Record<Locale, string>> = {
 
 export const SECTION_INTROS: Record<SeoSection, Record<Locale, string>> = {
   modules: {
-    es: "Treinta y seis estaciones offline que cubren cancha, cuerpo técnico, arbitraje, tribuna y transmisión. Todas funcionan sin internet y sin cuentas.",
-    en: "Thirty-six offline stations covering the court, coaching staff, refereeing, fans and streaming. All work without internet or accounts.",
-    pt: "Trinta e seis estações offline que cobrem quadra, comissão técnica, arbitragem, torcida e transmissão. Todas funcionam sem internet e sem contas.",
+    es: "Cuarenta y ocho estaciones offline que cubren cancha, cuerpo técnico, arbitraje, tribuna y transmisión. Todas funcionan sin internet y sin cuentas.",
+    en: "Forty-eight offline stations covering the court, coaching staff, refereeing, fans and streaming. All work without internet or accounts.",
+    pt: "Quarenta e oito estações offline que cobrem quadra, comissão técnica, arbitragem, torcida e transmissão. Todas funcionam sem internet e sem contas.",
   },
   positions: {
     es: "Roles, zonas y responsabilidades de cada posición del vóley indoor, con métricas que podés medir en VolleyOS.",
@@ -234,7 +234,66 @@ const MODULE_FACTS: Record<string, LArr> = {
     ["Feed with points, timeouts, subs, cards and set ends.", "Flags clutch points when both teams pass 20.", "Automatic ES, EN and PT recap with lead changes."],
     ["Feed com pontos, tempos, substituicoes, cartoes e fim de set.", "Marca pontos clutch quando ambos passam de 20.", "Resumo automatico em ES, EN e PT com viradas."],
   ),
-  "player-career": la(
+  "ball-aerodynamics": la(
+    ["Modelo de Reynolds con crisis de arrastre entre 52 y 74 km/h.", "La caida Magnus se calcula desde el spin y el tiempo de vuelo.", "Reporta desvio lateral y si el balon cae dentro de la cancha."],
+    ["Reynolds model with the drag crisis between 52 and 74 km/h.", "Magnus drop is computed from spin and flight time.", "Reports lateral deviation and whether the ball lands in court."],
+    ["Modelo de Reynolds com crise de arrasto entre 52 e 74 km/h.", "A queda Magnus e calculada pelo giro e tempo de voo.", "Reporta desvio lateral e se a bola cai dentro da quadra."],
+  ),
+  "rally-clipper": la(
+    ["Filtra rallies por jugador y duracion minima.", "Calcula tiempo neto, tiempo muerto y porcentaje de juego.", "Exporta comandos FFmpeg, capitulos YouTube y EDL."],
+    ["Filters rallies by player and minimum duration.", "Computes net play, dead time and play percentage.", "Exports FFmpeg commands, YouTube chapters and EDL."],
+    ["Filtra rallies por jogador e duracao minima.", "Calcula tempo liquido, tempo morto e percentual de jogo.", "Exporta comandos FFmpeg, capitulos YouTube e EDL."],
+  ),
+  "recruiting-dossier": la(
+    ["Puntua altura, alcance, salto, eficiencia y volumen.", "Clasifica en U21, Div II, Div I o proyeccion nacional.", "Firma el dossier con un sello HMAC verificable."],
+    ["Scores height, reach, jump, efficiency and volume.", "Classifies as U21, Div II, Div I or national projection.", "Signs the dossier with a verifiable HMAC seal."],
+    ["Pontua altura, alcance, salto, eficiencia e volume.", "Classifica em U21, Div II, Div I ou projecao nacional.", "Assina o dossie com selo HMAC verificavel."],
+  ),
+  "system-transition": la(
+    ["Compara 4-2, 6-2 y 5-1 con atacantes delanteros por rotacion.", "Recomienda el sistema segun armadores y receptores.", "Genera un mapa de infiltracion R1-R6."],
+    ["Compares 4-2, 6-2 and 5-1 with front attackers by rotation.", "Recommends a system from setters and hitters.", "Builds an R1-R6 infiltration map."],
+    ["Compara 4-2, 6-2 e 5-1 com atacantes da frente por rotacao.", "Recomenda o sistema conforme levantadores e atacantes.", "Gera um mapa de infiltracao R1-R6."],
+  ),
+  "deception-reader": la(
+    ["Combina velocidad, codo, offset y bloqueo comprometido.", "Estima swing, toque y volcada del armador.", "Asigna el defensor responsable de la cobertura."],
+    ["Combines speed, elbow, offset and committed blockers.", "Estimates swing, tip and setter dump odds.", "Assigns the defender responsible for coverage."],
+    ["Combina velocidade, cotovelo, offset e bloqueio comprometido.", "Estima ataque, toque e largada do levantador.", "Atribui o defensor responsavel pela cobertura."],
+  ),
+  "inclusive-adaptive": la(
+    ["Canchas 2v2, 3v3 y 4v4 con redes de 2.00 a 2.10 m.", "Voley sentado con red de 1.15 m masculino y 1.05 m femenino.", "Aplica contacto de pelvis y prohibe bloquear el saque."],
+    ["2v2, 3v3 and 4v4 courts with nets from 2.00 to 2.10 m.", "Sitting volleyball at 1.15 m men and 1.05 m women.", "Requires pelvis contact and bans serve blocking."],
+    ["Quadras 2v2, 3v3 e 4v4 com redes de 2.00 a 2.10 m.", "Volei sentado com rede de 1.15 m masculino e 1.05 m feminino.", "Exige contato de pelvis e proibe bloquear o saque."],
+  ),
+  "elo-ranking": la(
+    ["Puntos esperados con la curva logistica clasica.", "Factor de margen 1.0, 0.9 y 0.8 segun el marcador.", "Transferencia simetrica entre ambos equipos."],
+    ["Expected points from the classic logistic curve.", "Margin factor 1.0, 0.9 and 0.8 by set score.", "Symmetric transfer between both teams."],
+    ["Pontos esperados pela curva logistica classica.", "Fator de margem 1.0, 0.9 e 0.8 pelo placar.", "Transferencia simetrica entre as duas equipes."],
+  ),
+  "team-treasury": la(
+    ["Reparte camisetas, cuotas, balones e inscripcion.", "Muestra saldo por jugador y estado de cobro.", "Exporta WhatsApp y filas listas para Excel."],
+    ["Splits jerseys, fees, balls and registration.", "Shows each player balance and collection status.", "Exports WhatsApp text and Excel-ready rows."],
+    ["Divide camisas, mensalidades, bolas e inscricao.", "Mostra saldo por jogador e status de cobranca.", "Exporta WhatsApp e linhas prontas para Excel."],
+  ),
+  "house-rules": la(
+    ["Valida mixto 6v6 con minimo dos hombres y dos mujeres.", "Soporta relojito y sets cortos a 15.", "Activa golden point en 14-14 y genera rotacion con banco."],
+    ["Validates mixed 6v6 with at least two men and two women.", "Supports relojito and 15-point short sets.", "Enables golden point at 14-14 and builds bench rotation."],
+    ["Valida misto 6v6 com no minimo dois homens e duas mulheres.", "Suporta reloginho e sets curtos a 15.", "Ativa golden point em 14-14 e gera rotacao com banco."],
+  ),
+  "arena-dj": la(
+    ["Cinco cues WebAudio: block, spike, ace, challenge y set point.", "Cada cue trae frecuencias, duracion y forma de onda.", "Banners trilingues listos para pantalla gigante."],
+    ["Five WebAudio cues: block, spike, ace, challenge and set point.", "Each cue carries frequencies, duration and waveform.", "Trilingual banners ready for the big screen."],
+    ["Cinco cues WebAudio: block, spike, ace, challenge e set point.", "Cada cue traz frequencias, duracao e forma de onda.", "Banners trilingues prontos para o telao."],
+  ),
+  "court-slang": la(
+    ["Traduce mate, pase, remate, bloqueo, armador, punta y pipe.", "Mapea Argentina, Espana, Mexico, Brasil y Estados Unidos.", "Explica significado tecnico y ejemplo de uso real."],
+    ["Translates mate, pass, spike, block, setter, outside and pipe.", "Maps Argentina, Spain, Mexico, Brazil and the United States.", "Explains technical meaning and a real usage example."],
+    ["Traduz mate, passe, ataque, bloqueio, levantador, ponteiro e pipe.", "Mapeia Argentina, Espanha, Mexico, Brasil e Estados Unidos.", "Explica significado tecnico e exemplo de uso real."],
+  ),
+  "qr-sync": la(
+    ["Firma el payload canonico con HMAC-SHA256.", "Genera matrices SVG de 21x21 o 29x29.", "Sincroniza partido, rotacion o jugador sin internet."],
+    ["Signs canonical JSON payloads with HMAC-SHA256.", "Generates 21x21 or 29x29 SVG matrices.", "Syncs match, rotation or player data without internet."],
+    ["Assina payloads JSON canonicos com HMAC-SHA256.", "Gera matrizes SVG de 21x21 ou 29x29.", "Sincroniza partida, rotacao ou jogador sem internet."],
+  ),  "player-career": la(
     ["Deltas de salto, alcance, saque, ataque y recepcion.", "Indice 0-100 con 70% absoluto y 30% progreso.", "Detecta el cuello de botella y la brecha a la proxima categoria."],
     ["Deltas for jump, reach, serve, attack and reception.", "0-100 index with 70% absolute and 30% progress.", "Finds the bottleneck and the gap to the next category."],
     ["Deltas de salto, alcance, saque, ataque e recepcao.", "Indice 0-100 com 70% absoluto e 30% progresso.", "Detecta o gargalo e a distancia para a proxima categoria."],

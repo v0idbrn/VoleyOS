@@ -1,4 +1,4 @@
-"""Single dispatcher for the 36 engines, shared by API, demo and health probe."""
+"""Single dispatcher for the 48 engines, shared by API, demo and health probe."""
 
 from __future__ import annotations
 
@@ -8,7 +8,9 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.security import sanitize_value
+from app.services.arena_dj import ArenaEventRequest, build_arena_cue
 from app.services.attack_tempo import classify_timing, tempo_plan, tempo_window
+from app.services.ball_aerodynamics import BallAeroRequest, analyze_aerodynamics
 from app.services.beach_engine import BeachState, new_beach_match
 from app.services.beach_engine import award_point as beach_point
 from app.services.biomechanics import PoseSequence, analyze_sequence
@@ -16,9 +18,14 @@ from app.services.block_shadow import BlockShadowRequest, compute_block_shadow
 from app.services.blockout_lab import BlockoutRequest, evaluate_blockout
 from app.services.capsule_io import CapsuleRequest, run_capsule
 from app.services.captain_draft import DraftRequest, snake_draft
+from app.services.court_slang import SlangRequest, translate_slang
 from app.services.court_split import CourtSplitRequest, split_costs
+from app.services.deception_reader import DeceptionRequest, read_deception
+from app.services.elo_ranking import EloRequest, calculate_elo
 from app.services.equipment_inspector import EquipmentRequest, inspect_equipment
 from app.services.fan_companion import FanRequest, fan_report
+from app.services.house_rules import HouseRulesRequest, validate_house_rules
+from app.services.inclusive_adaptive import AdaptiveRequest, build_adaptive_rulebook
 from app.services.integrity_seal import (
     SealRequest,
     VerifySealRequest,
@@ -42,6 +49,9 @@ from app.services.play_by_play import PlayByPlayRequest, build_play_by_play
 from app.services.player_career import CareerRequest, build_career_report
 from app.services.pocket_var import analyze_play, toss_coin, whistle
 from app.services.practice_planner import PracticeRequest, plan_practice
+from app.services.qr_sync import QrSyncRequest, build_qr_sync
+from app.services.rally_clipper import ClipRequest, build_clip_plan
+from app.services.recruiting_dossier import RecruitRequest, build_recruiting_dossier
 from app.services.referee_console import RefereeRequest, referee_report
 from app.services.roster_pass import RosterRequest, build_roster_pass
 from app.services.rotation_validator import (
@@ -71,6 +81,8 @@ from app.services.serve_radar import ServeRadarRequest, analyze_serve
 from app.services.setter_iq import SetterIQRequest, compute_setter_iq
 from app.services.setter_signals import SetterSignalRequest, build_signal_sheet
 from app.services.substitution_tracker import SubstitutionRequest, track_substitutions
+from app.services.system_transition import SystemRequest, analyze_system
+from app.services.team_treasury import TreasuryRequest, build_treasury
 from app.services.timeout_chalkboard import ChalkboardRequest, build_chalkboard
 from app.services.tournament_engine import (
     MatchResult,
@@ -383,6 +395,102 @@ MODULES: tuple[ModuleInfo, ...] = (
         profile="referees",
         profiles=["referees"],
         description="Deltas atléticos, índice de evolución 0-100 y cuello de botella.",
+    ),
+    ModuleInfo(
+        slug="ball-aerodynamics",
+        name="Laboratorio Aerodinamico Magnus",
+        name_en="Magnus Aerodynamics Lab",
+        profile="players",
+        profiles=["players"],
+        description="Reynolds, crisis de arrastre del flotado y caida Magnus en centimetros.",
+    ),
+    ModuleInfo(
+        slug="rally-clipper",
+        name="Cortador de Highlights y Tiempos Muertos",
+        name_en="Rally Highlight Clipper",
+        profile="players",
+        profiles=["players"],
+        description="Tiempo neto, capitulos YouTube, comando FFmpeg y EDL sin recodificar.",
+    ),
+    ModuleInfo(
+        slug="recruiting-dossier",
+        name="Dossier de Reclutamiento y Beca",
+        name_en="Recruiting & Scholarship Dossier",
+        profile="tournaments",
+        profiles=["tournaments"],
+        description="Score 0-100 contra percentiles universitarios y sello VOS-SEAL.",
+    ),
+    ModuleInfo(
+        slug="system-transition",
+        name="Simulador 4-2 / 6-2 / 5-1",
+        name_en="4-2 / 6-2 / 5-1 Transition Simulator",
+        profile="coaches",
+        profiles=["coaches"],
+        description="Atacantes delanteros por rotacion, sistema optimo y mapa de infiltracion.",
+    ),
+    ModuleInfo(
+        slug="deception-reader",
+        name="Lector de Engano del Armador",
+        name_en="Setter Deception Reader",
+        profile="coaches",
+        profiles=["coaches"],
+        description="Probabilidades de swing, toque y volcada con defensor responsable.",
+    ),
+    ModuleInfo(
+        slug="inclusive-adaptive",
+        name="Mini-Voley y Voley Sentado",
+        name_en="Mini & Sitting Volleyball",
+        profile="court",
+        profiles=["court"],
+        description="Canchas 2v2/3v3/4v4 y reglas World ParaVolley a 1.15/1.05 m.",
+    ),
+    ModuleInfo(
+        slug="elo-ranking",
+        name="Ranking ELO / FIVB Probabilistico",
+        name_en="Probabilistic ELO / FIVB Ranking",
+        profile="referees",
+        profiles=["referees"],
+        description="Puntos esperados y transferencia por margen 3-0 a 0-3.",
+    ),
+    ModuleInfo(
+        slug="team-treasury",
+        name="Tesoreria del Equipo",
+        name_en="Team Treasury",
+        profile="tournaments",
+        profiles=["tournaments"],
+        description="Cuotas, camisetas e inscripcion al centavo con resumen WhatsApp y Excel.",
+    ),
+    ModuleInfo(
+        slug="house-rules",
+        name="Reglas de Casa, Mixto y Relojito",
+        name_en="House Rules, Mixed & Relojito",
+        profile="court",
+        profiles=["court"],
+        description="Contactos por genero, rotacion con banco y sets a 15 con golden point.",
+    ),
+    ModuleInfo(
+        slug="arena-dj",
+        name="Arena DJ de Estadio VNL",
+        name_en="VNL Arena DJ",
+        profile="fans",
+        profiles=["fans"],
+        description="Cues WebAudio y banners ES/EN/PT para block, spike, ace y challenge.",
+    ),
+    ModuleInfo(
+        slug="court-slang",
+        name="Traductor Mundial de Jerga",
+        name_en="World Court Slang Translator",
+        profile="fans",
+        profiles=["fans"],
+        description="Diccionario tactico AR/ES/MX/BR/US con significado y uso en cancha.",
+    ),
+    ModuleInfo(
+        slug="qr-sync",
+        name="Sincronizador QR Air-Gapped",
+        name_en="Air-Gapped QR Sync",
+        profile="referees",
+        profiles=["referees"],
+        description="Token firmado HMAC y matriz SVG 21x21/29x29 sin internet.",
     ),
 )
 
@@ -700,6 +808,54 @@ def _run_player_career(payload: dict[str, Any]) -> dict[str, Any]:
     return _dump(build_career_report(CareerRequest.model_validate(payload)))
 
 
+def _run_ball_aerodynamics(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(analyze_aerodynamics(BallAeroRequest.model_validate(payload)))
+
+
+def _run_rally_clipper(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_clip_plan(ClipRequest.model_validate(payload)))
+
+
+def _run_recruiting_dossier(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_recruiting_dossier(RecruitRequest.model_validate(payload)))
+
+
+def _run_system_transition(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(analyze_system(SystemRequest.model_validate(payload)))
+
+
+def _run_deception_reader(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(read_deception(DeceptionRequest.model_validate(payload)))
+
+
+def _run_inclusive_adaptive(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_adaptive_rulebook(AdaptiveRequest.model_validate(payload)))
+
+
+def _run_elo_ranking(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(calculate_elo(EloRequest.model_validate(payload)))
+
+
+def _run_team_treasury(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_treasury(TreasuryRequest.model_validate(payload)))
+
+
+def _run_house_rules(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(validate_house_rules(HouseRulesRequest.model_validate(payload)))
+
+
+def _run_arena_dj(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_arena_cue(ArenaEventRequest.model_validate(payload)))
+
+
+def _run_court_slang(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(translate_slang(SlangRequest.model_validate(payload)))
+
+
+def _run_qr_sync(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_qr_sync(QrSyncRequest.model_validate(payload)))
+
+
 RUNNERS = {
     "biomechanics": _run_biomechanics,
     "rotation": _run_rotation,
@@ -737,6 +893,18 @@ RUNNERS = {
     "practice-planner": _run_practice_planner,
     "play-by-play": _run_play_by_play,
     "player-career": _run_player_career,
+    "ball-aerodynamics": _run_ball_aerodynamics,
+    "rally-clipper": _run_rally_clipper,
+    "recruiting-dossier": _run_recruiting_dossier,
+    "system-transition": _run_system_transition,
+    "deception-reader": _run_deception_reader,
+    "inclusive-adaptive": _run_inclusive_adaptive,
+    "elo-ranking": _run_elo_ranking,
+    "team-treasury": _run_team_treasury,
+    "house-rules": _run_house_rules,
+    "arena-dj": _run_arena_dj,
+    "court-slang": _run_court_slang,
+    "qr-sync": _run_qr_sync,
 }
 
 
