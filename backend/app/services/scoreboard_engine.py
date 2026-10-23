@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 FRONT_ROW = {2, 3, 4}
 BACK_ROW = {1, 5, 6}
+RosterRole = Literal["S", "OH", "MB", "OPP", "L"]
 
 
 class Player(BaseModel):
@@ -13,6 +16,23 @@ class Player(BaseModel):
 
     number: int = Field(ge=1, le=99)
     name: str = ""
+
+
+class RosterEntry(Player):
+    role: RosterRole = "OH"
+    captain: bool = False
+
+
+class TeamRoster(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    id: str
+    name: str
+    code: str
+    players: list[RosterEntry]
+    starters: list[int]
+    libero: int | None = None
+    bench: list[int]
 
 
 class MatchState(BaseModel):
@@ -62,6 +82,45 @@ def _validate_team(players: list[Player]) -> None:
     numbers = [player.number for player in players]
     if len(set(numbers)) != 6:
         raise ValueError("duplicate shirt numbers")
+
+
+def create_team(team_id: str, name: str, code: str, players: list[RosterEntry]) -> TeamRoster:
+    if not 6 <= len(players) <= 14:
+        raise ValueError("roster needs 6-14 players")
+    numbers = [player.number for player in players]
+    if len(set(numbers)) != len(numbers):
+        raise ValueError("duplicate shirt numbers")
+    liberos = [player for player in players if player.role == "L"]
+    if len(liberos) > 2:
+        raise ValueError("at most two liberos")
+    captains = [player for player in players if player.captain]
+    if len(captains) != 1:
+        raise ValueError("exactly one captain is required")
+    if captains[0].role == "L":
+        raise ValueError("the captain cannot be the libero")
+    court = [player for player in players if player.role != "L"]
+    if len(court) < 6:
+        raise ValueError("at least six court players are required")
+    starters = [player.number for player in court[:6]]
+    return TeamRoster(
+        id=team_id,
+        name=name,
+        code=code[:3].upper(),
+        players=players,
+        starters=starters,
+        libero=liberos[0].number if liberos else None,
+        bench=[
+            player.number
+            for player in players
+            if player.number not in starters and player.role != "L"
+        ],
+    )
+
+
+def roster_lineup(team: TeamRoster) -> dict[int, int]:
+    if len(team.starters) != 6:
+        raise ValueError("starting six required")
+    return {zone + 1: number for zone, number in enumerate(team.starters)}
 
 
 def new_match(

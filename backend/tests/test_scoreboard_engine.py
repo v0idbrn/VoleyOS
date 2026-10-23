@@ -2,11 +2,14 @@ import pytest
 
 from app.services.scoreboard_engine import (
     Player,
+    RosterEntry,
     award_point,
     call_timeout,
+    create_team,
     libero_issues,
     new_match,
     place_libero,
+    roster_lineup,
     rotate_lineup,
     server_number,
     substitute,
@@ -171,3 +174,46 @@ def test_invalid_team_rejected() -> None:
 def test_team_size_validated() -> None:
     with pytest.raises(ValueError, match="exactly 6"):
         new_match([Player(number=1)], team(10))
+
+
+def roster() -> list[RosterEntry]:
+    return [
+        RosterEntry(number=1, name="Sofia", role="S", captain=True),
+        RosterEntry(number=4, name="Valentina", role="OH"),
+        RosterEntry(number=7, name="Martina", role="L"),
+        RosterEntry(number=9, name="Renata", role="MB"),
+        RosterEntry(number=11, name="Carla", role="OPP"),
+        RosterEntry(number=14, name="Julieta", role="MB"),
+        RosterEntry(number=21, name="Micaela", role="OH"),
+        RosterEntry(number=22, name="Lucia", role="OH"),
+    ]
+
+
+def test_create_team_assigns_starting_six_and_libero() -> None:
+    team = create_team("tib", "Tiburones", "tib", roster())
+    assert team.starters == [1, 4, 9, 11, 14, 21]
+    assert team.libero == 7
+    assert team.bench == [22]
+    assert roster_lineup(team)[1] == 1
+
+
+def test_create_team_rejects_duplicate_jerseys() -> None:
+    players = roster()
+    players[6] = RosterEntry(number=1, name="Micaela", role="OH")
+    with pytest.raises(ValueError, match="duplicate"):
+        create_team("tib", "Tiburones", "TIB", players)
+
+
+def test_create_team_requires_one_captain() -> None:
+    players = roster()
+    players[0].captain = False
+    with pytest.raises(ValueError, match="one captain"):
+        create_team("tib", "Tiburones", "TIB", players)
+
+
+def test_create_team_rejects_libero_captain() -> None:
+    players = roster()
+    players[0].captain = False
+    players[2].captain = True
+    with pytest.raises(ValueError, match="cannot be the libero"):
+        create_team("tib", "Tiburones", "TIB", players)

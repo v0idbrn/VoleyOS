@@ -109,6 +109,7 @@ import {
   saveTeam,
   deleteTeam,
   newTeam,
+  teamFromRosterSheet,
 } from "@/lib/local-engines";
 import {
   PICKUP_SAMPLE,
@@ -528,11 +529,47 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   });
   const [message, setMessage] = useState(t(locale, "Elegí un equipo para sumar.", "Pick a team to score.", "Escolha um time para pontuar."));
   const [hardwareMode, setHardwareMode] = useState(false);
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const [rosterName, setRosterName] = useState("");
+  const [rosterCode, setRosterCode] = useState("");
+  const [rosterSheet, setRosterSheet] = useState("");
+  const [rosterError, setRosterError] = useState<string | null>(null);
   const state = history.present;
 
   useEffect(() => {
     setTeams(loadTeams());
   }, []);
+
+  const applyRoster = (team: TeamRoster, side: "A" | "B"): void => {
+    if (side === "A") setTeamAId(team.id);
+    else setTeamBId(team.id);
+    setHistory(newScoreboardHistory({
+      ...state,
+      teamA: side === "A" ? team.name : state.teamA,
+      teamB: side === "B" ? team.name : state.teamB,
+      lineupA: side === "A" && team.starters.length === 6 ? team.starters : state.lineupA,
+      lineupB: side === "B" && team.starters.length === 6 ? team.starters : state.lineupB,
+      rosterA: side === "A" ? team : state.rosterA,
+      rosterB: side === "B" ? team : state.rosterB,
+    }));
+    setMessage(t(locale, `${team.name} cargado en ${side}.`, `${team.name} loaded on ${side}.`, `${team.name} carregado em ${side}.`));
+    triggerCourtHaptics(20);
+  };
+
+  const saveRoster = (): void => {
+    try {
+      const team = teamFromRosterSheet(rosterName, rosterCode, rosterSheet);
+      setTeams(saveTeam(team));
+      applyRoster(team, teamAId ? "B" : "A");
+      setRosterError(null);
+      setRosterOpen(false);
+      setRosterName("");
+      setRosterCode("");
+      setRosterSheet("");
+    } catch (error) {
+      setRosterError(error instanceof Error ? error.message : "Error");
+    }
+  };
 
   const point = (team: "A" | "B"): void => {
     try {
@@ -633,6 +670,65 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         <button type="button" onClick={() => { setMatchFormat("bo5"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 5, { matchFormat: "bo5" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo5" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 5 (25/15)", "Best of 5 (25/15)", "Melhor de 5 (25/15)")}</button>
         <button type="button" onClick={() => { setMatchFormat("short15"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 1, { matchFormat: "short15" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "short15" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Set corto 15", "Short Set 15", "Set curto 15")}</button>
       </div>
+      <div className="mb-2 grid grid-cols-2 gap-1">
+        <select
+          aria-label={t(locale, "Equipo local", "Home team", "Time da casa")}
+          value={teamAId ?? ""}
+          onChange={(event) => {
+            const team = teams.find((item) => item.id === event.target.value);
+            if (team) applyRoster(team, "A");
+          }}
+          className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px] text-white"
+        >
+          <option value="">{t(locale, "Equipo A", "Team A", "Time A")}</option>
+          {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+        </select>
+        <select
+          aria-label={t(locale, "Equipo visitante", "Away team", "Time visitante")}
+          value={teamBId ?? ""}
+          onChange={(event) => {
+            const team = teams.find((item) => item.id === event.target.value);
+            if (team) applyRoster(team, "B");
+          }}
+          className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px] text-white"
+        >
+          <option value="">{t(locale, "Equipo B", "Team B", "Time B")}</option>
+          {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+        </select>
+        <button type="button" className={`${BTN} col-span-2`} onClick={() => setRosterOpen((open) => !open)}>
+          {t(locale, "Administrar plantillas", "Manage rosters", "Gerenciar elencos")}
+        </button>
+      </div>
+      {rosterOpen ? (
+        <div className="mb-2 space-y-1 rounded-xl border border-white/10 bg-obsidian/80 p-2">
+          <div className="grid grid-cols-[1fr_4rem] gap-1">
+            <input value={rosterName} onChange={(event) => setRosterName(event.target.value)} placeholder={t(locale, "Nombre del equipo", "Team name", "Nome do time")} className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px]" />
+            <input value={rosterCode} onChange={(event) => setRosterCode(event.target.value)} placeholder="ABC" maxLength={3} className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px] uppercase" />
+          </div>
+          <textarea
+            value={rosterSheet}
+            onChange={(event) => setRosterSheet(event.target.value)}
+            rows={5}
+            placeholder={"1 Sofia S C\n7 Martina L\n4 Valentina OH\n9 Renata MB\n11 Carla OPP\n14 Julieta MB"}
+            className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 font-mono text-[10px]"
+          />
+          <p className="text-[9px] text-white/40">{t(locale, "Dorsal nombre rol (S OH MB OPP L) y C/L para capitan o libero.", "Number name role (S OH MB OPP L), C/L for captain or libero.", "Numero nome posicao (S OH MB OPP L), C/L para capitao ou libero.")}</p>
+          {rosterError ? <p className="text-[10px] text-crimson">{rosterError}</p> : null}
+          <button type="button" className={`${BTN} w-full`} onClick={saveRoster}>{t(locale, "Guardar plantilla", "Save roster", "Salvar elenco")}</button>
+          {teams.length > 0 ? (
+            <div className="space-y-1">
+              {teams.map((team) => (
+                <div key={team.id} className="flex items-center gap-1 text-[10px]">
+                  <span className="flex-1 truncate">{team.name} ({team.players.length})</span>
+                  <button type="button" className={BTN} onClick={() => applyRoster(team, "A")}>A</button>
+                  <button type="button" className={BTN} onClick={() => applyRoster(team, "B")}>B</button>
+                  <button type="button" className={BTN} onClick={() => setTeams(deleteTeam(team.id))}>×</button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <div data-hardware-volume-score={hardwareMode ? "true" : "false"} className="relative rounded-xl">
       <button
         type="button"

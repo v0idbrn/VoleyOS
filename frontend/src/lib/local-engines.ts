@@ -2646,6 +2646,58 @@ export function newTeam(name: string, code: string, color = "#e11d48"): TeamRost
   };
 }
 
+const ROSTER_ROLES = new Set<RosterPlayer["role"]>(["S", "OH", "MB", "OPP", "L"]);
+
+export function parseRosterSheet(text: string): RosterPlayer[] {
+  const players: RosterPlayer[] = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const tokens = line.split(/\s+/);
+    const number = Number(tokens[0]);
+    const role = tokens[2]?.toUpperCase() as RosterPlayer["role"] | undefined;
+    if (!Number.isInteger(number) || number < 1 || number > 99) throw new Error(`Dorsal invalido: ${line}`);
+    if (!role || !ROSTER_ROLES.has(role)) throw new Error(`Rol invalido en: ${line}`);
+    const flags = tokens.slice(3).map((token) => token.toUpperCase());
+    players.push({
+      number,
+      name: tokens[1] ?? `#${number}`,
+      role,
+      captain: flags.includes("C"),
+    });
+  }
+  return players;
+}
+
+export function validateRosterPlayers(players: RosterPlayer[]): string[] {
+  const issues: string[] = [];
+  if (players.length < 6 || players.length > 14) issues.push("El plantel debe tener entre 6 y 14 jugadores.");
+  const numbers = players.map((player) => player.number);
+  if (new Set(numbers).size !== numbers.length) issues.push("Dorsales repetidos.");
+  const liberos = players.filter((player) => player.role === "L");
+  if (liberos.length > 2) issues.push("Maximo dos liberos.");
+  const captains = players.filter((player) => player.captain);
+  if (captains.length !== 1) issues.push("Debe haber exactamente un capitan.");
+  if (captains[0]?.role === "L") issues.push("El libero no puede ser capitan.");
+  if (players.filter((player) => player.role !== "L").length < 6) issues.push("Seis jugadores de cancha como minimo.");
+  return issues;
+}
+
+export function teamFromRosterSheet(name: string, code: string, text: string, color = "#e11d48"): TeamRoster {
+  const players = parseRosterSheet(text);
+  const issues = validateRosterPlayers(players);
+  if (issues.length > 0) throw new Error(issues.join(" "));
+  const courtPlayers = players.filter((player) => player.role !== "L");
+  const libero = players.find((player) => player.role === "L");
+  return {
+    ...newTeam(name, code, color),
+    players,
+    starters: courtPlayers.slice(0, 6).map((player) => player.number),
+    libero: libero?.number ?? null,
+    bench: players.filter((player) => !courtPlayers.slice(0, 6).includes(player)).map((player) => player.number),
+  };
+}
+
 export function newScoreboardHistory(state: ScoreboardState): ScoreboardHistory {
   return { past: [], present: structuredClone(state), future: [] };
 }
