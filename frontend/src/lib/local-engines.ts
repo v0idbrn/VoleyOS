@@ -293,6 +293,30 @@ export function scoutingReport(events: ScoutEvent[]): {
 
 /* ---------------------------------------------------------------- module 4 */
 
+export interface RosterPlayer {
+  number: number;
+  name: string;
+  role: "S" | "OH" | "MB" | "OPP" | "L";
+  captain?: boolean;
+}
+
+export interface TeamRoster {
+  id: string;
+  name: string;
+  code: string;
+  color: string;
+  players: RosterPlayer[];
+  starters: number[];
+  libero?: number | null;
+  bench: number[];
+}
+
+export interface SetHistoryEntry {
+  setNumber: number;
+  scoreA: number;
+  scoreB: number;
+}
+
 export interface ScoreboardState {
   teamA: string;
   teamB: string;
@@ -309,6 +333,13 @@ export interface ScoreboardState {
   streak: number;
   status: "live" | "finished";
   winner: Side | null;
+  matchFormat?: "bo3" | "bo5" | "short15";
+  setHistory?: SetHistoryEntry[];
+  rosterA?: TeamRoster | null;
+  rosterB?: TeamRoster | null;
+  isDecider?: boolean;
+  isTieBreak?: boolean;
+  sideSwitchedAt8?: boolean;
 }
 
 export interface PointResult {
@@ -320,11 +351,12 @@ export interface PointResult {
   message: string;
 }
 
-export function newScoreboard(teamA = "Tiburones", teamB = "Cóndores", bestOf = 3): ScoreboardState {
+export function newScoreboard(teamA = "Tiburones", teamB = "Cóndores", bestOf = 3, options: Partial<ScoreboardState> = {}): ScoreboardState {
+  const format = options.matchFormat ?? (bestOf === 5 ? "bo5" : bestOf === 1 ? "short15" : "bo3");
   return {
     teamA,
     teamB,
-    bestOf,
+    bestOf: format === "bo5" ? 5 : format === "bo3" ? 3 : 1,
     setNumber: 1,
     scoreA: 0,
     scoreB: 0,
@@ -332,11 +364,19 @@ export function newScoreboard(teamA = "Tiburones", teamB = "Cóndores", bestOf =
     setsB: 0,
     serving: "A",
     firstServing: "A",
-    lineupA: [1, 2, 3, 4, 5, 6],
-    lineupB: [7, 8, 9, 10, 11, 12],
+    lineupA: options.lineupA ?? [1, 2, 3, 4, 5, 6],
+    lineupB: options.lineupB ?? [7, 8, 9, 10, 11, 12],
     streak: 1,
     status: "live",
     winner: null,
+    matchFormat: format,
+    setHistory: [],
+    rosterA: options.rosterA ?? null,
+    rosterB: options.rosterB ?? null,
+    isDecider: false,
+    isTieBreak: false,
+    sideSwitchedAt8: false,
+    ...options,
   };
 }
 
@@ -347,6 +387,7 @@ export function rotateLineup(lineup: number[]): number[] {
 export function awardIndoorPoint(state: ScoreboardState, team: Side): PointResult {
   if (state.status !== "live") throw new Error("match is not live");
   const next: ScoreboardState = structuredClone(state);
+  if (!next.setHistory) next.setHistory = [];
   const sideOut = team !== next.serving;
   if (sideOut) {
     if (team === "A") next.lineupA = rotateLineup(next.lineupA);
@@ -359,22 +400,36 @@ export function awardIndoorPoint(state: ScoreboardState, team: Side): PointResul
   if (team === "A") next.scoreA += 1;
   else next.scoreB += 1;
 
-  const decider = next.setNumber === next.bestOf;
-  const target = decider ? 15 : 25;
+  const format = next.matchFormat ?? (next.bestOf === 5 ? "bo5" : next.bestOf === 1 ? "short15" : "bo3");
+  const isDeciderSet = next.setNumber === next.bestOf || (format === "bo3" && next.setNumber === 3) || (format === "bo5" && next.setNumber === 5);
+  next.isDecider = isDeciderSet;
+  const target = isDeciderSet || format === "short15" ? 15 : 25;
   const own = team === "A" ? next.scoreA : next.scoreB;
   const rival = team === "A" ? next.scoreB : next.scoreA;
   const setFinished = own >= target && own - rival >= 2;
   let matchFinished = false;
   let message = `Punto ${team} — ${next.scoreA}-${next.scoreB}`;
 
+  if (next.scoreA === 24 && next.scoreB === 24 && target === 25) {
+    message = `🔥 DEUCE — WIN BY 2 — ${next.scoreA}-${next.scoreB}`;
+  } else if (isDeciderSet && next.scoreA === 14 && next.scoreB === 14 && target === 15) {
+    message = `🔥 DEUCE — WIN BY 2 — ${next.scoreA}-${next.scoreB}`;
+  } else if (setFinished && team === "A") {
+    if (own >= target - 1) message = own - rival >= 1 ? `🏆 MATCH POINT — ${team}` : `⚡ SET POINT — ${team}`;
+  } else if (setFinished && team === "B") {
+    if (own >= target - 1) message = own - rival >= 1 ? `🏆 MATCH POINT — ${team}` : `⚡ SET POINT — ${team}`;
+  }
+
   if (setFinished) {
     if (team === "A") next.setsA += 1;
     else next.setsB += 1;
-    matchFinished = next.setsA > Math.floor(next.bestOf / 2) || next.setsB > Math.floor(next.bestOf / 2);
+    next.setHistory.push({ setNumber: next.setNumber, scoreA: next.scoreA, scoreB: next.scoreB });
+    const setsNeeded = format === "bo5" ? 3 : 2;
+    matchFinished = (team === "A" && next.setsA >= setsNeeded) || (team === "B" && next.setsB >= setsNeeded) || next.setsA > Math.floor(next.bestOf / 2) || next.setsB > Math.floor(next.bestOf / 2);
     if (matchFinished) {
       next.status = "finished";
       next.winner = team;
-      message = `Partido para ${team} (${next.setsA}-${next.setsB}).`;
+      message = `🏆 MATCH FINISHED — WINNER: ${team === "A" ? next.teamA : next.teamB} (${next.setsA}-${next.setsB}).`;
     } else {
       next.setNumber += 1;
       next.scoreA = 0;
@@ -382,10 +437,12 @@ export function awardIndoorPoint(state: ScoreboardState, team: Side): PointResul
       next.firstServing = next.firstServing === "A" ? "B" : "A";
       next.serving = next.firstServing;
       next.streak = 1;
+      next.sideSwitchedAt8 = false;
       message = `Set para ${team}. Nuevo set ${next.setNumber}.`;
     }
   }
-  const sideSwitchDue = decider && !setFinished && next.scoreA + next.scoreB === 8;
+  const sideSwitchDue = (isDeciderSet || next.isTieBreak) && !setFinished && next.scoreA + next.scoreB === 8;
+  if (sideSwitchDue) next.sideSwitchedAt8 = true;
   return { state: next, rotated: sideOut, setFinished, matchFinished, sideSwitchDue, message };
 }
 
@@ -2540,8 +2597,56 @@ export interface ScoreboardHistory {
   future: ScoreboardState[];
 }
 
+const TEAMS_STORAGE_KEY = "volleyos.teams";
+
+export function loadTeams(): TeamRoster[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(TEAMS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as TeamRoster[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveTeam(team: TeamRoster): TeamRoster[] {
+  if (typeof window === "undefined") return [];
+  const teams = loadTeams();
+  const idx = teams.findIndex((t) => t.id === team.id);
+  if (idx >= 0) teams[idx] = team;
+  else teams.push(team);
+  try {
+    window.localStorage.setItem(TEAMS_STORAGE_KEY, JSON.stringify(teams));
+  } catch {}
+  return teams;
+}
+
+export function deleteTeam(id: string): TeamRoster[] {
+  if (typeof window === "undefined") return [];
+  const teams = loadTeams().filter((t) => t.id !== id);
+  try {
+    window.localStorage.setItem(TEAMS_STORAGE_KEY, JSON.stringify(teams));
+  } catch {}
+  return teams;
+}
+
+export function newTeam(name: string, code: string, color = "#e11d48"): TeamRoster {
+  return {
+    id: `team_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    name,
+    code: code.slice(0, 3).toUpperCase(),
+    color,
+    players: [],
+    starters: [],
+    libero: null,
+    bench: [],
+  };
+}
+
 export function newScoreboardHistory(state: ScoreboardState): ScoreboardHistory {
-  return { past: [], present: state, future: [] };
+  return { past: [], present: structuredClone(state), future: [] };
 }
 
 export function commitScoreboard(

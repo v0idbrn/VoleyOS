@@ -104,6 +104,11 @@ import {
   type BlockoutDecision,
   type PracticeFocus,
   type ScoreboardState,
+  type TeamRoster,
+  loadTeams,
+  saveTeam,
+  deleteTeam,
+  newTeam,
 } from "@/lib/local-engines";
 import {
   PICKUP_SAMPLE,
@@ -512,10 +517,22 @@ function pressurePoint(state: ScoreboardState): boolean {
 }
 
 export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
-  const [history, setHistory] = useState(() => newScoreboardHistory(readClonedScoreboard() ?? newScoreboard("Tiburones", "Cóndores", 3)));
+  const [matchFormat, setMatchFormat] = useState<"bo3" | "bo5" | "short15">("bo3");
+  const [teams, setTeams] = useState<TeamRoster[]>([]);
+  const [teamAId, setTeamAId] = useState<string | null>(null);
+  const [teamBId, setTeamBId] = useState<string | null>(null);
+  const [history, setHistory] = useState(() => {
+    const saved = readClonedScoreboard();
+    if (saved) return newScoreboardHistory(saved);
+    return newScoreboardHistory(newScoreboard("Tiburones", "Cóndores", 3, { matchFormat: "bo3" }));
+  });
   const [message, setMessage] = useState(t(locale, "Elegí un equipo para sumar.", "Pick a team to score.", "Escolha um time para pontuar."));
   const [hardwareMode, setHardwareMode] = useState(false);
   const state = history.present;
+
+  useEffect(() => {
+    setTeams(loadTeams());
+  }, []);
 
   const point = (team: "A" | "B"): void => {
     try {
@@ -611,6 +628,11 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         setMessage(t(locale, "Ejemplo cargado: set decisivo 22-20.", "Example loaded: decider 22-20.", "Exemplo carregado: set decisivo 22-20."));
       }}
     >
+      <div className="mb-2 flex flex-wrap gap-1">
+        <button type="button" onClick={() => { setMatchFormat("bo3"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 3, { matchFormat: "bo3" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo3" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 3 (25/15)", "Best of 3 (25/15)", "Melhor de 3 (25/15)")}</button>
+        <button type="button" onClick={() => { setMatchFormat("bo5"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 5, { matchFormat: "bo5" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo5" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 5 (25/15)", "Best of 5 (25/15)", "Melhor de 5 (25/15)")}</button>
+        <button type="button" onClick={() => { setMatchFormat("short15"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 1, { matchFormat: "short15" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "short15" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Set corto 15", "Short Set 15", "Set curto 15")}</button>
+      </div>
       <div data-hardware-volume-score={hardwareMode ? "true" : "false"} className="relative rounded-xl">
       <button
         type="button"
@@ -631,7 +653,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       </button>
       <div className="rounded-xl border border-white/10 bg-obsidian/80 p-3">
         <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/50">
-          <span>Set {state.setNumber} / {state.bestOf}</span>
+          <span>Set {state.setNumber} / {state.bestOf} {state.matchFormat === "short15" ? "(15)" : state.setNumber === state.bestOf || state.isDecider ? "(15 TB)" : "(25)"}</span>
           <span>{state.status === "finished" ? "FINAL" : `${state.streak} ${t(locale, "en racha", "run", "em sequência")}`}</span>
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2 text-center">
@@ -2663,4 +2685,16 @@ export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   "court-slang": EnginePreviewStation,
   "qr-sync": QrSyncStation,
   "gym-screen": GymScreenStation,
+  "fivb-escoresheet": EnginePreviewStation,
+  "video-telestrator": EnginePreviewStation,
+  "playbook-animator": EnginePreviewStation,
+  "shot-heatmap": EnginePreviewStation,
+  "tournament-nutrition": EnginePreviewStation,
+  "injury-prehab": EnginePreviewStation,
+  "tiebreak-commander": EnginePreviewStation,
+  "bracket-architect": EnginePreviewStation,
+  "sponsor-deck": EnginePreviewStation,
+  "head-to-head": EnginePreviewStation,
+  "peripheral-reflex": EnginePreviewStation,
+  "club-white-label": EnginePreviewStation,
 };
