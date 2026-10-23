@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 import re
 import time
@@ -129,3 +131,61 @@ class SecurityShieldMiddleware:
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Permissions-Policy"] = "camera=(self), microphone=(self), geolocation=()"
+
+
+LICENSE_PREFIX = "VOS-LIC-"
+LICENSE_TTL_SECONDS = 30 * 24 * 60 * 60
+MAX_CREATOR_KEY_LENGTH = 256
+
+
+def creator_key_digest() -> str:
+    """Public SHA-256 digest configured for the creator master key."""
+    raw = os.environ.get("CREATOR_KEY_SHA256") or os.environ.get(
+        "NEXT_PUBLIC_CREATOR_KEY_SHA256", ""
+    )
+    return raw.strip().lower()
+
+
+def verify_creator_key(raw_key: str) -> bool:
+    """Constant-time comparison of the creator key against its configured digest."""
+    expected = creator_key_digest()
+    key = raw_key.strip()
+    if not expected or not key or len(key) > MAX_CREATOR_KEY_LENGTH:
+        return False
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
+    return hmac.compare_digest(digest, expected)
+
+
+def _license_secret() -> bytes:
+    return os.environ.get("PAYMENT_WEBHOOK_SECRET", "volleyos-dev-secret").encode()
+
+
+def _license_signature(body: str) -> str:
+    return hmac.new(
+        _license_secret(), f"{LICENSE_PREFIX}{body}".encode(), hashlib.sha256
+    ).hexdigest()
+
+
+def issue_license_token(scope: str = "pro_creator") -> str:
+    """Server-signed licence token: VOS-LIC-<payload_hex>.<hmac_sig>."""
+    expires = int(time.time()) + LICENSE_TTL_SECONDS
+    body = f"{scope}|{expires}".encode().hex()
+    return f"{LICENSE_PREFIX}{body}.{_license_signature(body)}"
+
+
+def verify_license_token(token: str) -> bool:
+    """Check signature and expiry without trusting any client-supplied state."""
+    value = token.strip()
+    if not value.startswith(LICENSE_PREFIX):
+        return False
+    body, separator, signature = value[len(LICENSE_PREFIX) :].partition(".")
+    if not separator or not body or not signature:
+        return False
+    if not hmac.compare_digest(signature, _license_signature(body)):
+        return False
+    try:
+        scope, _, expires = bytes.fromhex(body).decode("utf-8").partition("|")
+        deadline = int(expires)
+    except (ValueError, UnicodeDecodeError):
+        return False
+    return bool(scope) and deadline >= int(time.time())

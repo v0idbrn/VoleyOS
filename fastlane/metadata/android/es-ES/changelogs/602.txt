@@ -1,0 +1,3 @@
+- Las descargas .xlsx y las vistas previas Pro ahora se autorizan en el servidor: sin pago ni licencia valida, el backend responde 402 y oculta la auditoria profunda.
+- La clave de creador se valida con SHA-256 y emite una licencia firmada VOS-LIC; el navegador ya no puede desbloquear escribiendo "true" en localStorage.
+- APK universal y APK de creador compiladas por separado; solo la publica se adjunta al Release.

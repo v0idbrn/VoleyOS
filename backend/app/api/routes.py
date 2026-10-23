@@ -22,7 +22,12 @@ from app.api.store import (
     utc_now,
     verify_signature,
 )
-from app.security import sanitize_value
+from app.security import (
+    issue_license_token,
+    sanitize_value,
+    verify_creator_key,
+    verify_license_token,
+)
 from app.services.excel_exporter import export_csv, export_xlsx
 from app.services.integrity_seal import VerifySealRequest, verify_seal
 from app.services.persistent_store import (
@@ -71,6 +76,13 @@ class JobCreate(BaseModel):
     kind: str = "report"
     summary: dict[str, Any] = Field(default_factory=dict)
     rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class CreatorUnlockRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    creator_key: str = Field(min_length=1, max_length=256)
+    job_id: str | None = Field(default=None, max_length=64)
 
 
 class LiveRoomCreate(BaseModel):
@@ -193,6 +205,21 @@ def security_verify_seal(request: VerifySealRequest) -> dict[str, Any]:
     return report.model_dump(mode="json")
 
 
+@router.post("/security/creator-unlock")
+def creator_unlock(request: CreatorUnlockRequest) -> dict[str, Any]:
+    if not verify_creator_key(request.creator_key):
+        raise HTTPException(status_code=403, detail="invalid creator key")
+    if request.job_id is not None:
+        job = mark_paid(request.job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="job not found")
+    return {
+        "unlocked": True,
+        "license_token": issue_license_token("creator"),
+        "tier": "creator_pro",
+    }
+
+
 @router.post("/live")
 def create_live(request: LiveRoomCreate) -> dict[str, Any]:
     try:
@@ -258,26 +285,47 @@ def destroy_live(
     return receipt
 
 
+def _licensed_request(
+    license_token: str | None, creator_key: str | None
+) -> bool:
+    return verify_license_token(license_token or "") or verify_creator_key(
+        creator_key or ""
+    )
+
+
 @router.get("/jobs/{job_id}/preview")
-def preview(job_id: str) -> dict[str, Any]:
+def preview(
+    job_id: str,
+    x_volleyos_license: str | None = Header(default=None, alias="X-VoleyOS-License"),
+    x_creator_key: str | None = Header(default=None, alias="X-Creator-Key"),
+) -> dict[str, Any]:
     job = _job_or_404(job_id)
+    authorized = job.is_paid or _licensed_request(x_volleyos_license, x_creator_key)
     columns = list(job.rows[0].keys()) if job.rows else []
+    summary = job.summary
+    if not authorized:
+        summary = {
+            key: value
+            for key, value in job.summary.items()
+            if "audit" not in key.lower()
+        }
     payload: dict[str, Any] = {
         "job_id": job.job_id,
         "module": job.module,
         "title": job.title,
         "kind": job.kind,
         "is_paid": job.is_paid,
-        "locked": not job.is_paid,
+        "locked": not authorized,
         "row_count": len(job.rows),
         "columns": columns,
-        "summary": job.summary,
+        "summary": summary,
         "preview_rows": job.rows[:3],
         "created_at": job.created_at,
     }
-    if job.is_paid:
+    if authorized:
         payload["rows"] = job.rows
     else:
+        payload["server_pro_audit_locked"] = True
         payload["paywall"] = {
             "price_usd": "7",
             "message": "Pase Express desbloquea el .xlsx/.csv completo.",
@@ -287,9 +335,14 @@ def preview(job_id: str) -> dict[str, Any]:
 
 
 @router.get("/jobs/{job_id}/download")
-def download(job_id: str, format: str = "xlsx") -> Response:
+def download(
+    job_id: str,
+    format: str = "xlsx",
+    x_volleyos_license: str | None = Header(default=None, alias="X-VoleyOS-License"),
+    x_creator_key: str | None = Header(default=None, alias="X-Creator-Key"),
+) -> Response:
     job = _job_or_404(job_id)
-    if not job.is_paid:
+    if not job.is_paid and not _licensed_request(x_volleyos_license, x_creator_key):
         raise HTTPException(
             status_code=402,
             detail="Payment Required: desbloquea el reporte con el webhook HMAC.",

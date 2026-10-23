@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 
 import pytest
@@ -7,11 +8,13 @@ from fastapi.testclient import TestClient
 
 from app.api.store import sign
 from app.main import app
-from app.security import reset_rate_limits
+from app.security import reset_rate_limits, verify_license_token
 from app.services.excel_exporter import export_csv, export_xlsx
 from app.services.integrity_seal import build_seal, verify_seal
 
 client = TestClient(app)
+CREATOR_KEY = "TEST-CREATOR-LICENCE-KEY"
+CREATOR_DIGEST = hashlib.sha256(CREATOR_KEY.encode()).hexdigest()
 
 
 @pytest.fixture(autouse=True)
@@ -56,6 +59,91 @@ def test_formula_injection_is_neutralised_in_exports() -> None:
         kind="scouting", title="Injection", summary={"ok": "1"}, rows=[dict(rows[0])]
     )
     assert xlsx[:2] == b"PK"
+
+
+def _create_unpaid_job() -> str:
+    response = client.post(
+        "/api/v1/jobs",
+        json={
+            "module": "scouting",
+            "title": "Licencia",
+            "summary": {"Ataques": 3, "audit_deep": "pro"},
+            "rows": [{"Jugador": 7, "Zona": 4}, {"Jugador": 9, "Zona": 2}],
+        },
+    )
+    assert response.status_code == 200
+    return str(response.json()["job"]["job_id"])
+
+
+def test_fake_license_cannot_download_xlsx() -> None:
+    job_id = _create_unpaid_job()
+    response = client.get(
+        f"/api/v1/jobs/{job_id}/download",
+        headers={"X-VoleyOS-License": "VOS-LIC-fake.123"},
+    )
+    assert response.status_code == 402
+
+
+def test_unlock_with_fake_creator_key_is_forbidden(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CREATOR_KEY_SHA256", CREATOR_DIGEST)
+    response = client.post(
+        "/api/v1/security/creator-unlock",
+        json={"creator_key": "TEST-CREATOR-WRONG"},
+    )
+    assert response.status_code == 403
+
+
+def test_creator_key_issues_license_and_unlocks_download(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CREATOR_KEY_SHA256", CREATOR_DIGEST)
+    job_id = _create_unpaid_job()
+
+    locked = client.get(f"/api/v1/jobs/{job_id}/preview").json()
+    assert locked["server_pro_audit_locked"] is True
+    assert "audit_deep" not in locked["summary"]
+
+    unlock = client.post(
+        "/api/v1/security/creator-unlock",
+        json={"creator_key": CREATOR_KEY, "job_id": job_id},
+    )
+    assert unlock.status_code == 200
+    body = unlock.json()
+    assert body["unlocked"] is True
+    assert body["tier"] == "creator_pro"
+    assert body["license_token"].startswith("VOS-LIC-")
+    assert verify_license_token(body["license_token"]) is True
+
+    paid = client.get(f"/api/v1/jobs/{job_id}/download")
+    assert paid.status_code == 200
+    assert paid.content.startswith(b"PK")
+
+
+def test_license_header_authorizes_an_unpaid_report(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CREATOR_KEY_SHA256", CREATOR_DIGEST)
+    job_id = _create_unpaid_job()
+    unlock = client.post(
+        "/api/v1/security/creator-unlock", json={"creator_key": CREATOR_KEY}
+    ).json()
+
+    download = client.get(
+        f"/api/v1/jobs/{job_id}/download?format=csv",
+        headers={"X-VoleyOS-License": unlock["license_token"]},
+    )
+    assert download.status_code == 200
+    assert b"Jugador" in download.content
+
+    preview = client.get(
+        f"/api/v1/jobs/{job_id}/preview",
+        headers={"X-Creator-Key": CREATOR_KEY},
+    ).json()
+    assert preview["locked"] is False
+    assert "server_pro_audit_locked" not in preview
+    assert preview["summary"]["audit_deep"] == "pro"
 
 
 def test_seal_tamper_after_one_point_change() -> None:

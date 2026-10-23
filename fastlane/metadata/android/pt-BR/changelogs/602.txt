@@ -1,0 +1,3 @@
+- Downloads .xlsx e previas Pro agora sao autorizados no servidor: sem pagamento nem licenca valida, o backend responde 402 e oculta a auditoria profunda.
+- A chave do criador e validada com SHA-256 e emite uma licenca assinada VOS-LIC; digitar "true" no localStorage nao desbloqueia mais o app.
+- APK universal e APK do criador compiladas separadamente; apenas a publica vai para o Release.

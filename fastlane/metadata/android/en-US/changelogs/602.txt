@@ -1,0 +1,3 @@
+- .xlsx downloads and Pro previews are now authorised on the server: without payment or a valid licence the backend answers 402 and hides the deep audit data.
+- The creator key is checked with SHA-256 and mints a signed VOS-LIC licence; typing "true" into localStorage no longer unlocks the app.
+- Universal and creator APKs are built separately; only the public one is attached to the Release.

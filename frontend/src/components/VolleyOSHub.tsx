@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { COPY, LOCALE_NAMES, t } from "@/lib/i18n";
 import { buildTarget, paywallEnabled, type Locale, type Profile } from "@/lib/local-engines";
-import { clearCreatorUnlock, creatorUnlocked, matchesCreatorKey, persistCreatorUnlock } from "@/lib/creator-unlock";
+import { clearCreatorUnlock, creatorUnlocked, matchesCreatorKey, persistCreatorToken } from "@/lib/creator-unlock";
+import { clearLicenseToken, unlockCreatorOnServer } from "@/lib/api-client";
 import { MODULES, PROFILE_LABELS } from "@/lib/modules";
 import { addVaultEntry } from "@/lib/vault";
 import { announceScoreTTS, requestCourtWakeLock, triggerCourtHaptics } from "@/lib/court-ux";
@@ -101,7 +102,10 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const ordered = useMemo(() => [...visible].sort((left, right) => Number(pinned.includes(right.slug)) - Number(pinned.includes(left.slug))), [visible, pinned]);
 
   useEffect(() => {
-    setCreator(creatorUnlocked());
+    let active = true;
+    void creatorUnlocked().then((unlocked) => {
+      if (active) setCreator(unlocked);
+    });
     const storedRole = window.localStorage.getItem(ROLE_KEY);
     if (isProfile(storedRole)) setProfile(storedRole);
     setContrast(window.localStorage.getItem(CONTRAST_KEY) === "1");
@@ -109,6 +113,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
       const storedPins = JSON.parse(window.localStorage.getItem(PIN_KEY) ?? "[]") as unknown;
       if (Array.isArray(storedPins)) setPinned(storedPins.filter((value): value is string => typeof value === "string"));
     } catch { setPinned([]); }
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -131,7 +136,9 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
 
   const submitCreatorKey = async (): Promise<void> => {
     if (await matchesCreatorKey(keyValue)) {
-      persistCreatorUnlock();
+      const key = keyValue.trim();
+      persistCreatorToken(key);
+      void unlockCreatorOnServer(key);
       setCreator(true);
       setKeyOpen(false);
       setKeyValue("");
@@ -144,6 +151,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
 
   const relockCreator = (): void => {
     clearCreatorUnlock();
+    clearLicenseToken();
     setCreator(false);
     setToast(t(locale, "Modo creador desactivado.", "Creator mode disabled.", "Modo criador desativado."));
   };

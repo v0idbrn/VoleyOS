@@ -1,41 +1,49 @@
 /**
  * Creator unlock: the shipped bundle only carries the SHA-256 digest of the
- * creator token, never the token itself. Typing the token hashes it locally and
- * compares it against the public digest; the unlocked state stays in localStorage.
+ * creator token, never the token itself.
+ *
+ * The unlocked state is never a boolean: the entered token is stored and every
+ * hydration re-hashes it against the public digest, so injecting "true", "1" or
+ * "admin" into localStorage leaves the paywall locked and clears the bad value.
  *
  * Build flag NEXT_PUBLIC_DEV_UNLOCK=true marks a private build that skips the gate.
  */
 
-const CREATOR_STORAGE_KEY = "volleyos.creator.unlocked";
+const CREATOR_TOKEN_KEY = "volleyos.creator.token";
+const LEGACY_UNLOCK_KEY = "volleyos.creator.unlocked";
 const MAX_INPUT_LENGTH = 128;
 
 export function buildUnlocksCreator(): boolean {
   return process.env.NEXT_PUBLIC_DEV_UNLOCK === "true";
 }
 
-export function creatorUnlocked(): boolean {
-  if (buildUnlocksCreator()) return true;
+function storage(): Storage | null {
   try {
-    return window.localStorage.getItem(CREATOR_STORAGE_KEY) === "1";
+    return window.localStorage;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export function persistCreatorUnlock(): void {
-  try {
-    window.localStorage.setItem(CREATOR_STORAGE_KEY, "1");
-  } catch {
-    /* storage blocked: unlock lasts for this session only */
-  }
+export function readCreatorToken(): string | null {
+  const store = storage();
+  if (!store) return null;
+  store.removeItem(LEGACY_UNLOCK_KEY);
+  const value = store.getItem(CREATOR_TOKEN_KEY);
+  return value && value.length <= MAX_INPUT_LENGTH ? value : null;
+}
+
+export function persistCreatorToken(token: string): void {
+  const store = storage();
+  if (!store) return;
+  store.setItem(CREATOR_TOKEN_KEY, token.trim());
 }
 
 export function clearCreatorUnlock(): void {
-  try {
-    window.localStorage.removeItem(CREATOR_STORAGE_KEY);
-  } catch {
-    /* nothing to clear */
-  }
+  const store = storage();
+  if (!store) return;
+  store.removeItem(CREATOR_TOKEN_KEY);
+  store.removeItem(LEGACY_UNLOCK_KEY);
 }
 
 function toHex(buffer: ArrayBuffer): string {
@@ -53,4 +61,14 @@ export async function matchesCreatorKey(candidate: string): Promise<boolean> {
   if (!subtle) return false;
   const digest = await subtle.digest("SHA-256", new TextEncoder().encode(value));
   return toHex(digest) === expected;
+}
+
+/** True only when the stored value hashes to the configured digest. */
+export async function creatorUnlocked(): Promise<boolean> {
+  if (buildUnlocksCreator()) return true;
+  const token = readCreatorToken();
+  if (token === null) return false;
+  if (await matchesCreatorKey(token)) return true;
+  clearCreatorUnlock();
+  return false;
 }

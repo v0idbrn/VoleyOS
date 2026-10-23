@@ -2,10 +2,18 @@ import { createHash } from "node:crypto";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildUnlocksCreator, clearCreatorUnlock, creatorUnlocked, matchesCreatorKey, persistCreatorUnlock } from "./creator-unlock";
+import {
+  buildUnlocksCreator,
+  clearCreatorUnlock,
+  creatorUnlocked,
+  matchesCreatorKey,
+  persistCreatorToken,
+  readCreatorToken,
+} from "./creator-unlock";
 
 const TOKEN = "TEST-CREATOR-0123456789ABCDEF";
 const DIGEST = createHash("sha256").update(TOKEN).digest("hex");
+const TOKEN_KEY = "volleyos.creator.token";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -26,18 +34,34 @@ describe("creator unlock", () => {
     await expect(matchesCreatorKey(TOKEN)).resolves.toBe(false);
   });
 
-  it("persists the unlocked state and clears it again", () => {
+  it("hydrates the unlocked state by re-hashing the stored token", async () => {
     vi.stubEnv("NEXT_PUBLIC_DEV_UNLOCK", "false");
-    expect(creatorUnlocked()).toBe(false);
-    persistCreatorUnlock();
-    expect(creatorUnlocked()).toBe(true);
+    vi.stubEnv("NEXT_PUBLIC_CREATOR_KEY_SHA256", DIGEST);
+    persistCreatorToken(TOKEN);
+    await expect(creatorUnlocked()).resolves.toBe(true);
     clearCreatorUnlock();
-    expect(creatorUnlocked()).toBe(false);
+    await expect(creatorUnlocked()).resolves.toBe(false);
+  });
+
+  it("rejects injected booleans and clears the bad value", async () => {
+    vi.stubEnv("NEXT_PUBLIC_DEV_UNLOCK", "false");
+    vi.stubEnv("NEXT_PUBLIC_CREATOR_KEY_SHA256", DIGEST);
+    for (const injected of ["true", "1", "admin"]) {
+      window.localStorage.setItem(TOKEN_KEY, injected);
+      await expect(creatorUnlocked()).resolves.toBe(false);
+      expect(readCreatorToken()).toBeNull();
+    }
+  });
+
+  it("rejects a stored token with the wrong digest", async () => {
+    vi.stubEnv("NEXT_PUBLIC_CREATOR_KEY_SHA256", DIGEST);
+    persistCreatorToken("TEST-CREATOR-WRONG");
+    await expect(creatorUnlocked()).resolves.toBe(false);
+    expect(window.localStorage.getItem(TOKEN_KEY)).toBeNull();
   });
 
   it("treats a DEV_UNLOCK build as unlocked without storage", () => {
     vi.stubEnv("NEXT_PUBLIC_DEV_UNLOCK", "true");
     expect(buildUnlocksCreator()).toBe(true);
-    expect(creatorUnlocked()).toBe(true);
   });
 });
