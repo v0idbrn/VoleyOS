@@ -1,0 +1,5 @@
+Three-tap onboarding: language, role and four key modules pinned.
+Scoreboard from the physical volume buttons, with two-point undo.
+100% offline .xlsx and A4 PDF export with a SHA-256 seal.
+Multi-frame QR scoreboard cloning with no internet.
+All 48 engines fully translated into Spanish, English and Portuguese.

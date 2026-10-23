@@ -1,0 +1,5 @@
+Onboarding em 3 toques: idioma, papel e quatro módulos-chave nos favoritos.
+Placar pelos botões físicos de volume, com desfazer de dois pontos.
+Exportação .xlsx e PDF A4 100% offline com selo SHA-256.
+Clonagem de placar por QR multi-frame sem internet.
+Os 48 motores totalmente traduzidos em espanhol, inglês e português.

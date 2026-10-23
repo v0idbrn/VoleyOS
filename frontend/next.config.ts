@@ -12,7 +12,8 @@ const securityHeaders = [
     value:
       "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https: http://127.0.0.1:8000; frame-ancestors 'self'",
   },
-  { key: "Permissions-Policy", value: "camera=(), geolocation=()" },
+  // QR scoreboard cloning needs the camera in this origin; geolocation stays off.
+  { key: "Permissions-Policy", value: "camera=(self), geolocation=()" },
 ];
 
 const nextConfig: NextConfig = {

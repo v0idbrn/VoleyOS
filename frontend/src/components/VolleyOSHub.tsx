@@ -8,6 +8,7 @@ import { clearCreatorUnlock, creatorUnlocked, matchesCreatorKey, persistCreatorT
 import { clearLicenseToken, unlockCreatorOnServer } from "@/lib/api-client";
 import { MODULES, MODULE_BY_SLUG, PROFILE_LABELS } from "@/lib/modules";
 import { addVaultEntry, loadVault } from "@/lib/vault";
+import { downloadXlsx, openPrintableReport, type ReportSpec } from "@/lib/offline-xlsx";
 import { announceScoreTTS, requestCourtWakeLock, triggerCourtHaptics } from "@/lib/court-ux";
 import { playWhistle, setCourtAudioEnabled } from "@/lib/court-audio";
 import { EphemeralVaultBar } from "@/components/EphemeralVaultBar";
@@ -21,6 +22,16 @@ const PIN_KEY = "volleyos.pins";
 const RECENT_KEY = "volleyos.recent";
 const AUDIO_KEY = "volleyos.courtAudio";
 const VOICE_KEY = "volleyos.voice";
+const ONBOARDING_KEY = "voleyos_onboarding_done";
+const ONBOARDING_LANG_KEY = "voleyos.onboardingLang";
+
+const ROLE_SETUP: Record<string, { profile: Profile; tab: Tab; slugs: string[] }> = {
+  player: { profile: "players", tab: "lab", slugs: ["biomechanics", "volleycard", "serve-radar", "tempo"] },
+  coach: { profile: "coaches", tab: "board", slugs: ["rotation", "scouting", "block-shadow", "setter-iq"] },
+  referee: { profile: "referees", tab: "court", slugs: ["lineup-slip", "referee-console", "var", "integrity-seal"] },
+  organiser: { profile: "tournaments", tab: "home", slugs: ["tournament", "captain-draft", "court-split", "team-treasury"] },
+  fan: { profile: "fans", tab: "home", slugs: ["overlay", "match-poster", "fan-companion", "arena-dj"] },
+};
 
 type Tab = "home" | "court" | "board" | "lab" | "settings";
 
@@ -176,6 +187,9 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [courtAudio, setCourtAudio] = useState(true);
   const [awake, setAwake] = useState(false);
   const [creator, setCreator] = useState(false);
+  const [onboarding, setOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(1);
+  const [roleChoice, setRoleChoice] = useState<string | null>(null);
   const [keyOpen, setKeyOpen] = useState(false);
   const [keyValue, setKeyValue] = useState("");
   const [keyError, setKeyError] = useState(false);
@@ -215,8 +229,11 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     setSolar(window.localStorage.getItem(THEME_KEY) === "solar");
     setVoice(window.localStorage.getItem(VOICE_KEY) === "1");
     setCourtAudio(window.localStorage.getItem(AUDIO_KEY) !== "0");
-    setPinned(readStringList(PIN_KEY));
+    setPinned((current) => (current.length > 0 ? current : readStringList(PIN_KEY)));
     setRecent(readStringList(RECENT_KEY));
+    const done = window.localStorage.getItem(ONBOARDING_KEY) === "1";
+    setOnboarding(!done);
+    if (!done && window.localStorage.getItem(ONBOARDING_LANG_KEY)) setOnboardingStep(2);
     return () => {
       active = false;
     };
@@ -376,33 +393,93 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     triggerCourtHaptics(20);
   };
 
-  const exportCsv = (slug: string): void => {
+  const buildReport = (slug: string): ReportSpec | null => {
     const meta = MODULE_BY_SLUG.get(slug);
-    if (!meta) return;
+    if (!meta) return null;
     const entries = loadVault().filter((entry) => entry.module === slug);
     if (entries.length === 0) {
       setToast(t(locale, "Guardá un reporte primero.", "Save a report first.", "Salve um relatório primeiro."));
-      return;
+      return null;
     }
-    const lines = [
-      "sep=;",
-      "Modulo;Reporte;Filas;Fecha",
-      ...entries.map((entry) => `${meta.name[locale].replaceAll(";", ",")};${entry.id};${entry.rows};${entry.createdAt}`),
-    ];
-    const blob = new Blob([`\ufeff${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `volleyos-${slug}.csv`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    setToast(t(locale, "CSV listo para Excel.", "CSV ready for Excel.", "CSV pronto para o Excel."));
+    return {
+      title: meta.name[locale],
+      module: meta.slug,
+      locale,
+      generatedAt: new Date().toISOString(),
+      sheets: [
+        {
+          name: t(locale, "Reportes", "Reports", "Relatórios"),
+          headers: [
+            t(locale, "Módulo", "Module", "Módulo"),
+            t(locale, "Reporte", "Report", "Relatório"),
+            t(locale, "Filas", "Rows", "Linhas"),
+            t(locale, "Fecha", "Date", "Data"),
+          ],
+          rows: entries.map((entry) => [meta.name[locale], entry.id, entry.rows, entry.createdAt]),
+        },
+        {
+          name: t(locale, "Ficha", "Sheet", "Ficha"),
+          headers: [t(locale, "Campo", "Field", "Campo"), t(locale, "Valor", "Value", "Valor")],
+          rows: [
+            [t(locale, "Módulo", "Module", "Módulo"), meta.name[locale]],
+            [t(locale, "Número", "Number", "Número"), String(meta.number).padStart(2, "0")],
+            [t(locale, "Resumen", "Summary", "Resumo"), meta.tagline[locale]],
+            [t(locale, "Generado", "Generated", "Gerado"), new Date().toISOString()],
+            [t(locale, "Idioma", "Language", "Idioma"), locale.toUpperCase()],
+          ],
+        },
+      ],
+    };
+  };
+
+  const exportExcel = (slug: string): void => {
+    const report = buildReport(slug);
+    if (!report) return;
+    downloadXlsx(report);
+    setToast(t(locale, "XLSX generado offline.", "XLSX generated offline.", "XLSX gerado offline."));
+    triggerCourtHaptics(30);
+  };
+
+  const exportPdf = (slug: string): void => {
+    const report = buildReport(slug);
+    if (!report) return;
+    void openPrintableReport(report).then((opened) => {
+      setToast(
+        opened
+          ? t(locale, "Reporte listo para guardar como PDF.", "Report ready to save as PDF.", "Relatório pronto para salvar como PDF.")
+          : t(locale, "Permití ventanas emergentes para imprimir.", "Allow pop-ups to print.", "Permita pop-ups para imprimir."),
+      );
+    });
   };
 
   const goTab = (next: Tab): void => {
     setTab(next);
     setActiveSlug(null);
     triggerCourtHaptics(16);
+  };
+
+  const finishOnboarding = (): void => {
+    const setup = roleChoice ? ROLE_SETUP[roleChoice] : null;
+    if (setup) {
+      setPinned(setup.slugs);
+      window.localStorage.setItem(PIN_KEY, JSON.stringify(setup.slugs));
+      setProfile(setup.profile);
+      window.localStorage.setItem(ROLE_KEY, setup.profile);
+      setTab(setup.tab);
+    }
+    window.localStorage.setItem(ONBOARDING_KEY, "1");
+    window.localStorage.removeItem(ONBOARDING_LANG_KEY);
+    setOnboarding(false);
+    setOnboardingStep(1);
+    triggerCourtHaptics([40, 30, 70]);
+  };
+
+  const reopenOnboarding = (): void => {
+    window.localStorage.removeItem(ONBOARDING_KEY);
+    window.localStorage.removeItem(ONBOARDING_LANG_KEY);
+    setRoleChoice(null);
+    setOnboardingStep(1);
+    setOnboarding(true);
   };
 
   const groupKey = tab === "court" || tab === "board" || tab === "lab" ? tab : null;
@@ -558,15 +635,22 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => exportCsv(activeMeta.slug)}
-                  className="tap flex-1 rounded-xl border border-white/15 bg-panel px-2 py-2.5 text-[11px] font-black text-white/80"
+                  onClick={() => exportExcel(activeMeta.slug)}
+                  className="tap flex-1 rounded-xl border border-white/15 bg-panel px-1 py-2.5 text-[10px] font-black text-white/80"
                 >
                   {shell.exportCsv}
                 </button>
                 <button
                   type="button"
+                  onClick={() => exportPdf(activeMeta.slug)}
+                  className="tap flex-1 rounded-xl border border-white/15 bg-panel px-1 py-2.5 text-[10px] font-black text-white/80"
+                >
+                  {t(locale, "PDF", "PDF", "PDF")}
+                </button>
+                <button
+                  type="button"
                   onClick={() => openModule("match-poster")}
-                  className="tap flex-1 rounded-xl border border-white/15 bg-panel px-2 py-2.5 text-[11px] font-black text-white/80"
+                  className="tap flex-1 rounded-xl border border-white/15 bg-panel px-1 py-2.5 text-[10px] font-black text-white/80"
                 >
                   {t(locale, "Póster", "Poster", "Pôster")}
                 </button>
@@ -592,6 +676,17 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 </label>
 
                 <div className="snap-row mt-3 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={shell.allModules}>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={!favOnly && profile === "all"}
+                    onClick={() => chooseProfile("all")}
+                    className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+                      !favOnly && profile === "all" ? "border-volt bg-volt text-obsidian" : "border-white/10 text-white/60"
+                    }`}
+                  >
+                    {PROFILE_LABELS.all[locale]}
+                  </button>
                   <button
                     type="button"
                     role="tab"
@@ -781,6 +876,12 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   })}
                 </div>
 
+                <ValueRow
+                  label={t(locale, "Asistente inicial", "Setup assistant", "Assistente inicial")}
+                  value={t(locale, "3 toques", "3 taps", "3 toques")}
+                  onClick={reopenOnboarding}
+                />
+
                 <h2 className="mt-5 px-1 pb-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.theme}</h2>
                 <SwitchRow
                   label={shell.theme}
@@ -893,6 +994,89 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
             })}
           </div>
         </nav>
+      ) : null}
+
+      {onboarding ? (
+        <div role="dialog" aria-modal="true" aria-label={t(locale, "Configuración inicial", "First setup", "Configuração inicial")} className="fixed inset-0 z-50 grid place-items-end bg-black/80 p-3 sm:place-items-center">
+          <div className="w-full max-w-md rounded-3xl border border-white/15 bg-panel p-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-crimson">
+                {onboardingStep}/3 · {t(locale, "Tu cancha en 3 toques", "Your court in 3 taps", "Sua quadra em 3 toques")}
+              </p>
+              <button type="button" aria-label={t(locale, "Cerrar", "Close", "Fechar")} onClick={finishOnboarding} className="text-white/40">✕</button>
+            </div>
+
+            {onboardingStep === 1 ? (
+              <div className="mt-3">
+                <h2 className="text-lg font-black">{t(locale, "¿En qué idioma hablás en la cancha?", "Which language do you speak on court?", "Em que idioma você fala na quadra?")}</h2>
+                <div className="mt-3 grid gap-2">
+                  {([["es", "🇦🇷 / 🇪🇸 Español"], ["en", "🇺🇸 English"], ["pt", "🇧🇷 Português"]] as const).map(([code, label]) => (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => {
+                        window.localStorage.setItem(ONBOARDING_LANG_KEY, code);
+                        if (code === locale) setOnboardingStep(2);
+                        else window.location.href = `/${code}`;
+                      }}
+                      className={`tap rounded-2xl border px-4 py-3 text-left text-[13px] font-bold ${code === locale ? "border-volt bg-volt/10 text-volt" : "border-white/10 bg-obsidian text-white/80"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {onboardingStep === 2 ? (
+              <div className="mt-3">
+                <h2 className="text-lg font-black">{t(locale, "¿Cuál es tu rol principal?", "What is your main role?", "Qual é o seu papel principal?")}</h2>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {([
+                    ["player", "🔥", t(locale, "Jugador", "Player", "Jogador")],
+                    ["coach", "📋", t(locale, "DT / Estadístico", "Coach / Analyst", "Técnico / Estatístico")],
+                    ["referee", "🟨", t(locale, "Árbitro / Mesa", "Referee / Table", "Árbitro / Mesa")],
+                    ["organiser", "🏆", t(locale, "Organizador", "Organiser", "Organizador")],
+                    ["fan", "🍿", t(locale, "Tribuna", "Fan stand", "Torcida")],
+                  ] as const).map(([key, icon, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      aria-pressed={roleChoice === key}
+                      onClick={() => { setRoleChoice(key); setOnboardingStep(3); triggerCourtHaptics(25); }}
+                      className={`tap flex items-center gap-2 rounded-2xl border px-3 py-3 text-[12px] font-bold ${roleChoice === key ? "border-volt bg-volt/10 text-volt" : "border-white/10 bg-obsidian text-white/80"}`}
+                    >
+                      <span aria-hidden className="text-lg">{icon}</span>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {onboardingStep === 3 ? (
+              <div className="mt-3">
+                <h2 className="text-lg font-black">{t(locale, "Listo, cancha armada", "Court ready", "Quadra pronta")}</h2>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/55">
+                  {t(locale, "Te dejamos 4 módulos clave en favoritos y abrimos la pestaña que más vas a usar.", "Four key modules are starred and we open the tab you will use most.", "Deixamos 4 módulos-chave nos favoritos e abrimos a aba que você mais vai usar.")}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {(roleChoice ? ROLE_SETUP[roleChoice]?.slugs ?? [] : []).map((slug) => (
+                    <span key={slug} className="rounded-full border border-volt/40 bg-volt/10 px-2 py-1 text-[10px] font-bold text-volt">
+                      {MODULE_BY_SLUG.get(slug)?.name[locale] ?? slug}
+                    </span>
+                  ))}
+                </div>
+                <button type="button" onClick={finishOnboarding} className="tap mt-4 w-full rounded-xl bg-crimson px-3 py-3 text-[12px] font-black uppercase tracking-wider text-white">
+                  {t(locale, "Entrar a la cancha", "Enter the court", "Entrar na quadra")}
+                </button>
+                <button type="button" onClick={() => setOnboardingStep(2)} className="tap mt-2 w-full rounded-xl border border-white/15 px-3 py-2 text-[10px] font-bold text-white/60">
+                  {t(locale, "Cambiar rol", "Change role", "Mudar papel")}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
       ) : null}
 
       {toast ? (

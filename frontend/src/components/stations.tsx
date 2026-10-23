@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+
+import jsQR from "jsqr";
 
 import { playWhistle } from "@/lib/court-audio";
+import { triggerCourtHaptics } from "@/lib/court-ux";
+import { clearClonedScoreboard, createQrFrames, emptyIngest, ingestQrFrame, readClonedScoreboard, renderQrSvg, storeClonedScoreboard, type IngestResult, type QrFrame } from "@/lib/qr-transfer";
+import { localizeReactTree } from "@/lib/engine-l10n";
 import { COPY, t } from "@/lib/i18n";
 import {
   FAN_QUESTIONS,
@@ -98,6 +103,7 @@ import {
   type ZonePoint,
   type BlockoutDecision,
   type PracticeFocus,
+  type ScoreboardState,
 } from "@/lib/local-engines";
 import {
   PICKUP_SAMPLE,
@@ -162,7 +168,7 @@ function StationShell({
           {t(locale, "Local", "Local", "Local")}
         </span>
       </header>
-      <div className="flex-1 text-sm text-white/80">{children}</div>
+      <div className="flex-1 text-sm text-white/80">{localizeReactTree(children, locale)}</div>
       <footer className="flex flex-wrap gap-2 border-t border-white/10 pt-3">
         <button type="button" className={BTN_PRIMARY} onClick={onExample}>
           {COPY[locale].loadExample}
@@ -332,24 +338,152 @@ export function RotationStation({ meta, locale, onSave }: StationProps) {
 
 /* 3 ---------------------------------------------------------------------- */
 
+interface SpeechRecognitionLike {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+}
+
+type SpeechWindow = Window & {
+  SpeechRecognition?: new () => SpeechRecognitionLike;
+  webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+};
+
+const RESULT_LABELS: Record<string, Record<Locale, string>> = {
+  KILL: { es: "Punto", en: "Kill", pt: "Ponto" },
+  ACE: { es: "Ace", en: "Ace", pt: "Ace" },
+  ERROR: { es: "Error", en: "Error", pt: "Erro" },
+  BLOCKED: { es: "Bloqueada", en: "Blocked", pt: "Bloqueada" },
+  IN_PLAY: { es: "En juego", en: "In play", pt: "Em jogo" },
+};
+
+const SKILL_LABELS: Record<string, Record<Locale, string>> = {
+  attack: { es: "Ataque", en: "Attack", pt: "Ataque" },
+  serve: { es: "Saque", en: "Serve", pt: "Saque" },
+  reception: { es: "Recepción", en: "Pass", pt: "Passe" },
+  block: { es: "Bloqueo", en: "Block", pt: "Bloqueio" },
+  defense: { es: "Defensa", en: "Dig", pt: "Defesa" },
+  set: { es: "Armado", en: "Set", pt: "Levantamento" },
+};
+
+const DIRECTION_LABELS: Record<string, Record<Locale, string>> = {
+  cross: { es: "Cruzada", en: "Cross", pt: "Cruzada" },
+  line: { es: "Paralela", en: "Line", pt: "Paralela" },
+  diagonal: { es: "Diagonal", en: "Diagonal", pt: "Diagonal" },
+  unknown: { es: "Sin dirección", en: "No direction", pt: "Sem direção" },
+};
+
 export function ScoutingStation({ meta, locale, onSave }: StationProps) {
-  const [text, setText] = useState("Ataque del 7 por 4 diagonal punto");
+  const [text, setText] = useState(t(locale, "Ataque del 7 por 4 diagonal punto", "Attack 7 from 4 cross kill", "Ataque do 7 da 4 diagonal ponto"));
+  const [listening, setListening] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const [overrides, setOverrides] = useState<{ player?: number; origin?: number; target?: number; result?: string }>({});
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const parsed = useMemo(() => parsePlay(text), [text]);
   const report = useMemo(() => scoutingReport(SCOUT_SAMPLE), []);
   const cells = useMemo(() => heatmap(SCOUT_SAMPLE), []);
+  const player = overrides.player ?? parsed.player;
+  const origin = overrides.origin ?? parsed.originZone;
+  const target = overrides.target ?? parsed.targetZone;
+  const result = overrides.result ?? parsed.result;
+
+  useEffect(() => () => recognitionRef.current?.stop(), []);
+
+  const dictate = (): void => {
+    if (listening) {
+      recognitionRef.current?.stop();
+      setListening(false);
+      return;
+    }
+    const Ctor = (window as SpeechWindow).SpeechRecognition ?? (window as SpeechWindow).webkitSpeechRecognition;
+    if (!Ctor) {
+      setSpeechError(t(locale, "Este WebView no expone micrófono. Usá las píldoras táctiles.", "This WebView has no microphone API. Use the tap chips.", "Este WebView não expõe microfone. Use as pílulas táteis."));
+      return;
+    }
+    const recognition = new Ctor();
+    recognition.lang = locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : "es-ES";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onresult = (event) => {
+      const spoken = event.results[0]?.[0]?.transcript ?? "";
+      if (spoken) {
+        setText(spoken);
+        setOverrides({});
+      }
+    };
+    recognition.onerror = () => setSpeechError(t(locale, "No se escuchó la jugada. Probá de nuevo.", "Play not heard. Try again.", "Jogada não ouvida. Tente de novo."));
+    recognition.onend = () => setListening(false);
+    recognitionRef.current = recognition;
+    setSpeechError(null);
+    setListening(true);
+    try {
+      recognition.start();
+    } catch {
+      setListening(false);
+      setSpeechError(t(locale, "Micrófono no disponible.", "Microphone unavailable.", "Microfone indisponível."));
+    }
+  };
+
+  const nudge = (key: "player" | "origin" | "target", delta: number): void => {
+    const current = key === "player" ? player : key === "origin" ? origin : target;
+    const base = current ?? (key === "player" ? 1 : 1);
+    const next = Math.min(99, Math.max(1, base + delta));
+    setOverrides((value) => ({ ...value, [key]: next }));
+  };
+
+  const cycleResult = (): void => {
+    const order = ["KILL", "IN_PLAY", "ERROR", "BLOCKED"];
+    const index = order.indexOf(result);
+    setOverrides((value) => ({ ...value, result: order[(index + 1) % order.length] }));
+  };
 
   return (
-    <StationShell meta={meta} locale={locale} rows={report.attempts} onSave={onSave} onExample={() => setText("Saque del 4 al 5, pase A, ataque del 7 por 4 diagonal punto")}>
+    <StationShell meta={meta} locale={locale} rows={report.attempts} onSave={onSave} onExample={() => { setText(t(locale, "Saque del 4 al 5, pase A, ataque del 7 por 4 diagonal punto", "Serve 4 to 5, pass A, 7 attacks zone 4 cross kill", "Saque do 4 no 5, passe A, ataque do 7 na 4 diagonal ponto")); setOverrides({}); }}>
       <label className="text-xs">
-        <span className={LABEL}>{t(locale, "Voz o texto (ES/EN)", "Voice or text (ES/EN)", "Voz ou texto (ES/EN)")}</span>
-        <input className={INPUT} value={text} onChange={(event) => setText(event.target.value)} />
+        <span className={LABEL}>{t(locale, "Voz o texto (ES/EN/PT)", "Voice or text (ES/EN/PT)", "Voz ou texto (ES/EN/PT)")}</span>
+        <div className="flex gap-1">
+          <input className={INPUT} value={text} onChange={(event) => { setText(event.target.value); setOverrides({}); }} />
+          <button
+            type="button"
+            aria-pressed={listening}
+            aria-label={t(locale, "Dictar jugada", "Dictate play", "Ditar jogada")}
+            onClick={dictate}
+            className={`${BTN} shrink-0 ${listening ? "border-crimson bg-crimson text-white" : ""}`}
+          >
+            {listening ? "●" : "🎙"}
+          </button>
+        </div>
       </label>
-      <div className="mt-2 flex flex-wrap gap-1 text-[10px]">
-        <span className="rounded bg-crimson/20 px-2 py-1 text-crimson">#{parsed.player ?? "?"}</span>
-        <span className="rounded bg-white/10 px-2 py-1">{parsed.skill}</span>
-        <span className="rounded bg-white/10 px-2 py-1">Z{parsed.originZone ?? "?"}→Z{parsed.targetZone ?? "?"}</span>
-        <span className="rounded bg-white/10 px-2 py-1">{parsed.direction}</span>
-        <span className="rounded bg-emerald/20 px-2 py-1 text-emerald">{parsed.result}</span>
+      {speechError ? <p role="alert" className="mt-1 text-[10px] text-crimson">{speechError}</p> : null}
+      <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px]">
+        <span className="rounded bg-crimson/20 px-2 py-1 text-crimson">#{player ?? "?"}</span>
+        <span className="rounded bg-white/10 px-2 py-1">{SKILL_LABELS[parsed.skill]?.[locale] ?? parsed.skill}</span>
+        <span className="rounded bg-white/10 px-2 py-1">Z{origin ?? "?"}→Z{target ?? "?"}</span>
+        <span className="rounded bg-white/10 px-2 py-1">{DIRECTION_LABELS[parsed.direction]?.[locale] ?? parsed.direction}</span>
+        <span className="rounded bg-emerald/20 px-2 py-1 text-emerald">{RESULT_LABELS[result]?.[locale] ?? result}</span>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-1 text-[10px]">
+        {([
+          ["player", t(locale, "Jugador", "Player", "Jogador")],
+          ["origin", t(locale, "Z origen", "Origin Z", "Z origem")],
+          ["target", t(locale, "Z destino", "Target Z", "Z destino")],
+        ] as const).map(([key, label]) => (
+          <div key={key} className="flex items-center justify-between rounded-lg bg-white/5 px-2 py-1">
+            <span className="text-white/50">{label}</span>
+            <span className="flex gap-1">
+              <button type="button" aria-label={`${label} -`} className="rounded bg-white/10 px-2" onClick={() => nudge(key, -1)}>−</button>
+              <button type="button" aria-label={`${label} +`} className="rounded bg-white/10 px-2" onClick={() => nudge(key, 1)}>+</button>
+            </span>
+          </div>
+        ))}
+        <button type="button" onClick={cycleResult} className="rounded-lg bg-white/5 px-2 py-1 text-left text-white/70">
+          {t(locale, "Resultado", "Result", "Resultado")}: {RESULT_LABELS[result]?.[locale] ?? result}
+        </button>
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2">
         <Metric label="Eficiencia" value={report.efficiency.toFixed(2)} tone={report.efficiency >= 0 ? "text-emerald" : "text-crimson"} />
@@ -370,9 +504,16 @@ export function ScoutingStation({ meta, locale, onSave }: StationProps) {
 
 /* 4 ---------------------------------------------------------------------- */
 
+function pressurePoint(state: ScoreboardState): boolean {
+  if (state.status !== "live") return false;
+  const target = state.setNumber === state.bestOf ? 15 : 25;
+  return (state.scoreA >= target - 1 && state.scoreA - state.scoreB >= 0) || (state.scoreB >= target - 1 && state.scoreB - state.scoreA >= 0);
+}
+
 export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
-  const [history, setHistory] = useState(() => newScoreboardHistory(newScoreboard("Tiburones", "Cóndores", 3)));
+  const [history, setHistory] = useState(() => newScoreboardHistory(readClonedScoreboard() ?? newScoreboard("Tiburones", "Cóndores", 3)));
   const [message, setMessage] = useState(t(locale, "Elegí un equipo para sumar.", "Pick a team to score.", "Escolha um time para pontuar."));
+  const [hardwareMode, setHardwareMode] = useState(false);
   const state = history.present;
 
   const point = (team: "A" | "B"): void => {
@@ -384,6 +525,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           result.sideSwitchDue ? t(locale, " · cambio de lado", " · switch sides", " · troca de lado") : ""
         }`,
       );
+      triggerCourtHaptics(pressurePoint(result.state) ? [80, 50, 80, 50, 140] : 30);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Error");
     }
@@ -392,7 +534,31 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const undo = (): void => {
     setHistory((previous) => undoScoreboard(previous));
     setMessage(t(locale, "Jugada deshecha.", "Play undone.", "Jogada desfeita."));
+    triggerCourtHaptics(18);
   };
+
+  useEffect(() => {
+    window.localStorage.setItem("volleyos.liveScoreboard", JSON.stringify(state));
+    clearClonedScoreboard();
+  }, [state]);
+
+  useEffect(() => {
+    const bridge = (window as Window & { VoleyOSBridge?: { setHardwareScoreMode: (enabled: boolean) => void } }).VoleyOSBridge;
+    bridge?.setHardwareScoreMode(hardwareMode);
+    if (!hardwareMode) return;
+    const onHardwareKey = (event: Event): void => {
+      const detail = event instanceof CustomEvent ? String(event.detail) : "";
+      if (detail === "VOLUME_UP") point("A");
+      else if (detail === "VOLUME_DOWN") point("B");
+      else if (detail === "VOLUME_LONG_UNDO") {
+        setHistory((previous) => undoScoreboard(undoScoreboard(previous)));
+        setMessage(t(locale, "Dos puntos deshechos desde volumen.", "Two points undone from volume.", "Dois pontos desfeitos pelo volume."));
+        triggerCourtHaptics([40, 30, 40]);
+      }
+    };
+    window.addEventListener("voleyos:hardware-key", onHardwareKey);
+    return () => window.removeEventListener("voleyos:hardware-key", onHardwareKey);
+  }, [hardwareMode, locale, point]);
 
   const redo = (): void => {
     setHistory((previous) => redoScoreboard(previous));
@@ -444,20 +610,38 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         setMessage(t(locale, "Ejemplo cargado: set decisivo 22-20.", "Example loaded: decider 22-20.", "Exemplo carregado: set decisivo 22-20."));
       }}
     >
+      <div data-hardware-volume-score={hardwareMode ? "true" : "false"} className="relative rounded-xl">
+      <button
+        type="button"
+        aria-pressed={hardwareMode}
+        onClick={() => {
+          const next = !hardwareMode;
+          setHardwareMode(next);
+          setMessage(
+            next
+              ? t(locale, "Modo partido: volumen + local, volumen - visita, mantener para deshacer.", "Match mode: volume + home, volume - away, hold to undo.", "Modo partida: volume + casa, volume - visitante, segure para desfazer.")
+              : t(locale, "Modo partido apagado.", "Match mode off.", "Modo partida desligado."),
+          );
+          triggerCourtHaptics(next ? [40, 30, 40] : 20);
+        }}
+        className={`${BTN} mb-2 w-full ${hardwareMode ? "border-volt bg-volt/15 text-volt" : ""}`}
+      >
+        🔒 {t(locale, "Modo Partido (botones de volumen)", "Match mode (volume keys)", "Modo Partida (botões de volume)")}
+      </button>
       <div className="rounded-xl border border-white/10 bg-obsidian/80 p-3">
         <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/50">
           <span>Set {state.setNumber} / {state.bestOf}</span>
-          <span>{state.status === "finished" ? "FINAL" : `${state.streak} en racha`}</span>
+          <span>{state.status === "finished" ? "FINAL" : `${state.streak} ${t(locale, "en racha", "run", "em sequência")}`}</span>
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2 text-center">
           <div className={`rounded-lg py-2 ${state.serving === "A" ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
             <p className="truncate text-xs font-bold">{state.teamA}</p>
-            <p className="text-4xl font-black tabular-nums">{state.scoreA}</p>
+            <p data-testid="score-a" className="text-4xl font-black tabular-nums">{state.scoreA}</p>
             <p className="text-[10px] text-volt">Sets {state.setsA}</p>
           </div>
           <div className={`rounded-lg py-2 ${state.serving === "B" ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
             <p className="truncate text-xs font-bold">{state.teamB}</p>
-            <p className="text-4xl font-black tabular-nums">{state.scoreB}</p>
+            <p data-testid="score-b" className="text-4xl font-black tabular-nums">{state.scoreB}</p>
             <p className="text-[10px] text-volt">Sets {state.setsB}</p>
           </div>
         </div>
@@ -487,6 +671,20 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         ))}
       </div>
       <p className="mt-1 text-[9px] uppercase tracking-widest text-white/30">A/L punto · Z undo · W silbato · B buzzer · C contraste</p>
+      {hardwareMode ? (
+        <div className="absolute inset-0 z-30 grid place-items-center rounded-xl bg-obsidian/95 p-4 text-center">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-wider text-volt">🔒 {t(locale, "Toques bloqueados", "Touch lock", "Toques bloqueados")}</p>
+            <p className="mt-1 text-[10px] leading-relaxed text-white/60">
+              {t(locale, "Volumen + local · Volumen - visita · mantener volumen para deshacer.", "Volume + home · Volume - away · hold volume to undo.", "Volume + casa · Volume - visitante · segure o volume para desfazer.")}
+            </p>
+            <button type="button" className={`${BTN} mt-3`} onClick={() => { setHardwareMode(false); triggerCourtHaptics(20); }}>
+              🔓 {t(locale, "Desbloquear", "Unlock", "Desbloquear")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+      </div>
     </StationShell>
   );
 }
@@ -2176,6 +2374,192 @@ export function PlayerCareerStation({ meta, locale, onSave }: StationProps) {
   );
 }
 
+export function QrSyncStation({ meta, locale, onSave }: StationProps) {
+  const [mode, setMode] = useState<"emit" | "read">("emit");
+  const [frames, setFrames] = useState<QrFrame[]>([]);
+  const [frameIndex, setFrameIndex] = useState(0);
+  const [playing, setPlaying] = useState(true);
+  const [svg, setSvg] = useState("");
+  const [receiving, setReceiving] = useState(false);
+  const [ingest, setIngest] = useState<IngestResult>(() => emptyIngest());
+  const [status, setStatus] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanLoop = useRef<number | null>(null);
+  const ingestRef = useRef<IngestResult>(ingest);
+  const lastScan = useRef<string>("");
+
+  const payload = useMemo(() => {
+    let live: ScoreboardState | null = null;
+    try {
+      const raw = window.localStorage.getItem("volleyos.liveScoreboard");
+      if (raw) live = JSON.parse(raw) as ScoreboardState;
+    } catch {
+      live = null;
+    }
+    return { kind: "match", savedAt: new Date().toISOString(), state: live ?? newScoreboard("Local", "Visita", 3) };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void createQrFrames(payload).then((created) => {
+      if (active) setFrames(created);
+    });
+    return () => {
+      active = false;
+    };
+  }, [payload]);
+
+  useEffect(() => {
+    const frame = frames[frameIndex];
+    if (!frame) return;
+    let active = true;
+    void renderQrSvg(frame.text).then((markup) => {
+      if (active) setSvg(markup);
+    });
+    return () => {
+      active = false;
+    };
+  }, [frames, frameIndex]);
+
+  useEffect(() => {
+    if (!playing || frames.length < 2 || mode !== "emit") return;
+    const timer = window.setInterval(() => setFrameIndex((index) => (index + 1) % frames.length), 1200);
+    return () => window.clearInterval(timer);
+  }, [frames.length, mode, playing]);
+
+  const stopCamera = (): void => {
+    scanLoop.current !== null && window.cancelAnimationFrame(scanLoop.current);
+    scanLoop.current = null;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setReceiving(false);
+  };
+
+  useEffect(() => () => stopCamera(), []);
+
+  const handleScan = async (value: string): Promise<void> => {
+    if (value === lastScan.current) return;
+    lastScan.current = value;
+    const next = await ingestQrFrame(ingestRef.current, value);
+    ingestRef.current = next;
+    setIngest(next);
+    if (next.complete) {
+      setStatus(t(locale, "Estado completo. Aplicá al tablero.", "Full state received. Apply to the board.", "Estado completo. Aplique ao placar."));
+      triggerCourtHaptics([60, 40, 90]);
+    }
+  };
+
+  const scanTick = (): void => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (video && canvas && video.readyState === 4) {
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (context) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const image = context.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(image.data, image.width, image.height, { inversionAttempts: "dontInvert" });
+        if (code?.data) void handleScan(code.data);
+      }
+    }
+    scanLoop.current = window.requestAnimationFrame(scanTick);
+  };
+
+  const startCamera = async (): Promise<void> => {
+    setStatus(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setReceiving(true);
+      scanLoop.current = window.requestAnimationFrame(scanTick);
+    } catch {
+      setStatus(t(locale, "Sin acceso a cámara. Pegá el texto del frame manualmente.", "No camera access. Paste a frame manually.", "Sem acesso à câmera. Cole o texto do frame manualmente."));
+    }
+  };
+
+  const applyClone = (): void => {
+    const value = ingest.payload;
+    if (typeof value !== "object" || value === null) return;
+    const state = (value as { state?: ScoreboardState }).state;
+    if (!state || !Array.isArray(state.lineupA)) {
+      setStatus(t(locale, "El frame no contiene un tablero válido.", "Frame has no valid scoreboard.", "O frame não contém um placar válido."));
+      return;
+    }
+    storeClonedScoreboard(state);
+    window.localStorage.setItem("volleyos.liveScoreboard", JSON.stringify(state));
+    setStatus(t(locale, "Tablero clonado. Abrí Cancha para seguir el partido.", "Board cloned. Open Court to keep scoring.", "Placar clonado. Abra Quadra para continuar."));
+    triggerCourtHaptics([50, 40, 80]);
+  };
+
+  return (
+    <StationShell meta={meta} locale={locale} rows={frames.length} onSave={onSave} onExample={() => { setFrameIndex(0); setPlaying(true); }}>
+      <div className="flex gap-1" role="tablist" aria-label="QR mode">
+        {(["emit", "read"] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={mode === value}
+            onClick={() => { setMode(value); if (value === "emit") stopCamera(); }}
+            className={`${BTN} flex-1 ${mode === value ? "border-volt bg-volt/15 text-volt" : ""}`}
+          >
+            {value === "emit" ? t(locale, "Emitir", "Broadcast", "Emitir") : t(locale, "Leer", "Scan", "Ler")}
+          </button>
+        ))}
+      </div>
+
+      {mode === "emit" ? (
+        <div className="mt-3">
+          <div className="mx-auto w-full max-w-[280px] rounded-xl bg-white p-2" dangerouslySetInnerHTML={{ __html: svg }} />
+          <div className="mt-2 flex items-center justify-between text-[10px] text-white/60">
+            <span>{t(locale, "Frame", "Frame", "Frame")} {frames.length === 0 ? 0 : frameIndex + 1}/{frames.length}</span>
+            <span>{payload.state.teamA} {payload.state.scoreA}-{payload.state.scoreB} {payload.state.teamB}</span>
+          </div>
+          <div className="mt-2 flex gap-1">
+            <button type="button" className={BTN} onClick={() => setFrameIndex((index) => (index - 1 + frames.length) % Math.max(1, frames.length))} aria-label="Previous frame">‹</button>
+            <button type="button" className={`${BTN} flex-1`} onClick={() => setPlaying((value) => !value)}>{playing ? "⏸" : "▶"}</button>
+            <button type="button" className={BTN} onClick={() => setFrameIndex((index) => (index + 1) % Math.max(1, frames.length))} aria-label="Next frame">›</button>
+          </div>
+          <p className="mt-2 text-[10px] text-white/50">{t(locale, "Mostrá los frames seguidos al otro celular. Cada QR lleva índice y checksum.", "Show the frames in sequence to the other phone. Each QR carries index and checksum.", "Mostre os frames em sequência ao outro celular. Cada QR leva índice e checksum.")}</p>
+        </div>
+      ) : (
+        <div className="mt-3">
+          <video ref={videoRef} className="aspect-square w-full rounded-xl border border-white/15 bg-black object-cover" muted playsInline />
+          <canvas ref={canvasRef} className="hidden" />
+          <div className="mt-2 flex gap-1">
+            <button type="button" className={`${BTN} flex-1`} onClick={() => { if (receiving) { stopCamera(); } else { void startCamera(); } }}>
+              {receiving ? t(locale, "Detener", "Stop", "Parar") : t(locale, "Abrir cámara", "Open camera", "Abrir câmera")}
+            </button>
+            <button type="button" className={BTN} onClick={() => { ingestRef.current = emptyIngest(); setIngest(emptyIngest()); lastScan.current = ""; setStatus(null); }}>
+              {t(locale, "Reiniciar", "Reset", "Reiniciar")}
+            </button>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full bg-emerald transition-all" style={{ width: `${ingest.total === 0 ? 0 : Math.round((ingest.frames.size / ingest.total) * 100)}%` }} />
+          </div>
+          <p className="mt-1 text-[10px] text-white/55">{ingest.frames.size}/{ingest.total || "?"} {t(locale, "frames", "frames", "frames")} {ingest.error ? `· ${ingest.error}` : ""}</p>
+          {status ? <p className="mt-1 text-[10px] font-semibold text-emerald">{status}</p> : null}
+          {ingest.complete ? (
+            <div className="mt-2 rounded-xl border border-emerald/40 bg-emerald/10 p-2">
+              <p className="text-[10px] text-emerald">✓ {t(locale, "Checksum verificado", "Checksum verified", "Checksum verificado")}</p>
+              <button type="button" className={`${BTN_PRIMARY} mt-2 w-full`} onClick={applyClone}>
+                {t(locale, "Aplicar al Tablero", "Apply to Scoreboard", "Aplicar ao Placar")}
+              </button>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </StationShell>
+  );
+}
+
 export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
   const [report, setReport] = useState<Record<string, unknown> | null>(null);
   useEffect(() => {
@@ -2269,5 +2653,5 @@ export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   "house-rules": EnginePreviewStation,
   "arena-dj": EnginePreviewStation,
   "court-slang": EnginePreviewStation,
-  "qr-sync": EnginePreviewStation,
+  "qr-sync": QrSyncStation,
 };

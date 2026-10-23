@@ -7,6 +7,7 @@ import { loadVault } from "@/lib/vault";
 describe("native app shell", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.localStorage.setItem("voleyos_onboarding_done", "1");
     document.documentElement.className = "";
   });
 
@@ -36,7 +37,7 @@ describe("native app shell", () => {
     it(`renders the five native tabs in ${locale}`, () => {
       render(<VolleyOSHub locale={locale} />);
       expect(screen.getAllByTestId("module-card")).toHaveLength(48);
-      expect(screen.getAllByRole("tab")).toHaveLength(12);
+      expect(screen.getAllByRole("tab")).toHaveLength(13);
     });
   }
 
@@ -73,6 +74,20 @@ describe("native app shell", () => {
     const theme = screen.getByRole("switch", { name: "Tema" });
     fireEvent.click(theme);
     expect(document.documentElement.classList.contains("solar")).toBe(true);
+  });
+
+  it("onboards in three taps and prefills role favourites", () => {
+    window.localStorage.removeItem("voleyos_onboarding_done");
+    render(<VolleyOSHub locale="es" />);
+    expect(screen.getByRole("dialog", { name: "Configuración inicial" })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: /Español/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Jugador/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Entrar a la cancha/ }));
+    expect(window.localStorage.getItem("voleyos_onboarding_done")).toBe("1");
+    expect(screen.queryByRole("dialog", { name: "Configuración inicial" })).toBeNull();
+    fireEvent.click(screen.getAllByRole("tab", { name: /Inicio/ }).at(-1)!);
+    fireEvent.click(screen.getByRole("tab", { name: /Mis favoritos/ }));
+    expect(screen.getAllByTestId("module-card")).toHaveLength(4);
   });
 
   it("keeps the paywall closed when localStorage is injected with a fake unlock", async () => {

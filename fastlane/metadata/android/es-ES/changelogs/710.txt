@@ -1,0 +1,5 @@
+Onboarding de 3 toques: idioma, rol y cuatro módulos clave en favoritos.
+Marcador por botones físicos de volumen, con deshacer de dos puntos.
+Exportación .xlsx y PDF A4 100% offline con sello SHA-256.
+Clonación de tablero por QR multi-frame sin internet.
+Los 48 motores traducidos por completo en español, inglés y portugués.

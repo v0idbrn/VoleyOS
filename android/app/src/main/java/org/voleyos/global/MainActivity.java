@@ -1,13 +1,19 @@
 package org.voleyos.global;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.webkit.JavascriptInterface;
+import android.webkit.PermissionRequest;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -31,7 +37,41 @@ public class MainActivity extends Activity {
                     + "window.dispatchEvent(new CustomEvent('voleyos:back'));"
                     + "return '1';"
                     + "})()";
+    private static final int CAMERA_REQUEST = 771;
     private WebView webView;
+    private volatile boolean hardwareScoreMode = false;
+    private PermissionRequest pendingCameraPermission;
+
+    private final class VoleyOSBridge {
+        @JavascriptInterface
+        public void setHardwareScoreMode(boolean enabled) {
+            hardwareScoreMode = enabled;
+        }
+    }
+
+    private void emitHardwareKey(String detail) {
+        if (webView == null) return;
+        String script = "window.dispatchEvent(new CustomEvent('voleyos:hardware-key',{detail:'" + detail + "'}))";
+        webView.post(() -> webView.evaluateJavascript(script, null));
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (hardwareScoreMode) {
+            int code = event.getKeyCode();
+            if (code == KeyEvent.KEYCODE_VOLUME_UP || code == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (event.isLongPress()) {
+                        emitHardwareKey("VOLUME_LONG_UNDO");
+                    } else if (event.getRepeatCount() == 0) {
+                        emitHardwareKey(code == KeyEvent.KEYCODE_VOLUME_UP ? "VOLUME_UP" : "VOLUME_DOWN");
+                    }
+                }
+                return true;
+            }
+        }
+        return super.dispatchKeyEvent(event);
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -95,6 +135,24 @@ public class MainActivity extends Activity {
         settings.setLoadWithOverviewMode(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
 
+        webView.addJavascriptInterface(new VoleyOSBridge(), "VoleyOSBridge");
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onPermissionRequest(@NonNull PermissionRequest request) {
+                for (String resource : request.getResources()) {
+                    if (!PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) continue;
+                    if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                        request.grant(new String[]{resource});
+                    } else {
+                        pendingCameraPermission = request;
+                        requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_REQUEST);
+                    }
+                    return;
+                }
+                request.deny();
+            }
+        });
+
         webView.setWebViewClient(new WebViewClientCompat() {
             @Override
             public WebResourceResponse shouldInterceptRequest(@NonNull WebView view, @NonNull WebResourceRequest request) {
@@ -114,6 +172,19 @@ public class MainActivity extends Activity {
 
         setContentView(webView);
         webView.loadUrl(ORIGIN + "/index.html");
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != CAMERA_REQUEST || pendingCameraPermission == null) return;
+        boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        if (granted) {
+            pendingCameraPermission.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+        } else {
+            pendingCameraPermission.deny();
+        }
+        pendingCameraPermission = null;
     }
 
     @Override
