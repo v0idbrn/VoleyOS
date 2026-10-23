@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildUnlocksCreator, clearCreatorUnlock, creatorUnlocked, matchesCreatorKey, persistCreatorUnlock } from "./creator-unlock";
 
-const TOKEN = "VOS-MASTER-0123456789ABCDEF";
+const TOKEN = "TEST-CREATOR-0123456789ABCDEF";
 const DIGEST = createHash("sha256").update(TOKEN).digest("hex");
 
 afterEach(() => {
@@ -17,7 +17,7 @@ describe("creator unlock", () => {
     vi.stubEnv("NEXT_PUBLIC_CREATOR_KEY_SHA256", DIGEST);
     await expect(matchesCreatorKey(TOKEN)).resolves.toBe(true);
     await expect(matchesCreatorKey(` ${TOKEN} `)).resolves.toBe(true);
-    await expect(matchesCreatorKey("VOS-MASTER-FFFFFFFFFFFFFFFF")).resolves.toBe(false);
+    await expect(matchesCreatorKey("TEST-CREATOR-FFFFFFFFFFFFFFFF")).resolves.toBe(false);
     await expect(matchesCreatorKey("")).resolves.toBe(false);
   });
 
