@@ -30,7 +30,19 @@ export const ARENA_CUE_PLANS: Record<ArenaCue, { frequencies: number[]; duration
   SET_POINT_HEARTBEAT: { frequencies: [60, 55, 60], durationsMs: [180, 120, 260], waveform: "sine" },
 };
 
+let courtAudioEnabled = true;
+
+/** Global switch wired to the native Settings tab. */
+export function setCourtAudioEnabled(enabled: boolean): void {
+  courtAudioEnabled = enabled;
+}
+
+export function courtAudioActive(): boolean {
+  return courtAudioEnabled;
+}
+
 export function playArenaCue(cue: ArenaCue, volume = 0.5): boolean {
+  if (!courtAudioEnabled) return false;
   const audio = audioContext();
   if (!audio) return false;
   void audio.resume();
@@ -70,6 +82,7 @@ function audioContext(): AudioContext | null {
 }
 
 export function playWhistle(kind: WhistleKind = "short", volume = 0.7): boolean {
+  if (!courtAudioEnabled) return false;
   const audio = audioContext();
   if (!audio) return false;
   void audio.resume();

@@ -1,27 +1,48 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { COPY, LOCALE_NAMES, t } from "@/lib/i18n";
+import { LOCALE_NAMES, SHELL, t } from "@/lib/i18n";
 import { buildTarget, paywallEnabled, type Locale, type Profile } from "@/lib/local-engines";
 import { clearCreatorUnlock, creatorUnlocked, matchesCreatorKey, persistCreatorToken } from "@/lib/creator-unlock";
 import { clearLicenseToken, unlockCreatorOnServer } from "@/lib/api-client";
-import { MODULES, PROFILE_LABELS } from "@/lib/modules";
-import { addVaultEntry } from "@/lib/vault";
+import { MODULES, MODULE_BY_SLUG, PROFILE_LABELS } from "@/lib/modules";
+import { addVaultEntry, loadVault } from "@/lib/vault";
 import { announceScoreTTS, requestCourtWakeLock, triggerCourtHaptics } from "@/lib/court-ux";
-import { playArenaCue, type ArenaCue } from "@/lib/court-audio";
+import { playWhistle, setCourtAudioEnabled } from "@/lib/court-audio";
 import { EphemeralVaultBar } from "@/components/EphemeralVaultBar";
 import { STATIONS } from "@/components/stations";
 
 const FILTERS: Array<Profile | "all"> = ["all", "players", "coaches", "court", "referees", "fans", "tournaments"];
 const LOCALES: Locale[] = ["es", "en", "pt"];
 const ROLE_KEY = "volleyos.role";
-const CONTRAST_KEY = "volleyos.contrast";
+const THEME_KEY = "volleyos.theme";
 const PIN_KEY = "volleyos.pins";
-const ARENA_CUES: ArenaCue[] = ["MONSTER_BLOCK", "SUPER_SPIKE", "ACE_SIREN", "VIDEO_CHALLENGE_SUSPENSE", "SET_POINT_HEARTBEAT"];
+const RECENT_KEY = "volleyos.recent";
+const AUDIO_KEY = "volleyos.courtAudio";
+const VOICE_KEY = "volleyos.voice";
+
+type Tab = "home" | "court" | "board" | "lab" | "settings";
+
+const TAB_GROUP: Record<Exclude<Tab, "home" | "settings">, string[]> = {
+  court: ["scoreboard", "beach", "referee-console", "var", "timeout-chalkboard", "substitution-tracker"],
+  board: ["rotation", "block-shadow", "seam-radar", "system-transition", "blockout-lab", "matchup-matrix"],
+  lab: ["biomechanics", "serve-radar", "ball-aerodynamics", "volleycard", "scouting", "acwr"],
+};
+
+const TAB_ICON: Record<Tab, string> = { home: "🏠", court: "⏱️", board: "📋", lab: "⚡", settings: "⚙️" };
 
 function isProfile(value: string | null): value is Profile {
   return value !== null && (FILTERS as string[]).includes(value);
+}
+
+function readStringList(key: string): string[] {
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(key) ?? "[]") as unknown;
+    return Array.isArray(raw) ? raw.filter((value): value is string => typeof value === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 interface Plan {
@@ -36,7 +57,7 @@ const PLANS: Plan[] = [
   {
     name: "Pase Express",
     price: "$7",
-    tagline: { es: "Un torneo, cero fricción", en: "One tournament, zero friction", pt: "Um torneio, zero atrito" },
+    tagline: { es: "Un torneo, cero fricción", en: "One tournament, zero friction", pt: "Um torneio, sem atrito" },
     features: {
       es: ["1 torneo completo", "Export Excel con auditoría", "1 overlay OBS", "Sin suscripción"],
       en: ["1 full tournament", "Audited Excel export", "1 OBS overlay", "No subscription"],
@@ -48,9 +69,9 @@ const PLANS: Plan[] = [
     price: "$19",
     tagline: { es: "El plan del cuerpo técnico", en: "The staff plan", pt: "O plano da comissão técnica" },
     features: {
-      es: ["Torneos ilimitados", "VAR + Volleycards", "3 overlays simultáneos", "Scouting avanzado", "Soporte prioritario"],
-      en: ["Unlimited tournaments", "VAR + Volleycards", "3 simultaneous overlays", "Advanced scouting", "Priority support"],
-      pt: ["Torneios ilimitados", "VAR + Volleycards", "3 overlays simultâneos", "Scout avançado", "Suporte prioritário"],
+      es: ["Torneos ilimitados", "VAR + Volleycards", "3 overlays a la vez", "Scouting avanzado", "Soporte prioritario"],
+      en: ["Unlimited tournaments", "VAR + Volleycards", "3 overlays at once", "Advanced scouting", "Priority support"],
+      pt: ["Torneios ilimitados", "VAR + Volleycards", "3 overlays ao mesmo tempo", "Scout avançado", "Suporte prioritário"],
     },
     highlight: true,
   },
@@ -66,30 +87,110 @@ const PLANS: Plan[] = [
   },
 ];
 
+function SwitchRow({
+  label,
+  checked,
+  onToggle,
+  hint,
+}: {
+  label: string;
+  checked: boolean;
+  onToggle: () => void;
+  hint?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={onToggle}
+      className="tap flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-panel px-4 py-3 text-left"
+    >
+      <span className="min-w-0">
+        <span className="block text-[13px] font-semibold text-white">{label}</span>
+        {hint ? <span className="mt-0.5 block truncate text-[10px] text-white/45">{hint}</span> : null}
+      </span>
+      <span
+        aria-hidden
+        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? "bg-emerald" : "bg-white/20"}`}
+      >
+        <span
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${checked ? "left-[1.375rem]" : "left-0.5"}`}
+        />
+      </span>
+    </button>
+  );
+}
+
+function ValueRow({
+  label,
+  value,
+  onClick,
+  href,
+}: {
+  label: string;
+  value: string;
+  onClick?: () => void;
+  href?: string;
+}) {
+  const body = (
+    <>
+      <span className="text-[13px] font-semibold text-white">{label}</span>
+      <span className="flex items-center gap-1 text-[11px] text-white/50">
+        {value}
+        <span aria-hidden className="text-white/30">›</span>
+      </span>
+    </>
+  );
+  if (href) {
+    return (
+      <a href={href} className="tap flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-panel px-4 py-3">
+        {body}
+      </a>
+    );
+  }
+  return (
+    <button type="button" onClick={onClick} className="tap flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-panel px-4 py-3 text-left">
+      {body}
+    </button>
+  );
+}
+
 export function VolleyOSHub({ locale }: { locale: Locale }) {
-  const copy = COPY[locale];
+  const shell = SHELL[locale];
+  const [tab, setTab] = useState<Tab>("home");
+  const [activeSlug, setActiveSlug] = useState<string | null>(null);
+  const [tabPick, setTabPick] = useState<Record<string, string>>({
+    court: TAB_GROUP.court[0] ?? "",
+    board: TAB_GROUP.board[0] ?? "",
+    lab: TAB_GROUP.lab[0] ?? "",
+  });
   const [profile, setProfile] = useState<Profile | "all">("all");
+  const [favOnly, setFavOnly] = useState(false);
   const [query, setQuery] = useState("");
-  const [toast, setToast] = useState<string | null>(null);
-  const [contrast, setContrast] = useState(false);
-  const [voice, setVoice] = useState(false);
-  const [awake, setAwake] = useState(false);
-  const [view, setView] = useState<"bento" | "list">("bento");
-  const [checkout, setCheckout] = useState<Plan | null>(null);
   const [pinned, setPinned] = useState<string[]>([]);
-  const [cue, setCue] = useState<ArenaCue>("MONSTER_BLOCK");
+  const [recent, setRecent] = useState<string[]>([]);
+  const [solar, setSolar] = useState(false);
+  const [voice, setVoice] = useState(false);
+  const [courtAudio, setCourtAudio] = useState(true);
+  const [awake, setAwake] = useState(false);
   const [creator, setCreator] = useState(false);
   const [keyOpen, setKeyOpen] = useState(false);
   const [keyValue, setKeyValue] = useState("");
   const [keyError, setKeyError] = useState(false);
+  const [checkout, setCheckout] = useState<Plan | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const target = buildTarget();
   const locked = paywallEnabled() && !creator;
+  const activeMeta = activeSlug ? MODULE_BY_SLUG.get(activeSlug) : undefined;
 
   const visible = useMemo(() => {
     const needle = query.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     return MODULES.filter((module) => {
-      if (profile !== "all" && !module.profiles.includes(profile)) return false;
+      if (favOnly && !pinned.includes(module.slug)) return false;
+      if (!favOnly && profile !== "all" && !module.profiles.includes(profile)) return false;
       if (!needle) return true;
       return `${module.name[locale]} ${module.tagline[locale]} ${module.slug}`
         .normalize("NFD")
@@ -97,9 +198,12 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
         .toLowerCase()
         .includes(needle);
     });
-  }, [locale, profile, query]);
+  }, [locale, profile, query, favOnly, pinned]);
 
-  const ordered = useMemo(() => [...visible].sort((left, right) => Number(pinned.includes(right.slug)) - Number(pinned.includes(left.slug))), [visible, pinned]);
+  useEffect(() => {
+    document.documentElement.classList.add("app-shell");
+    return () => document.documentElement.classList.remove("app-shell");
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -108,30 +212,100 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     });
     const storedRole = window.localStorage.getItem(ROLE_KEY);
     if (isProfile(storedRole)) setProfile(storedRole);
-    setContrast(window.localStorage.getItem(CONTRAST_KEY) === "1");
-    try {
-      const storedPins = JSON.parse(window.localStorage.getItem(PIN_KEY) ?? "[]") as unknown;
-      if (Array.isArray(storedPins)) setPinned(storedPins.filter((value): value is string => typeof value === "string"));
-    } catch { setPinned([]); }
-    return () => { active = false; };
+    setSolar(window.localStorage.getItem(THEME_KEY) === "solar");
+    setVoice(window.localStorage.getItem(VOICE_KEY) === "1");
+    setCourtAudio(window.localStorage.getItem(AUDIO_KEY) !== "0");
+    setPinned(readStringList(PIN_KEY));
+    setRecent(readStringList(RECENT_KEY));
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("high-contrast", contrast);
-    window.localStorage.setItem(CONTRAST_KEY, contrast ? "1" : "0");
-  }, [contrast]);
+    document.documentElement.classList.toggle("solar", solar);
+    window.localStorage.setItem(THEME_KEY, solar ? "solar" : "obsidian");
+  }, [solar]);
+
+  useEffect(() => {
+    setCourtAudioEnabled(courtAudio);
+    window.localStorage.setItem(AUDIO_KEY, courtAudio ? "1" : "0");
+  }, [courtAudio]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 3200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const closeOverlays = useCallback((): boolean => {
+    if (keyOpen) {
+      setKeyOpen(false);
+      return true;
+    }
+    if (checkout) {
+      setCheckout(null);
+      return true;
+    }
+    return false;
+  }, [checkout, keyOpen]);
+
+  const closeModule = useCallback(() => setActiveSlug(null), []);
+
+  useEffect(() => {
+    const onBack = (): void => {
+      if (closeOverlays()) return;
+      setActiveSlug(null);
+    };
+    window.addEventListener("voleyos:back", onBack);
+    return () => window.removeEventListener("voleyos:back", onBack);
+  }, [closeOverlays]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setActiveSlug(null);
+        setTab("home");
+        window.setTimeout(() => searchRef.current?.focus(), 0);
+      }
+      if (event.key === "Escape") {
+        if (closeOverlays()) return;
+        if (document.activeElement === searchRef.current) {
+          setQuery("");
+          searchRef.current?.blur();
+          return;
+        }
+        setActiveSlug(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [closeOverlays]);
+
+  const openModule = useCallback((slug: string) => {
+    if (!STATIONS[slug]) return;
+    setActiveSlug(slug);
+    setRecent((current) => {
+      const next = [slug, ...current.filter((value) => value !== slug)].slice(0, 6);
+      window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+      return next;
+    });
+    triggerCourtHaptics(18);
+  }, []);
 
   const togglePin = (slug: string): void => {
     const next = pinned.includes(slug) ? pinned.filter((value) => value !== slug) : [...pinned, slug];
     setPinned(next);
     window.localStorage.setItem(PIN_KEY, JSON.stringify(next));
-    triggerCourtHaptics(30);
+    triggerCourtHaptics(25);
   };
 
   const chooseProfile = (value: Profile | "all"): void => {
     setProfile(value);
+    setFavOnly(false);
     window.localStorage.setItem(ROLE_KEY, value);
-    triggerCourtHaptics(25);
+    triggerCourtHaptics(22);
   };
 
   const submitCreatorKey = async (): Promise<void> => {
@@ -143,7 +317,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
       setKeyOpen(false);
       setKeyValue("");
       setKeyError(false);
-      setToast(t(locale, "Modo creador activado.", "Creator mode enabled.", "Modo criador ativado."));
+      setToast(shell.creatorOn);
+      triggerCourtHaptics([40, 30, 60]);
       return;
     }
     setKeyError(true);
@@ -153,455 +328,673 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     clearCreatorUnlock();
     clearLicenseToken();
     setCreator(false);
-    setToast(t(locale, "Modo creador desactivado.", "Creator mode disabled.", "Modo criador desativado."));
+    setToast(shell.creatorOff);
   };
 
   const toggleWakeLock = async (): Promise<void> => {
     if (awake) {
       setAwake(false);
-      setToast(t(locale, "Wake Lock liberado.", "Wake Lock released.", "Wake Lock liberado."));
+      setToast(shell.wakeOff);
       return;
     }
     const sentinel = await requestCourtWakeLock();
     setAwake(sentinel !== null);
     setToast(
       sentinel
-        ? t(locale, "Pantalla despierta durante el partido.", "Screen kept awake during the match.", "Tela acordada durante a partida.")
-        : t(locale, "Wake Lock no disponible en este navegador.", "Wake Lock unavailable in this browser.", "Wake Lock indisponivel neste navegador."),
+        ? shell.wakeOn
+        : t(locale, "Wake Lock no disponible en este navegador.", "Wake Lock unavailable in this browser.", "Wake Lock indisponível neste navegador."),
     );
   };
 
   const toggleVoice = (): void => {
     const next = !voice;
     setVoice(next);
-    setToast(
-      next
-        ? t(locale, "Narrador de voz activado.", "Voice announcer enabled.", "Narrador de voz ativado.")
-        : t(locale, "Narrador de voz apagado.", "Voice announcer off.", "Narrador de voz desligado."),
-    );
-    announceScoreTTS(t(locale, "Narrador listo.", "Announcer ready.", "Narrador pronto."), next, locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : "es-ES");
+    window.localStorage.setItem(VOICE_KEY, next ? "1" : "0");
+    setToast(next ? shell.voiceOn : shell.voiceOff);
+    announceScoreTTS(next ? shell.voiceOn : shell.voiceOff, next, locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : "es-ES");
   };
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        searchRef.current?.focus();
-      }
-      if (event.key === "Escape" && document.activeElement === searchRef.current) {
-        setQuery("");
-        searchRef.current?.blur();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 3400);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
 
   const handleSave = (slug: string, rows: number): void => {
     addVaultEntry(slug, rows);
-    const meta = MODULES.find((module) => module.slug === slug);
-    const text = `${meta?.name[locale] ?? slug}: ${rows} ${t(locale, "filas guardadas en la bóveda", "rows saved to the vault", "linhas salvas no cofre")}`;
+    const meta = MODULE_BY_SLUG.get(slug);
+    const text = `${meta?.name[locale] ?? slug}: ${rows} ${t(locale, "filas en la bóveda", "rows in the vault", "linhas no cofre")}`;
     setToast(text);
     triggerCourtHaptics([60, 40, 80]);
     announceScoreTTS(text, voice, locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : "es-ES");
   };
 
+  const shareWhatsApp = async (slug: string): Promise<void> => {
+    const meta = MODULE_BY_SLUG.get(slug);
+    if (!meta) return;
+    const text = `${meta.icon} ${meta.name[locale]} — VolleyOS\n${meta.tagline[locale]}\n${t(locale, "48 módulos offline en tu cancha.", "48 offline modules on your court.", "48 módulos offline na sua quadra.")}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setToast(shell.copied);
+    } catch {
+      setToast(t(locale, "No se pudo copiar.", "Could not copy.", "Não foi possível copiar."));
+    }
+    triggerCourtHaptics(20);
+  };
+
+  const exportCsv = (slug: string): void => {
+    const meta = MODULE_BY_SLUG.get(slug);
+    if (!meta) return;
+    const entries = loadVault().filter((entry) => entry.module === slug);
+    if (entries.length === 0) {
+      setToast(t(locale, "Guardá un reporte primero.", "Save a report first.", "Salve um relatório primeiro."));
+      return;
+    }
+    const lines = [
+      "sep=;",
+      "Modulo;Reporte;Filas;Fecha",
+      ...entries.map((entry) => `${meta.name[locale].replaceAll(";", ",")};${entry.id};${entry.rows};${entry.createdAt}`),
+    ];
+    const blob = new Blob([`\ufeff${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `volleyos-${slug}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setToast(t(locale, "CSV listo para Excel.", "CSV ready for Excel.", "CSV pronto para o Excel."));
+  };
+
+  const goTab = (next: Tab): void => {
+    setTab(next);
+    setActiveSlug(null);
+    triggerCourtHaptics(16);
+  };
+
+  const groupKey = tab === "court" || tab === "board" || tab === "lab" ? tab : null;
+  const groupSlugs = groupKey ? TAB_GROUP[groupKey] : [];
+  const pickedSlug = groupKey ? tabPick[groupKey] ?? groupSlugs[0] ?? "" : "";
+  const PickedStation = pickedSlug ? STATIONS[pickedSlug] : undefined;
+  const tabTitles: Record<Tab, { title: string; sub: string }> = {
+    home: { title: shell.allModules, sub: shell.fullScreenHint },
+    court: { title: shell.courtTitle, sub: shell.courtSub },
+    board: { title: shell.boardTitle, sub: shell.boardSub },
+    lab: { title: shell.labTitle, sub: shell.labSub },
+    settings: { title: shell.settingsTitle, sub: shell.license },
+  };
+
   return (
-    <main id="main" lang={locale} className="pb-32">
+    <main
+      id="main"
+      lang={locale}
+      data-view={activeMeta ? "module" : "tabs"}
+      data-dialog={keyOpen || checkout ? "open" : "closed"}
+      className="flex h-[100dvh] w-full flex-col overflow-hidden bg-obsidian text-white"
+    >
       <a
-        href="#stations"
+        href="#app-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-crimson focus:px-3 focus:py-2 focus:text-sm focus:font-bold focus:text-white"
       >
-        {t(locale, "Saltar a las estaciones", "Skip to stations", "Pular para as esta??es")}
+        {t(locale, "Saltar al contenido", "Skip to content", "Pular para o conteúdo")}
       </a>
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-obsidian/85 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-          <a href="#main" className="flex items-center gap-2 font-black tracking-tight">
-            <span aria-hidden className="grid h-8 w-8 place-items-center rounded-lg bg-crimson text-base">🏐</span>
-            <span className="text-sm">
-              Volley<span className="text-crimson">OS</span>
-            </span>
-          </a>
-          <nav className="ml-4 hidden items-center gap-4 text-xs font-semibold uppercase tracking-wider text-white/60 md:flex">
-            <a className="hover:text-volt" href="#stations">{copy.modules}</a>
-            <a className="hover:text-volt" href="#pricing">{copy.pricing}</a>
-            <a className="hover:text-volt" href="https://github.com/v0idbrn/VoleyOS" target="_blank" rel="noreferrer">GitHub ↗</a>
-          </nav>
-          <button
-            type="button"
-            aria-label={creator ? t(locale, "Modo creador activo. Desactivar", "Creator mode active. Disable", "Modo criador ativo. Desativar") : t(locale, "Introducir clave de creador", "Enter creator key", "Inserir chave do criador")}
-            aria-pressed={creator}
-            onClick={() => { if (creator) { relockCreator(); } else { setKeyOpen(true); setKeyError(false); } }}
-            className={`ml-auto rounded border px-2 py-1 text-[10px] font-bold ${creator ? "border-volt bg-volt text-obsidian" : "border-white/15 text-white/60 hover:text-white"}`}
-          >
-            {creator ? t(locale, "Creador", "Creator", "Criador") : "***"}
-          </button>
-          <button
-            type="button"
-            aria-pressed={contrast}
-            onClick={() => setContrast((value) => !value)}
-            className={`rounded border px-2 py-1 text-[10px] font-bold ${contrast ? "border-volt bg-volt text-obsidian" : "border-white/15 text-white/60 hover:text-white"}`}
-          >
-            {t(locale, "Alto contraste", "High contrast", "Alto contraste")}
-          </button>
-          <div className="flex items-center gap-1" aria-label="Idioma">
-            {LOCALES.map((code) => (
-              <a
-                key={code}
-                href={`/${code}`}
-                aria-current={code === locale ? "page" : undefined}
-                className={`rounded px-2 py-1 text-[10px] font-bold ${code === locale ? "bg-volt text-obsidian" : "text-white/50 hover:text-white"}`}
-              >
-                {LOCALE_NAMES[code]}
-              </a>
-            ))}
-          </div>
-          <span className={`ml-2 rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-wider ${target === "fdroid" ? "border-emerald text-emerald" : "border-crimson text-crimson"}`}>
-            {target === "fdroid" ? "FOSS" : "PRO"}
-          </span>
-        </div>
-      </header>
 
-      <div className="border-b border-white/10 bg-panel/60">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-2 text-[10px] font-bold uppercase tracking-wider">
-          <span className="rounded-full border border-emerald/40 bg-emerald/10 px-2 py-1 text-emerald">48/48 engines local</span>
-          <button
-            type="button"
-            aria-pressed={awake}
-            onClick={() => { void toggleWakeLock(); }}
-            className={`rounded-full border px-2 py-1 ${awake ? "border-volt bg-volt text-obsidian" : "border-white/15 text-white/60 hover:text-white"}`}
-          >
-            {t(locale, "Pantalla despierta", "Wake lock", "Tela acordada")}
-          </button>
-          <button
-            type="button"
-            aria-pressed={voice}
-            onClick={toggleVoice}
-            className={`rounded-full border px-2 py-1 ${voice ? "border-volt bg-volt text-obsidian" : "border-white/15 text-white/60 hover:text-white"}`}
-          >
-            {t(locale, "Narrador", "Voice", "Narrador")}
-          </button>
-          <button
-            type="button"
-            aria-pressed={contrast}
-            onClick={() => setContrast((value) => !value)}
-            className={`rounded-full border px-2 py-1 ${contrast ? "border-volt bg-volt text-obsidian" : "border-white/15 text-white/60 hover:text-white"}`}
-          >
-            {t(locale, "Contraste", "Contrast", "Contraste")}
-          </button>
-          <span className="ml-auto text-white/35">ES | EN | PT</span>
-        </div>
-      </div>
-
-      <section className="hero-grid border-b border-white/10">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-14 md:grid-cols-[1.4fr_1fr] md:py-20">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-crimson">{copy.heroKicker}</p>
-            <h1 className="mt-4 text-4xl font-black leading-[1.02] tracking-tight md:text-6xl">{copy.heroTitle}</h1>
-            <p className="mt-5 max-w-xl text-sm leading-relaxed text-white/65 md:text-base">{copy.heroSubtitle}</p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <a className="rounded-xl bg-crimson px-5 py-3 text-sm font-black uppercase tracking-wider text-white shadow-lg shadow-crimson/20 transition hover:bg-imperial" href="#stations">
-                {copy.cta}
-              </a>
-              <a className="rounded-xl border border-white/20 px-5 py-3 text-sm font-bold uppercase tracking-wider text-white/80 transition hover:border-volt hover:text-volt" href="#pricing">
-                {copy.pricing}
-              </a>
-            </div>
-            <p className="mt-4 text-[11px] text-emerald">✓ {copy.offline} · ✓ 0 telemetría · ✓ AGPL-3.0</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 self-center">
-            {[
-              { value: "48", label: t(locale, "módulos", "modules", "módulos") },
-              { value: "3", label: t(locale, "idiomas", "languages", "idiomas") },
-              { value: "0", label: t(locale, "telemetría", "telemetry", "telemetria") },
-              { value: "1", label: t(locale, "clic por reporte", "click per report", "clique por relatório") },
-            ].map((stat) => (
-              <div key={stat.label} className="rounded-2xl border border-white/10 bg-panel/70 p-4">
-                <p className="text-3xl font-black text-volt">{stat.value}</p>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="stations" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-12">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-black tracking-tight md:text-3xl">{copy.modules}</h2>
-            <p className="mt-1 text-xs text-white/50">
-              {t(locale, "Todo corre en tu dispositivo. Probá cada estación con datos realistas.", "Everything runs on your device. Try each station with realistic data.", "Tudo roda no seu dispositivo. Teste cada estação com dados realistas.")}
-            </p>
-          </div>
-          <input
-            ref={searchRef}
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t(locale, "Buscar módulo (Ctrl+K)", "Search modules (Ctrl+K)", "Buscar módulo (Ctrl+K)")}
-            aria-label={t(locale, "Buscar módulo", "Search modules", "Buscar módulo")}
-            className="w-full rounded-lg border border-white/15 bg-obsidian px-3 py-1.5 text-xs text-white outline-none placeholder:text-white/35 focus:border-volt sm:w-56"
-          />
-          <button
-            type="button"
-            onClick={() => setView((value) => (value === "bento" ? "list" : "bento"))}
-            className="rounded-lg border border-white/15 px-3 py-1.5 text-[11px] font-bold text-white/60 hover:text-white"
-          >
-            {view === "bento" ? t(locale, "Vista lista", "List view", "Vista lista") : t(locale, "Vista bento", "Bento view", "Vista bento")}
-          </button>
-          <div className="flex flex-wrap gap-1" role="tablist" aria-label={copy.modules}>
-            {FILTERS.map((filter) => (
-              <button
-                key={filter}
-                type="button"
-                role="tab"
-                aria-selected={profile === filter}
-                onClick={() => chooseProfile(filter)}
-                className={`rounded-lg border px-3 py-1.5 text-[11px] font-bold transition ${
-                  profile === filter ? "border-volt bg-volt/15 text-volt" : "border-white/10 text-white/55 hover:text-white"
-                }`}
-              >
-                {PROFILE_LABELS[filter][locale]}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-panel/50 px-3 py-2" aria-label={t(locale, "Arena DJ", "Arena DJ", "Arena DJ")}>
-          <span className="text-[10px] font-black uppercase tracking-wider text-crimson">Arena DJ</span>
-          {ARENA_CUES.map((value) => (
+      {activeMeta ? (
+        <header className="safe-top z-30 shrink-0 border-b border-white/10 bg-obsidian/95">
+          <div className="mx-auto flex h-14 max-w-3xl items-center gap-1 px-2">
             <button
-              key={value}
               type="button"
-              aria-pressed={cue === value}
-              onClick={() => { setCue(value); playArenaCue(value); triggerCourtHaptics(20); }}
-              className={`rounded-lg border px-2 py-1 text-[10px] font-bold ${cue === value ? "border-volt bg-volt text-obsidian" : "border-white/15 text-white/60 hover:text-white"}`}
+              onClick={closeModule}
+              aria-label={shell.back}
+              className="tap flex h-10 items-center gap-1 rounded-xl px-2 text-[12px] font-bold text-white/80"
             >
-              {value.replaceAll("_", " ")}
+              <span aria-hidden className="text-lg leading-none">←</span>
+              {shell.back}
             </button>
-          ))}
-        </div>
-        {pinned.length > 0 ? (
-          <div className="mt-3 flex flex-wrap items-center gap-1 text-[10px] text-white/50">
-            <span className="font-bold uppercase tracking-wider">{t(locale, "Fijados", "Pinned", "Fixados")}:</span>
-            {pinned.map((slug) => (
-              <button key={slug} type="button" onClick={() => togglePin(slug)} className="rounded-full border border-volt/40 bg-volt/10 px-2 py-0.5 text-volt">
-                {MODULES.find((module) => module.slug === slug)?.name[locale] ?? slug} x
-              </button>
-            ))}
+            <div className="min-w-0 flex-1 text-center">
+              <p className="truncate text-[13px] font-black leading-tight">
+                <span aria-hidden className="mr-1">{activeMeta.icon}</span>
+                {activeMeta.name[locale]}
+              </p>
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">
+                {shell.module} {activeMeta.number.toString().padStart(2, "0")}
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label={shell.favorite}
+              aria-pressed={pinned.includes(activeMeta.slug)}
+              onClick={() => togglePin(activeMeta.slug)}
+              className={`tap grid h-10 w-10 place-items-center rounded-xl text-lg ${pinned.includes(activeMeta.slug) ? "text-volt" : "text-white/45"}`}
+            >
+              {pinned.includes(activeMeta.slug) ? "★" : "☆"}
+            </button>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("voleyos:demo"))}
+              className="tap flex h-10 items-center gap-1 rounded-xl border border-volt/40 bg-volt/10 px-2 text-[11px] font-black text-volt"
+            >
+              <span aria-hidden>⚡</span>
+              {shell.demo}
+            </button>
           </div>
-        ) : null}
+        </header>
+      ) : (
+        <header className="safe-top z-30 shrink-0 border-b border-white/10 bg-obsidian/95">
+          <div className="mx-auto flex h-14 max-w-3xl items-center gap-2 px-3">
+            <button type="button" onClick={() => goTab("home")} className="tap flex items-center gap-2" aria-label="VolleyOS">
+              <span aria-hidden className="grid h-8 w-8 place-items-center rounded-xl bg-crimson text-base">🏐</span>
+              <span className="text-[13px] font-black tracking-tight">
+                Volley<span className="text-crimson">OS</span>
+              </span>
+            </button>
+            <span
+              className={`hidden rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider sm:inline ${
+                creator ? "border-volt/50 bg-volt/10 text-volt" : "border-emerald/40 bg-emerald/10 text-emerald"
+              }`}
+            >
+              {creator ? `👑 ${shell.pro}` : `⚡ ${shell.local}`}
+            </span>
+            <div className="ml-auto flex items-center gap-0.5">
+              <button
+                type="button"
+                aria-label={shell.whistle}
+                onClick={() => {
+                  playWhistle("short");
+                  triggerCourtHaptics(35);
+                }}
+                className="tap grid h-10 w-10 place-items-center rounded-xl text-base text-white/70"
+              >
+                🔊
+              </button>
+              <button
+                type="button"
+                aria-label={shell.sun}
+                aria-pressed={solar}
+                onClick={() => setSolar((value) => !value)}
+                className={`tap grid h-10 w-10 place-items-center rounded-xl text-base ${solar ? "bg-volt text-obsidian" : "text-white/70"}`}
+              >
+                ☀️
+              </button>
+              <a
+                href={`/${LOCALES[(LOCALES.indexOf(locale) + 1) % LOCALES.length]}`}
+                aria-label={shell.language}
+                className="tap grid h-10 min-w-9 place-items-center rounded-xl px-1 text-[11px] font-black text-white/60"
+              >
+                {LOCALE_NAMES[locale]}
+              </a>
+              <button
+                type="button"
+                aria-label={creator ? t(locale, "Modo creador activo. Desactivar", "Creator mode active. Disable", "Modo criador ativo. Desativar") : shell.unlockCreator}
+                aria-pressed={creator}
+                onClick={() => {
+                  if (creator) relockCreator();
+                  else {
+                    setKeyOpen(true);
+                    setKeyError(false);
+                  }
+                }}
+                className={`tap grid h-10 min-w-10 place-items-center rounded-xl px-2 text-[10px] font-black ${creator ? "bg-volt text-obsidian" : "text-white/40"}`}
+              >
+                {creator ? "👑" : "***"}
+              </button>
+            </div>
+          </div>
+        </header>
+      )}
 
-        <div className={view === "bento" ? "mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3" : "mt-6 grid gap-3"}>
-          {ordered.map((meta) => {
-            const Station = STATIONS[meta.slug];
-            if (!Station) return null;
-            return (
-              <div key={meta.slug} className="relative">
+      <div id="app-content" className="relative min-h-0 flex-1">
+        {activeMeta ? (
+          <>
+            <div className="h-full overflow-y-auto no-scrollbar px-3 pb-28 pt-3">
+              <div className="mx-auto w-full max-w-2xl">
+                {(() => {
+                  const Station = STATIONS[activeMeta.slug];
+                  return Station ? <Station meta={activeMeta} locale={locale} onSave={handleSave} /> : null;
+                })()}
+              </div>
+            </div>
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-obsidian via-obsidian/90 to-transparent pb-1 pt-8">
+              <div className="safe-bottom pointer-events-auto mx-auto flex max-w-2xl gap-2 px-3">
                 <button
                   type="button"
-                  aria-pressed={pinned.includes(meta.slug)}
-                  aria-label={`${t(locale, "Fijar", "Pin", "Fixar")} ${meta.name[locale]}`}
-                  onClick={() => togglePin(meta.slug)}
-                  className={`absolute right-3 top-3 z-10 grid h-7 w-7 place-items-center rounded-full border text-xs ${pinned.includes(meta.slug) ? "border-volt bg-volt text-obsidian" : "border-white/20 bg-obsidian/80 text-white/50 hover:text-volt"}`}
+                  onClick={() => void shareWhatsApp(activeMeta.slug)}
+                  className="tap flex-1 rounded-xl border border-emerald/40 bg-emerald/15 px-2 py-2.5 text-[11px] font-black text-emerald"
                 >
-                  {pinned.includes(meta.slug) ? "*" : "+"}
+                  {shell.shareWhatsApp}
                 </button>
-                <Station meta={meta} locale={locale} onSave={handleSave} />
+                <button
+                  type="button"
+                  onClick={() => exportCsv(activeMeta.slug)}
+                  className="tap flex-1 rounded-xl border border-white/15 bg-panel px-2 py-2.5 text-[11px] font-black text-white/80"
+                >
+                  {shell.exportCsv}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openModule("match-poster")}
+                  className="tap flex-1 rounded-xl border border-white/15 bg-panel px-2 py-2.5 text-[11px] font-black text-white/80"
+                >
+                  {t(locale, "Póster", "Poster", "Pôster")}
+                </button>
               </div>
-            );
-          })}
-        </div>
-      </section>
+            </div>
+          </>
+        ) : (
+          <div className="h-full overflow-y-auto no-scrollbar">
+            {tab === "home" ? (
+              <div className="mx-auto max-w-3xl px-3 pb-28 pt-3">
+                <label className="relative block">
+                  <span className="sr-only">{shell.search}</span>
+                  <span aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-white/35">⌕</span>
+                  <input
+                    ref={searchRef}
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={shell.searchPlaceholder}
+                    aria-label={shell.search}
+                    className="w-full rounded-xl border border-white/10 bg-panel py-2.5 pl-9 pr-3 text-[13px] text-white outline-none placeholder:text-white/35 focus:border-volt"
+                  />
+                </label>
 
-      <section id="pricing" className="border-y border-white/10 bg-panel/40">
-        <div className="mx-auto max-w-6xl scroll-mt-20 px-4 py-12">
-          <h2 className="text-2xl font-black tracking-tight md:text-3xl">{copy.pricing}</h2>
-          <p className="mt-1 text-xs text-white/50">
-            {locked
-              ? t(locale, "Pago único por evento vía Stripe. La app libre nunca se bloquea.", "One-time payment per event via Stripe. The free app is never locked.", "Pagamento único por evento via Stripe. O app livre nunca é bloqueado.")
-              : t(locale, "Build F-Droid: todos los módulos libres, sin cuentas ni pagos.", "F-Droid build: every module free, no accounts, no payments.", "Build F-Droid: todos os módulos livres, sem contas nem pagamentos.")}
-          </p>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {PLANS.map((plan) => (
-              <article
-                key={plan.name}
-                className={`flex flex-col rounded-2xl border p-5 ${plan.highlight ? "border-crimson bg-crimson/10 shadow-xl shadow-crimson/10" : "border-white/10 bg-obsidian/60"}`}
-              >
-                <div className="flex items-baseline justify-between gap-2">
-                  <h3 className="text-sm font-black uppercase tracking-wider">{plan.name}</h3>
-                  <p className="text-2xl font-black text-volt">{plan.price}<span className="text-[10px] text-white/40"> USD</span></p>
-                </div>
-                <p className="mt-1 text-[11px] text-white/50">{plan.tagline[locale]}</p>
-                <ul className="mt-4 flex-1 space-y-1.5 text-[11px] text-white/70">
-                  {plan.features[locale].map((feature) => (
-                    <li key={feature}>✓ {feature}</li>
-                  ))}
-                </ul>
-                {locked ? (
+                <div className="snap-row mt-3 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={shell.allModules}>
                   <button
                     type="button"
-                    onClick={() => setCheckout(plan)}
-                    className={`mt-4 rounded-lg px-3 py-2 text-center text-[11px] font-black uppercase tracking-wider ${plan.highlight ? "bg-crimson text-white" : "border border-white/20 text-white/80 hover:border-volt hover:text-volt"}`}
+                    role="tab"
+                    aria-selected={favOnly}
+                    onClick={() => {
+                      setFavOnly(true);
+                      triggerCourtHaptics(22);
+                    }}
+                    className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+                      favOnly ? "border-volt bg-volt text-obsidian" : "border-white/10 text-white/60"
+                    }`}
                   >
-                    {copy.cloudPro}
+                    ⭐ {shell.favorites}
                   </button>
-                ) : (
-                  <a
-                    href="https://github.com/v0idbrn/VoleyOS/releases"
-                    className={`mt-4 rounded-lg px-3 py-2 text-center text-[11px] font-black uppercase tracking-wider ${plan.highlight ? "bg-crimson text-white" : "border border-white/20 text-white/80 hover:border-volt hover:text-volt"}`}
-                  >
-                    {t(locale, "Descargar libre", "Download free", "Baixar livre")}
-                  </a>
-                )}
-              </article>
-            ))}
+                  {FILTERS.filter((value): value is Profile => value !== "all").map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="tab"
+                      aria-selected={!favOnly && profile === value}
+                      onClick={() => chooseProfile(value)}
+                      className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+                        !favOnly && profile === value ? "border-volt bg-volt text-obsidian" : "border-white/10 text-white/60"
+                      }`}
+                    >
+                      {PROFILE_LABELS[value][locale]}
+                    </button>
+                  ))}
+                </div>
+
+                {recent.length > 0 ? (
+                  <section className="mt-5">
+                    <h2 className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.recents}</h2>
+                    <div className="snap-row mt-2 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                      {recent.map((slug) => {
+                        const meta = MODULE_BY_SLUG.get(slug);
+                        if (!meta) return null;
+                        return (
+                          <button
+                            key={slug}
+                            type="button"
+                            onClick={() => openModule(slug)}
+                            className="tap flex w-[136px] shrink-0 flex-col gap-1 rounded-2xl border border-white/10 bg-panel p-3 text-left"
+                          >
+                            <span aria-hidden className="text-lg">{meta.icon}</span>
+                            <span className="line-clamp-2 text-[11px] font-bold leading-tight">{meta.name[locale]}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ) : null}
+
+                <section className="mt-5">
+                  <div className="flex items-baseline justify-between px-1">
+                    <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
+                      {favOnly ? shell.favorites : shell.allModules}
+                    </h2>
+                    <span className="text-[10px] font-bold text-emerald">{visible.length}/48</span>
+                  </div>
+                  {visible.length === 0 ? (
+                    <p className="mt-6 rounded-2xl border border-white/10 bg-panel px-4 py-6 text-center text-[12px] text-white/50">
+                      {favOnly ? shell.favoritesHint : shell.noRecents}
+                    </p>
+                  ) : (
+                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+                      {visible.map((meta) => (
+                        <div key={meta.slug} className="relative">
+                          <button
+                            type="button"
+                            data-testid="module-card"
+                            onClick={() => openModule(meta.slug)}
+                            className="tap flex h-full w-full flex-col items-start gap-2 rounded-2xl border border-white/10 bg-panel p-3 text-left active:border-volt/50"
+                          >
+                            <span className="flex w-full items-start justify-between">
+                              <span aria-hidden className="grid h-10 w-10 place-items-center rounded-xl bg-obsidian text-lg ring-1 ring-white/10">
+                                {meta.icon}
+                              </span>
+                              <span className="text-[9px] font-black tabular-nums text-white/25">{meta.number.toString().padStart(2, "0")}</span>
+                            </span>
+                            <span className="line-clamp-2 text-[12px] font-bold leading-tight text-white">{meta.name[locale]}</span>
+                            <span className="line-clamp-1 text-[10px] leading-tight text-white/45">{meta.tagline[locale]}</span>
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`${shell.favorite}: ${meta.name[locale]}`}
+                            aria-pressed={pinned.includes(meta.slug)}
+                            onClick={() => togglePin(meta.slug)}
+                            className={`tap absolute right-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-full text-[12px] ${
+                              pinned.includes(meta.slug) ? "text-volt" : "text-white/25"
+                            }`}
+                          >
+                            {pinned.includes(meta.slug) ? "★" : "☆"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <p className="mt-6 text-center text-[9px] uppercase tracking-[0.18em] text-white/25">
+                  {t(locale, "48 motores locales · 0 telemetría · AGPL-3.0", "48 local engines · 0 telemetry · AGPL-3.0", "48 motores locais · 0 telemetria · AGPL-3.0")}
+                </p>
+              </div>
+            ) : null}
+
+            {groupKey ? (
+              <div className="mx-auto flex h-full max-w-3xl flex-col">
+                <div className="shrink-0 px-3 pt-3">
+                  <div className="flex items-baseline justify-between">
+                    <div>
+                      <h1 className="text-lg font-black tracking-tight">{tabTitles[tab].title}</h1>
+                      <p className="text-[11px] text-white/45">{tabTitles[tab].sub}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openModule(pickedSlug)}
+                      className="tap rounded-full border border-white/10 px-2 py-1 text-[10px] font-bold text-white/60"
+                    >
+                      ⤢ {shell.openModule}
+                    </button>
+                  </div>
+                  <div className="snap-row mt-2 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={tabTitles[tab].title}>
+                    {groupSlugs.map((slug) => {
+                      const meta = MODULE_BY_SLUG.get(slug);
+                      if (!meta) return null;
+                      return (
+                        <button
+                          key={slug}
+                          type="button"
+                          role="tab"
+                          aria-selected={pickedSlug === slug}
+                          onClick={() => {
+                            setTabPick((current) => ({ ...current, [groupKey]: slug }));
+                            triggerCourtHaptics(18);
+                          }}
+                          className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+                            pickedSlug === slug ? "border-volt bg-volt text-obsidian" : "border-white/10 text-white/60"
+                          }`}
+                        >
+                          {meta.icon} {meta.name[locale]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar px-3 pb-24 pt-3">
+                  {PickedStation ? (
+                    <PickedStation meta={MODULE_BY_SLUG.get(pickedSlug) ?? MODULES[0]!} locale={locale} onSave={handleSave} />
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
+            {tab === "settings" ? (
+              <div className="mx-auto max-w-3xl px-3 pb-28 pt-3">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h1 className="text-lg font-black tracking-tight">{shell.settingsTitle}</h1>
+                    <p className="text-[11px] text-white/45">
+                      {creator ? `👑 ${shell.licenseCreator}` : shell.licenseLocked}
+                    </p>
+                  </div>
+                  <span className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-wider ${
+                    target === "fdroid" ? "border-emerald/40 text-emerald" : "border-crimson/50 text-crimson"
+                  }`}>
+                    {target === "fdroid" ? "FOSS" : "CLOUD"}
+                  </span>
+                </div>
+
+                <h2 className="px-1 pb-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.language}</h2>
+                <div className="grid grid-cols-3 gap-2">
+                  {LOCALES.map((code) => {
+                    const names: Record<Locale, string> = { es: "Español", en: "English", pt: "Português" };
+                    return (
+                      <a
+                        key={code}
+                        href={`/${code}`}
+                        aria-current={code === locale ? "page" : undefined}
+                        className={`tap rounded-2xl border px-3 py-3 text-center text-[12px] font-bold ${
+                          code === locale ? "border-volt bg-volt/15 text-volt" : "border-white/10 bg-panel text-white/60"
+                        }`}
+                      >
+                        {names[code]}
+                      </a>
+                    );
+                  })}
+                </div>
+
+                <h2 className="mt-5 px-1 pb-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.theme}</h2>
+                <SwitchRow
+                  label={shell.theme}
+                  hint={solar ? shell.themeSolar : shell.themeObsidian}
+                  checked={solar}
+                  onToggle={() => setSolar((value) => !value)}
+                />
+                <div className="mt-2 grid gap-2">
+                  <SwitchRow label={shell.courtAudio} checked={courtAudio} onToggle={() => setCourtAudio((value) => !value)} />
+                  <SwitchRow label={shell.voice} checked={voice} onToggle={toggleVoice} />
+                  <SwitchRow
+                    label={t(locale, "Pantalla despierta", "Keep screen awake", "Tela acordada")}
+                    checked={awake}
+                    onToggle={() => {
+                      void toggleWakeLock();
+                    }}
+                  />
+                </div>
+
+                <h2 className="mt-5 px-1 pb-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.license}</h2>
+                <ValueRow
+                  label={creator ? shell.licenseCreator : shell.licenseLocked}
+                  value={creator ? t(locale, "Activo", "Active", "Ativo") : "***"}
+                  onClick={() => {
+                    if (creator) relockCreator();
+                    else {
+                      setKeyOpen(true);
+                      setKeyError(false);
+                    }
+                  }}
+                />
+
+                <h2 className="mt-5 px-1 pb-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.vaultSection}</h2>
+                <EphemeralVaultBar locale={locale} embedded />
+
+                <h2 className="mt-5 px-1 pb-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.dataSection}</h2>
+                <ValueRow label={shell.capsule} value=".volleyos" onClick={() => openModule("capsule-io")} />
+
+                <details className="mt-5 rounded-2xl border border-white/10 bg-panel px-4 py-3">
+                  <summary className="cursor-pointer text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.pricingTitle}</summary>
+                  <p className="mt-2 text-[11px] leading-relaxed text-white/55">{shell.pricingNote}</p>
+                  <div className="mt-3 grid gap-2">
+                    {PLANS.map((plan) => (
+                      <div key={plan.name} className={`rounded-xl border p-3 ${plan.highlight ? "border-crimson/60 bg-crimson/10" : "border-white/10 bg-obsidian/60"}`}>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <p className="text-[12px] font-black">{plan.name}</p>
+                          <p className="text-sm font-black text-volt">{plan.price} <span className="text-[9px] text-white/40">USD</span></p>
+                        </div>
+                        <p className="mt-0.5 text-[10px] text-white/50">{plan.tagline[locale]}</p>
+                        {locked ? (
+                          <button
+                            type="button"
+                            onClick={() => setCheckout(plan)}
+                            className="tap mt-2 w-full rounded-lg bg-crimson px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white"
+                          >
+                            {t(locale, "Ver plan", "See plan", "Ver plano")}
+                          </button>
+                        ) : (
+                          <p className="mt-2 text-[10px] font-bold text-emerald">{t(locale, "Incluido en tu build", "Included in your build", "Incluído na sua versão")}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+
+                <details className="mt-3 rounded-2xl border border-white/10 bg-panel px-4 py-3">
+                  <summary className="cursor-pointer text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.legalSection}</summary>
+                  <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-white/60">
+                    <a className="tap py-1 hover:text-volt" href={`/${locale}/legal/privacy`}>{shell.privacy}</a>
+                    <a className="tap py-1 hover:text-volt" href={`/${locale}/legal/terms`}>{shell.terms}</a>
+                    <a className="tap py-1 hover:text-volt" href={`/${locale}/legal/disclaimer`}>{shell.disclaimer}</a>
+                    <a className="tap py-1 hover:text-volt" href={`/${locale}/legal/trademarks`}>{shell.trademarks}</a>
+                  </div>
+                </details>
+
+                <p className="mt-6 text-center text-[9px] text-white/30">
+                  © {new Date().getFullYear()} VolleyOS Global · AGPL-3.0-or-later · {t(locale, "hecho para canchas reales", "built for real courts", "feito para quadras reais")}
+                </p>
+              </div>
+            ) : null}
           </div>
-          <p className="mt-4 text-[10px] text-white/35">
-            {t(locale, "Precios de referencia. El backend valida el pago con firma HMAC-SHA256 antes de liberar cualquier descarga.", "Reference prices. The backend verifies HMAC-SHA256 signatures before releasing any download.", "Preços de referência. O backend valida o pagamento com assinatura HMAC-SHA256 antes de liberar qualquer download.")}
-          </p>
-        </div>
-      </section>
+        )}
+      </div>
 
-      <footer className="mx-auto max-w-6xl px-4 py-8 text-[11px] text-white/40">
-        <div className="mb-4 flex flex-wrap gap-x-3 gap-y-1">
-          <span className="font-bold uppercase tracking-wider text-white/60">{t(locale, "Gu?as", "Guides", "Guias")}</span>
-          <a className="hover:text-volt" href={`/${locale}/modules`}>{t(locale, "M?dulos", "Modules", "M?dulos")}</a>
-          <a className="hover:text-volt" href={`/${locale}/positions`}>{t(locale, "Posiciones", "Positions", "Posi??es")}</a>
-          <a className="hover:text-volt" href={`/${locale}/rotations`}>{t(locale, "Rotaciones", "Rotations", "Rota??es")}</a>
-          <a className="hover:text-volt" href={`/${locale}/alternatives`}>{t(locale, "Alternativas", "Alternatives", "Alternativas")}</a>
-          <a className="hover:text-volt" href={`/${locale}/tools`}>{t(locale, "Herramientas", "Tools", "Ferramentas")}</a>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p>© {new Date().getFullYear()} VolleyOS Global · AGPL-3.0-or-later · {t(locale, "hecho para canchas reales", "built for real courts", "feito para quadras reais")}</p>
-          <p className="flex gap-3">
-            <a className="hover:text-volt" href={`/${locale}/legal/privacy`}>{t(locale, "Privacidad", "Privacy", "Privacidade")}</a>
-            <a className="hover:text-volt" href={`/${locale}/legal/terms`}>{t(locale, "Términos", "Terms", "Termos")}</a>
-            <a className="hover:text-volt" href={`/${locale}/legal/disclaimer`}>{t(locale, "Aviso", "Disclaimer", "Aviso")}</a>
-            <a className="hover:text-volt" href={`/${locale}/legal/trademarks`}>{t(locale, "Marcas", "Trademarks", "Marcas")}</a>
-          </p>
-        </div>
-      </footer>
+      {!activeMeta ? (
+        <nav aria-label={shell.tabsLabel} className="safe-bottom z-30 shrink-0 border-t border-white/10 bg-obsidian/95">
+          <div role="tablist" aria-label={shell.tabsLabel} className="mx-auto grid h-16 max-w-3xl grid-cols-5">
+            {(["home", "court", "board", "lab", "settings"] as Tab[]).map((value) => {
+              const labels: Record<Tab, string> = {
+                home: shell.tabHome,
+                court: shell.tabCourt,
+                board: shell.tabBoard,
+                lab: shell.tabLab,
+                settings: shell.tabSettings,
+              };
+              const active = tab === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => goTab(value)}
+                  className={`tap flex flex-col items-center justify-center gap-0.5 ${active ? "text-volt" : "text-white/45"}`}
+                >
+                  <span aria-hidden className="text-lg leading-none">{TAB_ICON[value]}</span>
+                  <span className="text-[9px] font-black uppercase tracking-wider">{labels[value]}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      ) : null}
 
-      <EphemeralVaultBar locale={locale} />
+      {toast ? (
+        <div
+          role="status"
+          className="fixed bottom-24 left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 rounded-xl border border-emerald/40 bg-emerald/15 px-3 py-2 text-center text-[11px] font-semibold text-emerald backdrop-blur"
+        >
+          {toast}
+        </div>
+      ) : null}
+
       {keyOpen ? (
         <div
           role="dialog"
           aria-modal="true"
-          aria-label={t(locale, "Clave de creador", "Creator key", "Chave do criador")}
-          className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
+          aria-label={shell.creatorTitle}
+          className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4"
           onClick={() => setKeyOpen(false)}
         >
           <form
             className="w-full max-w-sm rounded-2xl border border-white/15 bg-panel p-5 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
-            onSubmit={(event) => { event.preventDefault(); void submitCreatorKey(); }}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submitCreatorKey();
+            }}
           >
-            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-crimson">
-              {t(locale, "Acceso de creador", "Creator access", "Acesso do criador")}
-            </p>
-            <h3 className="mt-1 text-xl font-black">{t(locale, "Clave maestra", "Master key", "Chave mestra")}</h3>
-            <p className="mt-2 text-[11px] leading-relaxed text-white/60">
-              {t(
-                locale,
-                "La app compara un hash SHA-256 en tu dispositivo. La clave no se envía ni se guarda en el código.",
-                "The app compares a SHA-256 hash on your device. The key is never sent or stored in the source.",
-                "O app compara um hash SHA-256 no seu dispositivo. A chave nunca é enviada nem guardada no código.",
-              )}
-            </p>
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-crimson">{shell.license}</p>
+            <h3 className="mt-1 text-xl font-black">{shell.creatorTitle}</h3>
+            <p className="mt-2 text-[11px] leading-relaxed text-white/60">{shell.creatorHelp}</p>
             <input
               type="password"
               autoFocus
               autoComplete="off"
               spellCheck={false}
               value={keyValue}
-              onChange={(event) => { setKeyValue(event.target.value); setKeyError(false); }}
+              onChange={(event) => {
+                setKeyValue(event.target.value);
+                setKeyError(false);
+              }}
               aria-invalid={keyError}
-              aria-label={t(locale, "Clave de creador", "Creator key", "Chave do criador")}
+              aria-label={shell.creatorTitle}
               className="mt-4 w-full rounded-lg border border-white/15 bg-obsidian px-3 py-2 text-sm text-white outline-none focus:border-volt"
             />
             {keyError ? (
               <p role="alert" className="mt-2 text-[11px] font-semibold text-crimson">
-                {t(locale, "Clave incorrecta.", "Wrong key.", "Chave incorreta.")}
+                {shell.wrongKey}
               </p>
             ) : null}
-            <button
-              type="submit"
-              className="mt-4 w-full rounded-lg bg-crimson px-3 py-2 text-[11px] font-black uppercase tracking-wider text-white transition hover:bg-imperial"
-            >
-              {t(locale, "Desbloquear", "Unlock", "Desbloquear")}
+            <button type="submit" className="tap mt-4 w-full rounded-lg bg-crimson px-3 py-2 text-[11px] font-black uppercase tracking-wider text-white">
+              {shell.unlock}
             </button>
             <button
               type="button"
-              className="mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-white hover:border-volt hover:text-volt"
+              className="tap mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-white"
               onClick={() => setKeyOpen(false)}
             >
-              {t(locale, "Cerrar", "Close", "Fechar")}
+              {shell.close}
             </button>
           </form>
         </div>
       ) : null}
+
       {checkout ? (
         <div
           role="dialog"
           aria-modal="true"
           aria-label={t(locale, "Confirmar plan", "Confirm plan", "Confirmar plano")}
-          className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
+          className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4"
           onClick={() => setCheckout(null)}
         >
           <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-panel p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-crimson">{copy.cloudPro}</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-crimson">Cloud Pro</p>
             <h3 className="mt-1 text-xl font-black">{checkout.name}</h3>
-            <p className="mt-1 text-2xl font-black text-volt">{checkout.price} <span className="text-[10px] text-white/40">USD</span></p>
+            <p className="mt-1 text-2xl font-black text-volt">
+              {checkout.price} <span className="text-[10px] text-white/40">USD</span>
+            </p>
             <p className="mt-2 text-[11px] text-white/60">{checkout.tagline[locale]}</p>
             <ul className="mt-3 space-y-1 text-[11px] text-white/70">
-              {checkout.features[locale].map((feature) => <li key={feature}>· {feature}</li>)}
+              {checkout.features[locale].map((feature) => (
+                <li key={feature}>· {feature}</li>
+              ))}
             </ul>
             <a
               href={`mailto:cloud@volleyos.app?subject=${encodeURIComponent(`VolleyOS ${checkout.name}`)}`}
-              className="mt-4 block rounded-lg bg-crimson px-3 py-2 text-center text-[11px] font-black uppercase tracking-wider text-white"
+              className="tap mt-4 block rounded-lg bg-crimson px-3 py-2 text-center text-[11px] font-black uppercase tracking-wider text-white"
             >
-              {t(locale, "Reservar por email", "Book by email", "Reservar por email")}
+              {t(locale, "Reservar por email", "Book by email", "Reservar por e-mail")}
             </a>
-            <button type="button" className="mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-white hover:border-volt hover:text-volt" onClick={() => setCheckout(null)}>
-              {t(locale, "Cerrar", "Close", "Fechar")}
+            <button
+              type="button"
+              className="tap mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-white"
+              onClick={() => setCheckout(null)}
+            >
+              {shell.close}
             </button>
-            <p className="mt-2 text-[9px] text-white/35">
+            <p className="mt-2 text-[9px] leading-relaxed text-white/35">
               {t(locale, "Sin telemetría. La confirmación se firma con HMAC-SHA256 en el backend.", "No telemetry. Confirmation is HMAC-SHA256 signed by the backend.", "Sem telemetria. A confirmação é assinada com HMAC-SHA256 no backend.")}
             </p>
           </div>
         </div>
       ) : null}
-      {toast ? (
-        <div role="status" className="fixed bottom-28 left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 rounded-xl border border-emerald/40 bg-emerald/15 px-3 py-2 text-center text-[11px] font-semibold text-emerald backdrop-blur">
-          {toast}
-        </div>
-      ) : null}
-      <nav
-        aria-label={t(locale, "Perfiles", "Profiles", "Perfis")}
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-white/15 bg-obsidian/95 px-2 py-2 backdrop-blur"
-      >
-        <div className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto">
-          {(FILTERS.filter((value): value is Profile => value !== "all")).map((value) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={profile === value}
-              onClick={() => chooseProfile(value)}
-              className={`min-w-[74px] flex-1 rounded-xl border px-2 py-2 text-[10px] font-black uppercase tracking-wide transition ${
-                profile === value ? "border-volt bg-volt text-obsidian" : "border-white/10 text-white/55 hover:text-white"
-              }`}
-            >
-              {PROFILE_LABELS[value][locale]}
-            </button>
-          ))}
-        </div>
-      </nav>
     </main>
   );
 }

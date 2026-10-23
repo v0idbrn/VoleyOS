@@ -139,6 +139,12 @@ function StationShell({
   rows: number;
   children: ReactNode;
 }) {
+  useEffect(() => {
+    const loadExample = (): void => onExample();
+    window.addEventListener("voleyos:demo", loadExample);
+    return () => window.removeEventListener("voleyos:demo", loadExample);
+  }, [onExample]);
+
   return (
     <article className={CARD} id={`station-${meta.slug}`}>
       <header className="flex items-start justify-between gap-3">

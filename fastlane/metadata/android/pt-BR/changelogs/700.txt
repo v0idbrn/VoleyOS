@@ -1,0 +1,3 @@
+Redesign nativo: cinco abas (Início, Quadra, Quadro, Lab & IA, Ajustes) e módulos em tela cheia, sem landing page nem rolagem infinita.
+Textos de quadra revisados em espanhol, inglês e português.
+Modo Sol para jogar de dia, ajustes no estilo iOS/Android e licença de criador validada no servidor.

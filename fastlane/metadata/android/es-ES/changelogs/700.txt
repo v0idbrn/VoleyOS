@@ -1,0 +1,3 @@
+Rediseño nativo: 5 pestañas (Inicio, Cancha, Pizarra, Lab & IA, Ajustes) y módulos a pantalla completa, sin landing ni scroll infinito.
+Textos de cancha revisados en español, inglés y portugués.
+Modo Sol para jugar de día, ajustes tipo iOS/Android y licencia creador validada en el servidor.

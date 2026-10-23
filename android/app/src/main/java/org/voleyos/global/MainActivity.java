@@ -3,8 +3,11 @@ package org.voleyos.global;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.View;
+import android.view.WindowManager;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -21,12 +24,23 @@ import java.net.URLConnection;
 
 public class MainActivity extends Activity {
     private static final String ORIGIN = "https://appassets.androidplatform.net";
+    private static final String BACK_PROBE =
+            "(function(){"
+                    + "var open=document.querySelector('[data-view=\"module\"], [data-dialog=\"open\"]');"
+                    + "if(!open){return '0';}"
+                    + "window.dispatchEvent(new CustomEvent('voleyos:back'));"
+                    + "return '1';"
+                    + "})()";
     private WebView webView;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().setStatusBarColor(Color.rgb(7, 7, 9));
+        getWindow().setNavigationBarColor(Color.rgb(7, 7, 9));
 
         final WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
                 .setDomain("appassets.androidplatform.net")
@@ -54,14 +68,32 @@ public class MainActivity extends Activity {
                 .build();
 
         webView = new WebView(this);
+        webView.setBackgroundColor(Color.rgb(7, 7, 9));
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        webView.setLongClickable(false);
+        webView.setOnLongClickListener(v -> true);
+        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        webView.setVerticalScrollBarEnabled(false);
+        webView.setHorizontalScrollBarEnabled(false);
+
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
+        settings.setAllowFileAccessFromFileURLs(false);
+        settings.setAllowUniversalAccessFromFileURLs(false);
+        settings.setSaveFormData(false);
+        settings.setGeolocationEnabled(false);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
+        settings.setTextZoom(100);
+        settings.setUseWideViewPort(true);
+        settings.setLoadWithOverviewMode(true);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
 
         webView.setWebViewClient(new WebViewClientCompat() {
             @Override
@@ -86,10 +118,14 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
+        if (webView == null) {
+            super.onBackPressed();
             return;
         }
-        super.onBackPressed();
+        webView.evaluateJavascript(BACK_PROBE, value -> {
+            if (value == null || !value.contains("1")) {
+                moveTaskToBack(true);
+            }
+        });
     }
 }

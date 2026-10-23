@@ -1,0 +1,3 @@
+Native redesign: five tabs (Home, Court, Board, Lab & AI, Settings) and full-screen modules, no landing page or endless scroll.
+Court language rewritten in Spanish, English and Portuguese.
+Sun mode for daytime courts, iOS/Android-style settings and creator licence enforced by the server.

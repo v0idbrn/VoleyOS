@@ -4,16 +4,101 @@
 
 :root {
   color-scheme: dark;
+  --vos-bg: #070709;
+  --vos-panel: #121218;
+  --vos-safe-top: env(safe-area-inset-top, 0px);
+  --vos-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
 }
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
-  background-color: #070709;
+  background-color: var(--vos-bg);
   color: #f8fafc;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overscroll-behavior-y: none;
+}
+
+/* The app shell owns the viewport: fixed chassis, inner panes scroll. */
+html.app-shell,
+html.app-shell body {
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  background-color: var(--vos-bg);
+  color: #fafafa;
+}
+
+html.app-shell body,
+html.app-shell button,
+html.app-shell nav,
+html.app-shell header,
+html.app-shell svg,
+html.app-shell span,
+html.app-shell div,
+html.app-shell p {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+.safe-top {
+  padding-top: var(--vos-safe-top);
+}
+
+.safe-bottom {
+  padding-bottom: var(--vos-safe-bottom);
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.tap {
+  transition:
+    transform 75ms ease,
+    border-color 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease;
+}
+
+.tap:active {
+  transform: scale(0.97);
+}
+
+.snap-row {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.snap-row > * {
+  scroll-snap-align: start;
 }
 
 ::selection {
@@ -50,31 +135,49 @@ input[type="range"] {
   accent-color: #e11d48;
 }
 
-html.high-contrast body {
-  background-color: #000;
+/* Outdoor sunlight mode: maximum contrast, no decorative glow. */
+html.solar {
+  --vos-bg: #000000;
+}
+
+html.solar body {
+  background-color: #000 !important;
   color: #fff;
 }
 
-html.high-contrast .text-white\/40,
-html.high-contrast .text-white\/50,
-html.high-contrast .text-white\/60,
-html.high-contrast .text-white\/65,
-html.high-contrast .text-white\/70 {
-  color: #e5e7eb !important;
+html.solar .hero-grid {
+  background-image: none;
 }
 
-html.high-contrast .bg-panel\/80,
-html.high-contrast .bg-obsidian\/60,
-html.high-contrast .bg-obsidian\/40 {
-  background-color: #000 !important;
+html.solar .text-white\/35,
+html.solar .text-white\/40,
+html.solar .text-white\/45,
+html.solar .text-white\/50,
+html.solar .text-white\/55,
+html.solar .text-white\/60,
+html.solar .text-white\/65,
+html.solar .text-white\/70 {
+  color: #f1f5f9 !important;
 }
 
-html.high-contrast .station-card,
-html.high-contrast .border-white\/10 {
-  border-color: #ffffff80 !important;
+html.solar .bg-panel,
+html.solar .bg-panel\/40,
+html.solar .bg-panel\/50,
+html.solar .bg-panel\/60,
+html.solar .bg-panel\/70,
+html.solar .bg-panel\/80,
+html.solar .bg-obsidian\/60,
+html.solar .bg-obsidian\/40,
+html.solar .bg-obsidian\/95 {
+  background-color: #0a0a0a !important;
 }
 
-html.high-contrast :focus-visible {
+html.solar .border-white\/10,
+html.solar .border-white\/15 {
+  border-color: rgba(255, 255, 255, 0.45) !important;
+}
+
+html.solar :focus-visible {
   outline: 3px solid #facc15 !important;
   outline-offset: 2px;
 }
@@ -92,7 +195,8 @@ html.high-contrast :focus-visible {
     transition-duration: 0.01ms !important;
   }
 
-  .station-card:hover {
+  .station-card:hover,
+  .tap:active {
     transform: none;
   }
 }
