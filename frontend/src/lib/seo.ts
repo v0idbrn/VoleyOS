@@ -293,6 +293,25 @@ const MODULE_FACTS: Record<string, LArr> = {
     ["Firma el payload canonico con HMAC-SHA256.", "Genera matrices SVG de 21x21 o 29x29.", "Sincroniza partido, rotacion o jugador sin internet."],
     ["Signs canonical JSON payloads with HMAC-SHA256.", "Generates 21x21 or 29x29 SVG matrices.", "Syncs match, rotation or player data without internet."],
     ["Assina payloads JSON canonicos com HMAC-SHA256.", "Gera matrizes SVG de 21x21 ou 29x29.", "Sincroniza partida, rotacao ou jogador sem internet."],
+  ),  "gym-screen": la(
+    ["Marcador gigante en horizontal con numeros legibles a 30 metros.", "Muestra sets, sets anteriores, saque y cronometro del partido.", "Abre en pantalla completa y respeta el bloqueo de rotacion del telefono."],
+    ["Giant landscape scoreboard readable from 30 metres.", "Shows sets, previous sets, server and match timer.", "Opens full screen and respects the phone rotation lock."],
+    ["Placar gigante em paisagem legivel a 30 metros.", "Mostra sets, sets anteriores, saque e cronometro da partida.", "Abre em tela cheia e respeita o bloqueio de rotacao do celular."],
+  ),
+  "fivb-escoresheet": la(
+    ["Acta electronica con sets Bo3/Bo5, cambios y sanciones.", "Firmas de capitanes y arbitros en una hoja A4 imprimible.", "Exporta el parte oficial sin conexion."],
+    ["Electronic scoresheet with Bo3/Bo5 sets, subs and sanctions.", "Captain and referee signatures on a printable A4 sheet.", "Exports the official record offline."],
+    ["Sumula eletronica com sets Bo3/Bo5, substituicoes e sancoes.", "Assinaturas de capitaes e arbitros em folha A4 imprimivel.", "Exporta o registro oficial sem conexao."],
+  ),
+  "video-telestrator": la(
+    ["Carga video de la galeria y avanza fotograma a fotograma.", "Mide tiempo de vuelo y salto con h = 1/8 g t2.", "Dibuja vectores y angulos sobre el video y exporta con sello."],
+    ["Loads gallery video and steps frame by frame.", "Measures flight time and jump with h = 1/8 g t2.", "Draws vectors and angles over video and exports with a seal."],
+    ["Carrega video da galeria e avanca quadro a quadro.", "Mede tempo de voo e salto com h = 1/8 g t2.", "Desenha vetores e angulos sobre o video e exporta com selo."],
+  ),
+  "playbook-animator": la(
+    ["Anima saque, transicao e ataque en tres fases.", "Usa la plantilla activa y las seis zonas del campo.", "Exporta la secuencia como SVG para la pizarra."],
+    ["Animates serve, transition and attack in three phases.", "Uses the active roster and the six court zones.", "Exports the sequence as SVG for the chalkboard."],
+    ["Anima saque, transicao e ataque em tres fases.", "Usa o elenco ativo e as seis zonas da quadra.", "Exporta a sequencia como SVG para o quadro."],
   ),  "player-career": la(
     ["Deltas de salto, alcance, saque, ataque y recepcion.", "Indice 0-100 con 70% absoluto y 30% progreso.", "Detecta el cuello de botella y la brecha a la proxima categoria."],
     ["Deltas for jump, reach, serve, attack and reception.", "0-100 index with 70% absolute and 30% progress.", "Finds the bottleneck and the gap to the next category."],

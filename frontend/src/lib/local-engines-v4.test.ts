@@ -146,6 +146,7 @@ describe("v4 offline engines", () => {
       const result = awardIndoorPoint(state, "A");
       state = result.state;
       history = commitScoreboard(history, state);
+      if (state.status !== "live") break;
     }
     expect(history.past).toHaveLength(SCOREBOARD_HISTORY_LIMIT);
   });

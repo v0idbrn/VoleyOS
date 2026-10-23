@@ -26,12 +26,12 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
 
   const bump = useCallback((key: keyof typeof payload, delta: number) => {
     setPayload((current) => {
-      const next = { ...current };
+      const next = { ...current } as any;
       const value = current[key];
       if (typeof value === "number") {
         next[key] = Math.max(0, value + delta);
       }
-      return next;
+      return next as typeof DEFAULT_GYM_PAYLOAD;
     });
   }, []);
 
@@ -133,7 +133,7 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
             onClick={() => setPayload((current) => ({ ...current, service: current.service === "A" ? "B" : "A" }))}
             className="tap h-16 rounded-2xl bg-crimson text-3xl font-black tracking-widest text-white hover:bg-imperial"
           >
-            {payload.service === "A" ? "Saque A" : "Saque B"}
+            {payload.service === "A" ? t(locale, "Saque A", "Serve A", "Saque A") : t(locale, "Saque B", "Serve B", "Saque B")}
           </button>
           <button
             type="button"
@@ -175,7 +175,7 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
 function tick(timer: string): string {
   const parts = timer.split(":").map((v) => Number(v));
   if (parts.length !== 2 || parts.some((v) => Number.isNaN(v))) return timer;
-  const total = parts[0] * 60 + parts[1] + 1;
+  const total = (parts[0] ?? 0) * 60 + (parts[1] ?? 0) + 1;
   const m = (total % 3600) % 60;
   const s = total % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;

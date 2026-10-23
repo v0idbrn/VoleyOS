@@ -13,6 +13,7 @@ import { announceScoreTTS, requestCourtWakeLock, triggerCourtHaptics } from "@/l
 import { playWhistle, setCourtAudioEnabled } from "@/lib/court-audio";
 import { EphemeralVaultBar } from "@/components/EphemeralVaultBar";
 import { STATIONS } from "@/components/stations";
+import { GymScreenModule } from "@/components/GymScreenModule";
 
 const FILTERS: Array<Profile | "all"> = ["all", "players", "coaches", "court", "referees", "fans", "tournaments"];
 const LOCALES: Locale[] = ["es", "en", "pt"];
@@ -619,6 +620,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
             <div className="h-full overflow-y-auto no-scrollbar px-3 pb-28 pt-3">
               <div className="mx-auto w-full max-w-2xl">
                 {(() => {
+                  if (activeMeta.slug === "gym-screen") return <GymScreenModule locale={locale} onClose={closeModule} />;
                   const Station = STATIONS[activeMeta.slug];
                   return Station ? <Station meta={activeMeta} locale={locale} onSave={handleSave} /> : null;
                 })()}

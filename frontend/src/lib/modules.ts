@@ -614,7 +614,7 @@ export const MODULES: ModuleMeta[] = [
     slug: "video-telestrator",
     number: 51,
     icon: "🎬",
-    profiles: ["lab"],
+    profiles: ["players"],
     name: { es: "Telestrador de Video", en: "Video Telestrator", pt: "Telestrador de Video" },
     tagline: {
       es: "Angles, jump height and vectors sobre el video desde tu galeria.",
@@ -626,7 +626,7 @@ export const MODULES: ModuleMeta[] = [
     slug: "playbook-animator",
     number: 52,
     icon: "🏀",
-    profiles: ["lab"],
+    profiles: ["players"],
     name: { es: "Animador de Jugadas", en: "Playbook Animator", pt: "Animador de Jogadas" },
     tagline: {
       es: "Secuencias en 3 fases: saque, transicion y ataque.",

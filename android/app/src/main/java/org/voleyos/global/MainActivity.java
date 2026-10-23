@@ -84,7 +84,8 @@ public class MainActivity extends Activity {
         webView.setLongClickable(true);
         webView.setOnLongClickListener(v -> {
             android.webkit.WebView.HitTestResult r = ((WebView) v).getHitTestResult();
-            return !(r != null && r.getType() == android.webkit.WebView.HitTestResult.EDIT_TEXT_TYPE);
+            return !(r != null && (r.getType() == android.webkit.WebView.HitTestResult.EDIT_TEXT_TYPE
+                    || r.getType() == android.webkit.WebView.HitTestResult.SRC_ANCHOR_TYPE));
         });
 
         container.addView(webView, new FrameLayout.LayoutParams(

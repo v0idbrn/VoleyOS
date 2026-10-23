@@ -423,6 +423,7 @@ export function awardIndoorPoint(state: ScoreboardState, team: Side): PointResul
   if (setFinished) {
     if (team === "A") next.setsA += 1;
     else next.setsB += 1;
+    if (!next.setHistory) next.setHistory = [];
     next.setHistory.push({ setNumber: next.setNumber, scoreA: next.scoreA, scoreB: next.scoreB });
     const setsNeeded = format === "bo5" ? 3 : 2;
     matchFinished = (team === "A" && next.setsA >= setsNeeded) || (team === "B" && next.setsB >= setsNeeded) || next.setsA > Math.floor(next.bestOf / 2) || next.setsB > Math.floor(next.bestOf / 2);
@@ -441,7 +442,7 @@ export function awardIndoorPoint(state: ScoreboardState, team: Side): PointResul
       message = `Set para ${team}. Nuevo set ${next.setNumber}.`;
     }
   }
-  const sideSwitchDue = (isDeciderSet || next.isTieBreak) && !setFinished && next.scoreA + next.scoreB === 8;
+  const sideSwitchDue = ((isDeciderSet || next.isTieBreak) && !setFinished && next.scoreA + next.scoreB === 8) as boolean;
   if (sideSwitchDue) next.sideSwitchedAt8 = true;
   return { state: next, rotated: sideOut, setFinished, matchFinished, sideSwitchDue, message };
 }
