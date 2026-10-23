@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import jsQR from "jsqr";
 
@@ -65,9 +65,12 @@ import {
   serveRadar,
   analyzeAerodynamics,
   analyzeSystem,
+  analyzeTelestration,
   buildAdaptiveRulebook,
   buildArenaCue,
   buildClipPlan,
+  buildPlaybookAnimation,
+  buildShotHeatmap,
   buildQrSync,
   buildRecruitingDossier,
   buildTreasury,
@@ -88,6 +91,7 @@ import {
   type LineupNumbers,
   type Locale,
   type MvpPlayer,
+  type PlaybookPhaseInput,
   type PosterTheme,
   type RefereeEvent,
   type RefereeGesture,
@@ -97,6 +101,7 @@ import {
   type SetDistribution,
   type SetterGesture,
   type SetterPlay,
+  type ShotResult,
   type SixAttributes,
   type SubEvent,
   type TempoCode,
@@ -105,6 +110,7 @@ import {
   type PracticeFocus,
   type ScoreboardState,
   type TeamRoster,
+  type TelestrationPoint,
   loadTeams,
   saveTeam,
   deleteTeam,
@@ -2679,6 +2685,261 @@ export function QrSyncStation({ meta, locale, onSave }: StationProps) {
   );
 }
 
+export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) {
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [strokes, setStrokes] = useState<TelestrationPoint[][]>([]);
+  const [drawing, setDrawing] = useState<TelestrationPoint[] | null>(null);
+  const report = useMemo(
+    () => (strokes.length > 0 ? analyzeTelestration({ frameWidth: 100, frameHeight: 100, strokes, scaleCmPerPx: 1 }) : null),
+    [strokes],
+  );
+
+  useEffect(() => () => { if (videoUrl) URL.revokeObjectURL(videoUrl); }, [videoUrl]);
+
+  const pointFrom = (event: ReactPointerEvent<SVGSVGElement>): TelestrationPoint => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100)),
+      y: Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100)),
+    };
+  };
+
+  const finish = (): void => {
+    if (drawing && drawing.length >= 2) setStrokes((previous) => [...previous, drawing]);
+    setDrawing(null);
+  };
+
+  return (
+    <StationShell meta={meta} locale={locale} rows={6} onSave={onSave} onExample={() => setStrokes([])}>
+      <input
+        type="file"
+        accept="video/*"
+        aria-label={t(locale, "Video local", "Local video", "Video local")}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          setVideoUrl(URL.createObjectURL(file));
+          setStrokes([]);
+        }}
+        className="mb-2 w-full text-[10px]"
+      />
+      <div className="relative aspect-video overflow-hidden rounded-xl border border-white/10 bg-black">
+        {videoUrl ? <video src={videoUrl} controls playsInline className="h-full w-full object-contain" /> : (
+          <p className="grid h-full place-items-center px-4 text-center text-[11px] text-white/45">
+            {t(locale, "Elegí un video de tu galería. Nada sale del teléfono.", "Pick a video from your gallery. Nothing leaves the phone.", "Escolha um video da galeria. Nada sai do telefone.")}
+          </p>
+        )}
+        <svg
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          className="absolute inset-0 h-full w-full touch-none"
+          onPointerDown={(event) => {
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setDrawing([pointFrom(event)]);
+          }}
+          onPointerMove={(event) => {
+            if (!drawing) return;
+            setDrawing((previous) => (previous ? [...previous, pointFrom(event)] : previous));
+          }}
+          onPointerUp={finish}
+          onPointerCancel={finish}
+        >
+          {strokes.map((stroke, index) => (
+            <polyline
+              key={`stroke-${index}`}
+              points={stroke.map((point) => `${point.x},${point.y}`).join(" ")}
+              fill="none"
+              stroke="#e11d48"
+              strokeWidth="0.8"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {drawing ? (
+            <polyline
+              points={drawing.map((point) => `${point.x},${point.y}`).join(" ")}
+              fill="none"
+              stroke="#c8ff00"
+              strokeWidth="0.8"
+              vectorEffect="non-scaling-stroke"
+            />
+          ) : null}
+        </svg>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1">
+        <button type="button" className={BTN} onClick={() => setStrokes([])}>{t(locale, "Borrar trazos", "Clear strokes", "Apagar tracos")}</button>
+        <span className={BTN}>{strokes.length} {t(locale, "trazos", "strokes", "tracos")}</span>
+      </div>
+      {report ? (
+        <div className="mt-2 rounded-xl border border-white/10 p-2 text-[10px]">
+          <p>{report.message}</p>
+          <p className="text-white/50">
+            {t(locale, "Angulo medio", "Mean angle", "Angulo medio")}: {report.meanAngleDeg}° · {t(locale, "Maximo", "Max", "Maximo")}: {report.maxAngleDeg}°
+          </p>
+        </div>
+      ) : null}
+    </StationShell>
+  );
+}
+
+const PLAYBOOK_SAMPLE: PlaybookPhaseInput[] = [
+  {
+    phase: "serve",
+    durationMs: 1200,
+    targetZone: 1,
+    players: [
+      { number: 1, x: 50, y: 90 }, { number: 4, x: 30, y: 70 }, { number: 7, x: 70, y: 70 },
+      { number: 9, x: 20, y: 50 }, { number: 11, x: 50, y: 55 }, { number: 14, x: 80, y: 50 },
+    ],
+  },
+  {
+    phase: "transition",
+    durationMs: 1800,
+    targetZone: 5,
+    players: [
+      { number: 1, x: 45, y: 85 }, { number: 4, x: 25, y: 60 }, { number: 7, x: 65, y: 55 },
+      { number: 9, x: 30, y: 40 }, { number: 11, x: 55, y: 45 }, { number: 14, x: 75, y: 40 },
+    ],
+  },
+  {
+    phase: "attack",
+    durationMs: 1000,
+    targetZone: 9,
+    players: [
+      { number: 1, x: 40, y: 80 }, { number: 4, x: 20, y: 50 }, { number: 7, x: 60, y: 45 },
+      { number: 9, x: 35, y: 30 }, { number: 11, x: 60, y: 25 }, { number: 14, x: 80, y: 30 },
+    ],
+  },
+];
+
+export function PlaybookAnimatorStation({ meta, locale, onSave }: StationProps) {
+  const [phases] = useState(PLAYBOOK_SAMPLE);
+  const [index, setIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const report = useMemo(() => buildPlaybookAnimation(phases), [phases]);
+  const phase = phases[index] ?? phases[0];
+
+  useEffect(() => {
+    if (!playing) return;
+    const timer = setInterval(() => {
+      setIndex((current) => {
+        if (current >= phases.length - 1) {
+          setPlaying(false);
+          return current;
+        }
+        return current + 1;
+      });
+    }, 900);
+    return () => clearInterval(timer);
+  }, [playing, phases.length]);
+
+  const vectors = report.phases[index]?.vectors ?? [];
+  const previous = phases[index - 1];
+
+  return (
+    <StationShell meta={meta} locale={locale} rows={5} onSave={onSave} onExample={() => { setIndex(0); setPlaying(false); }}>
+      <div className="relative aspect-[3/2] overflow-hidden rounded-xl border border-white/10 bg-obsidian">
+        <svg viewBox="0 0 100 100" className="h-full w-full">
+          <rect width="100" height="100" fill="#101010" />
+          <line x1="50" y1="0" x2="50" y2="100" stroke="#ffffff22" />
+          <line x1="0" y1="50" x2="100" y2="50" stroke="#ffffff22" strokeDasharray="2 2" />
+          {previous ? previous.players.map((player) => {
+            const now = phase?.players.find((item) => item.number === player.number);
+            if (!now) return null;
+            return <line key={`vector-${player.number}`} x1={player.x} y1={player.y} x2={now.x} y2={now.y} stroke="#c8ff00" strokeWidth="0.7" markerEnd="url(#arrow)" />;
+          }) : null}
+          <defs>
+            <marker id="arrow" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto">
+              <path d="M0,0 L4,2 L0,4 z" fill="#c8ff00" />
+            </marker>
+          </defs>
+          {phase?.players.map((player) => (
+            <g key={`player-${player.number}`}>
+              <circle cx={player.x} cy={player.y} r="3" fill="#e11d48" />
+              <text x={player.x} y={player.y + 1.2} textAnchor="middle" fontSize="2.6" fill="white">{player.number}</text>
+            </g>
+          ))}
+        </svg>
+      </div>
+      <div className="mt-2 flex items-center gap-1">
+        <button type="button" className={BTN} onClick={() => { setIndex(0); setPlaying((value) => !value); }}>
+          {playing ? t(locale, "Pausar", "Pause", "Pausar") : t(locale, "Reproducir", "Play", "Reproduzir")}
+        </button>
+        {report.phases.map((frame) => (
+          <button key={frame.phase} type="button" className={`${BTN} ${index === frame.order - 1 ? "border-volt text-volt" : ""}`} onClick={() => setIndex(frame.order - 1)}>
+            {frame.phase}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-[10px] text-white/60">
+        {t(locale, "Fase", "Phase", "Fase")} {index + 1}/3 · {phase?.durationMs} ms · {t(locale, "Zona", "Zone", "Zona")} {phase?.targetZone} · {vectors.length} {t(locale, "vectores", "vectors", "vetores")}
+      </p>
+      <p className="mt-1 text-[10px] text-white/40">{report.message}</p>
+    </StationShell>
+  );
+}
+
+const HEATMAP_SAMPLE = [
+  { x: 16, y: 16, result: "kill" as ShotResult },
+  { x: 50, y: 16, result: "kill" as ShotResult },
+  { x: 50, y: 16, result: "kill" as ShotResult },
+  { x: 84, y: 16, result: "blocked" as ShotResult },
+  { x: 16, y: 50, result: "error" as ShotResult },
+  { x: 50, y: 50, result: "kill" as ShotResult },
+  { x: 84, y: 50, result: "kill" as ShotResult },
+  { x: 16, y: 84, result: "in_play" as ShotResult },
+  { x: 50, y: 84, result: "error" as ShotResult },
+  { x: 84, y: 84, result: "kill" as ShotResult },
+];
+
+export function ShotHeatmapStation({ meta, locale, onSave }: StationProps) {
+  const [shots, setShots] = useState(HEATMAP_SAMPLE);
+  const [result, setResult] = useState<ShotResult>("kill");
+  const report = useMemo(
+    () => (shots.length > 0
+      ? buildShotHeatmap({ shots })
+      : { total: 0, kills: 0, errors: 0, blocked: 0, efficiencyPct: 0, hotZone: 1, cells: Array.from({ length: 9 }, (_, index) => ({ zone: index + 1, count: 0, sharePct: 0 })), message: "Sin remates." }),
+    [shots],
+  );
+
+  return (
+    <StationShell meta={meta} locale={locale} rows={5} onSave={onSave} onExample={() => setShots(HEATMAP_SAMPLE)}>
+      <div className="mb-1 flex flex-wrap items-center gap-1">
+        <select value={result} onChange={(event) => setResult(event.target.value as ShotResult)} className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px]">
+          <option value="kill">Kill</option>
+          <option value="error">Error</option>
+          <option value="blocked">Blocked</option>
+          <option value="in_play">In play</option>
+        </select>
+        <button type="button" className={BTN} onClick={() => setShots([])}>{t(locale, "Limpiar", "Clear", "Limpar")}</button>
+        <button type="button" className={BTN} onClick={() => setShots(HEATMAP_SAMPLE)}>{t(locale, "Ejemplo", "Example", "Exemplo")}</button>
+      </div>
+      <div className="grid grid-cols-3 gap-1">
+        {report.cells.map((cell) => (
+          <button
+            key={cell.zone}
+            type="button"
+            aria-label={`Zona ${cell.zone}`}
+            onClick={() => {
+              const column = (cell.zone - 1) % 3;
+              const row = Math.floor((cell.zone - 1) / 3);
+              setShots((previous) => [...previous, { x: column * 33.4 + 16.7, y: row * 33.4 + 16.7, result }]);
+            }}
+            className="relative h-16 rounded-lg border border-white/10 text-left"
+            style={{ backgroundColor: `rgba(225, 29, 72, ${Math.max(0.08, cell.sharePct / 100)})` }}
+          >
+            <span className="absolute left-1 top-1 text-[9px] text-white/50">Z{cell.zone}</span>
+            <span className="absolute bottom-1 right-1 text-sm font-black tabular-nums">{cell.count}</span>
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-[11px]">
+        {t(locale, "Zona caliente", "Hot zone", "Zona quente")}: <strong className="text-volt">Z{report.hotZone}</strong> · {report.total} {t(locale, "remates", "shots", "ataques")} · {t(locale, "eficiencia", "efficiency", "eficiencia")} {report.efficiencyPct}%
+      </p>
+      <p className="mt-1 text-[10px] text-white/40">{t(locale, "Tocá una zona para sumar un remate con el resultado elegido.", "Tap a zone to add a shot with the selected result.", "Toque uma zona para somar um ataque com o resultado escolhido.")}</p>
+    </StationShell>
+  );
+}
+
 export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
   const [report, setReport] = useState<Record<string, unknown> | null>(null);
   useEffect(() => {
@@ -2782,9 +3043,9 @@ export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   "qr-sync": QrSyncStation,
   "gym-screen": GymScreenStation,
   "fivb-escoresheet": EnginePreviewStation,
-  "video-telestrator": EnginePreviewStation,
-  "playbook-animator": EnginePreviewStation,
-  "shot-heatmap": EnginePreviewStation,
+  "video-telestrator": VideoTelestratorStation,
+  "playbook-animator": PlaybookAnimatorStation,
+  "shot-heatmap": ShotHeatmapStation,
   "tournament-nutrition": EnginePreviewStation,
   "injury-prehab": EnginePreviewStation,
   "tiebreak-commander": EnginePreviewStation,

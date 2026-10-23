@@ -4170,3 +4170,202 @@ export async function buildQrSync(input: {
     message: `QR ${input.kind} ${size}x${size} firmado HMAC.`,
   };
 }
+
+/* --------------------------------------------------------------- module 51 */
+
+export interface TelestrationPoint {
+  x: number;
+  y: number;
+}
+
+export interface TelestrationInput {
+  frameWidth: number;
+  frameHeight: number;
+  strokes: TelestrationPoint[][];
+  scaleCmPerPx?: number;
+  takeoff?: TelestrationPoint;
+  apex?: TelestrationPoint;
+}
+
+export interface TelestrationReport {
+  strokeCount: number;
+  totalLengthPx: number;
+  totalLengthCm: number;
+  meanAngleDeg: number;
+  maxAngleDeg: number;
+  jumpHeightCm: number | null;
+  metrics: Array<{ index: number; lengthPx: number; lengthCm: number; angleDeg: number }>;
+  warnings: string[];
+  message: string;
+}
+
+export function analyzeTelestration(input: TelestrationInput): TelestrationReport {
+  const scale = input.scaleCmPerPx ?? 0.5;
+  if (input.frameWidth <= 0 || input.frameHeight <= 0) throw new Error("frame dimensions must be positive");
+  if (input.strokes.length === 0) throw new Error("at least one stroke is required");
+  const warnings: string[] = [];
+  const metrics = input.strokes.map((points, index) => {
+    if (points.length < 2) throw new Error("a stroke needs two points");
+    for (const point of points) {
+      if (point.x < 0 || point.y < 0 || point.x > input.frameWidth || point.y > input.frameHeight) {
+        throw new Error("stroke point outside the video frame");
+      }
+    }
+    let lengthPx = 0;
+    let angleSum = 0;
+    for (let part = 0; part < points.length - 1; part += 1) {
+      const start = points[part] as TelestrationPoint;
+      const end = points[part + 1] as TelestrationPoint;
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      lengthPx += Math.hypot(dx, dy);
+      angleSum += (Math.atan2(Math.abs(dy), dx) * 180) / Math.PI;
+    }
+    if (lengthPx === 0) warnings.push(`Trazado ${index + 1} sin desplazamiento.`);
+    return {
+      index,
+      lengthPx: round2(lengthPx),
+      lengthCm: round2(lengthPx * scale),
+      angleDeg: round2(angleSum / (points.length - 1)),
+    };
+  });
+  let jumpHeightCm: number | null = null;
+  if (input.takeoff && input.apex) {
+    if (input.apex.y > input.takeoff.y) throw new Error("apex must be above takeoff in video coordinates");
+    jumpHeightCm = round2((input.takeoff.y - input.apex.y) * scale);
+  }
+  const totalLengthPx = round2(metrics.reduce((sum, metric) => sum + metric.lengthPx, 0));
+  return {
+    strokeCount: metrics.length,
+    totalLengthPx,
+    totalLengthCm: round2(metrics.reduce((sum, metric) => sum + metric.lengthCm, 0)),
+    meanAngleDeg: round2(metrics.reduce((sum, metric) => sum + metric.angleDeg, 0) / metrics.length),
+    maxAngleDeg: Math.max(...metrics.map((metric) => metric.angleDeg)),
+    jumpHeightCm,
+    metrics,
+    warnings,
+    message: `${metrics.length} trazados y ${round2(totalLengthPx * scale)} cm analizados sin subir el video.`,
+  };
+}
+
+/* --------------------------------------------------------------- module 52 */
+
+export type PlaybookPhaseName = "serve" | "transition" | "attack";
+
+export interface PlaybookPlayer {
+  number: number;
+  x: number;
+  y: number;
+}
+
+export interface PlaybookPhaseInput {
+  phase: PlaybookPhaseName;
+  durationMs: number;
+  targetZone: number;
+  players: PlaybookPlayer[];
+}
+
+export interface PlaybookReport {
+  totalDurationMs: number;
+  keyframes: number;
+  phases: Array<{
+    order: number;
+    phase: PlaybookPhaseName;
+    startMs: number;
+    endMs: number;
+    targetZone: number;
+    vectors: Array<{ number: number; dx: number; dy: number; distance: number }>;
+  }>;
+  message: string;
+}
+
+export function buildPlaybookAnimation(phases: PlaybookPhaseInput[]): PlaybookReport {
+  const order = phases.map((phase) => phase.phase).join(",");
+  if (order !== "serve,transition,attack") throw new Error("phases must be serve, transition and attack in order");
+  let cursor = 0;
+  let previous: Map<number, PlaybookPlayer> | null = null;
+  const frames = phases.map((phase, index) => {
+    if (phase.durationMs <= 0) throw new Error("phase duration must be positive");
+    if (phase.targetZone < 1 || phase.targetZone > 9) throw new Error("target zone must be 1-9");
+    const seen = new Set<number>();
+    for (const player of phase.players) {
+      if (seen.has(player.number)) throw new Error(`duplicate player #${player.number} in ${phase.phase}`);
+      seen.add(player.number);
+      if (player.x < 0 || player.x > 100 || player.y < 0 || player.y > 100) throw new Error("player outside court");
+    }
+    const vectors = previous
+      ? phase.players.flatMap((player) => {
+          const before = previous?.get(player.number);
+          if (!before) return [];
+          const dx = round2(player.x - before.x);
+          const dy = round2(player.y - before.y);
+          return [{ number: player.number, dx, dy, distance: round2(Math.hypot(dx, dy)) }];
+        })
+      : [];
+    const frame = {
+      order: index + 1,
+      phase: phase.phase,
+      startMs: cursor,
+      endMs: cursor + phase.durationMs,
+      targetZone: phase.targetZone,
+      vectors,
+    };
+    cursor += phase.durationMs;
+    previous = new Map(phase.players.map((player) => [player.number, player]));
+    return frame;
+  });
+  return {
+    totalDurationMs: cursor,
+    keyframes: phases.reduce((sum, phase) => sum + phase.players.length, 0),
+    phases: frames,
+    message: `Jugada de ${cursor} ms en 3 fases lista para reproducir sin conexion.`,
+  };
+}
+
+/* --------------------------------------------------------------- module 53 */
+
+export type ShotResult = "kill" | "error" | "blocked" | "in_play";
+
+export interface ShotHeatmapInput {
+  shots: Array<{ x: number; y: number; result?: ShotResult }>;
+}
+
+export interface ShotHeatmapReport {
+  total: number;
+  kills: number;
+  errors: number;
+  blocked: number;
+  efficiencyPct: number;
+  hotZone: number;
+  cells: Array<{ zone: number; count: number; sharePct: number }>;
+  message: string;
+}
+
+export function buildShotHeatmap(input: ShotHeatmapInput): ShotHeatmapReport {
+  if (input.shots.length === 0) throw new Error("at least one shot is required");
+  const counts = Array.from({ length: 9 }, () => 0);
+  for (const shot of input.shots) {
+    if (shot.x < 0 || shot.x > 100 || shot.y < 0 || shot.y > 100) throw new Error("shot outside court");
+    const zone = Math.min(2, Math.floor((shot.y * 3) / 100)) * 3 + Math.min(2, Math.floor((shot.x * 3) / 100)) + 1;
+    counts[zone - 1] = (counts[zone - 1] ?? 0) + 1;
+  }
+  const total = input.shots.length;
+  const kills = input.shots.filter((shot) => (shot.result ?? "kill") === "kill").length;
+  const errors = input.shots.filter((shot) => shot.result === "error").length;
+  const blocked = input.shots.filter((shot) => shot.result === "blocked").length;
+  let hotZone = 1;
+  for (let zone = 2; zone <= 9; zone += 1) {
+    if ((counts[zone - 1] ?? 0) > (counts[hotZone - 1] ?? 0)) hotZone = zone;
+  }
+  return {
+    total,
+    kills,
+    errors,
+    blocked,
+    efficiencyPct: round2(((kills - errors - blocked) * 100) / total),
+    hotZone,
+    cells: counts.map((count, index) => ({ zone: index + 1, count, sharePct: round2((count * 100) / total) })),
+    message: `Zona caliente ${hotZone} con ${counts[hotZone - 1]} de ${total} remates.`,
+  };
+}
+
