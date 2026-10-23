@@ -1,0 +1,4 @@
+- Universal APK signed with the persistent production keystore: updates install over the previous build without uninstalling.
+- Fixed the module count in the hub and store listing: 48 in ES, EN and PT.
+- Reproducible build: automatic verification of the web payload (Next.js chunks) and of the certificate SHA-256 fingerprint.
+- 48 modules, 74 frontend tests and 440+ backend tests.

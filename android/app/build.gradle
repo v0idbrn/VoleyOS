@@ -10,8 +10,8 @@ android {
         applicationId "org.voleyos.global"
         minSdk 24
         targetSdk 35
-        versionCode 600
-        versionName "6.0.0"
+        versionCode 601
+        versionName "6.0.1"
     }
 
     // Android's asset merger ignores directories whose name starts with an underscore
@@ -30,6 +30,7 @@ android {
         signingConfigs {
             release {
                 storeFile file(keystorePath)
+                storeType "PKCS12"
                 storePassword System.getenv("VOLEYOS_KEYSTORE_PASSWORD") ?: "voleyos-ci"
                 keyAlias System.getenv("VOLEYOS_KEY_ALIAS") ?: "voleyos"
                 keyPassword System.getenv("VOLEYOS_KEY_PASSWORD") ?: "voleyos-ci"

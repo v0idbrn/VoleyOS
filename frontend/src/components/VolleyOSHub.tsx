@@ -274,7 +274,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
           </div>
           <div className="grid grid-cols-2 gap-3 self-center">
             {[
-              { value: "36", label: t(locale, "módulos", "modules", "módulos") },
+              { value: "48", label: t(locale, "módulos", "modules", "módulos") },
               { value: "3", label: t(locale, "idiomas", "languages", "idiomas") },
               { value: "0", label: t(locale, "telemetría", "telemetry", "telemetria") },
               { value: "1", label: t(locale, "clic por reporte", "click per report", "clique por relatório") },

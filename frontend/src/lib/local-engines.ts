@@ -1,5 +1,5 @@
 /**
- * Offline-first TypeScript mirror of the 36 VolleyOS Python engines.
+ * Offline-first TypeScript mirror of the 48 VolleyOS Python engines.
  * Runs in the browser with zero network and zero telemetry.
  */
 
