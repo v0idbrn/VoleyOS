@@ -18,6 +18,7 @@ coverage/
 .env.local
 .env.production.local
 DEPLOY_CREDENTIALS.txt
+PRIVATE_APK/
 .tmp/
 *.xlsx
 

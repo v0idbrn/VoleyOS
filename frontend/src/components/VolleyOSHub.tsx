@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { COPY, LOCALE_NAMES, t } from "@/lib/i18n";
 import { buildTarget, paywallEnabled, type Locale, type Profile } from "@/lib/local-engines";
+import { clearCreatorUnlock, creatorUnlocked, matchesCreatorKey, persistCreatorUnlock } from "@/lib/creator-unlock";
 import { MODULES, PROFILE_LABELS } from "@/lib/modules";
 import { addVaultEntry } from "@/lib/vault";
 import { announceScoreTTS, requestCourtWakeLock, triggerCourtHaptics } from "@/lib/court-ux";
@@ -76,8 +77,13 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [checkout, setCheckout] = useState<Plan | null>(null);
   const [pinned, setPinned] = useState<string[]>([]);
   const [cue, setCue] = useState<ArenaCue>("MONSTER_BLOCK");
+  const [creator, setCreator] = useState(false);
+  const [keyOpen, setKeyOpen] = useState(false);
+  const [keyValue, setKeyValue] = useState("");
+  const [keyError, setKeyError] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const target = buildTarget();
+  const locked = paywallEnabled() && !creator;
 
   const visible = useMemo(() => {
     const needle = query.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -95,6 +101,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const ordered = useMemo(() => [...visible].sort((left, right) => Number(pinned.includes(right.slug)) - Number(pinned.includes(left.slug))), [visible, pinned]);
 
   useEffect(() => {
+    setCreator(creatorUnlocked());
     const storedRole = window.localStorage.getItem(ROLE_KEY);
     if (isProfile(storedRole)) setProfile(storedRole);
     setContrast(window.localStorage.getItem(CONTRAST_KEY) === "1");
@@ -120,6 +127,25 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     setProfile(value);
     window.localStorage.setItem(ROLE_KEY, value);
     triggerCourtHaptics(25);
+  };
+
+  const submitCreatorKey = async (): Promise<void> => {
+    if (await matchesCreatorKey(keyValue)) {
+      persistCreatorUnlock();
+      setCreator(true);
+      setKeyOpen(false);
+      setKeyValue("");
+      setKeyError(false);
+      setToast(t(locale, "Modo creador activado.", "Creator mode enabled.", "Modo criador ativado."));
+      return;
+    }
+    setKeyError(true);
+  };
+
+  const relockCreator = (): void => {
+    clearCreatorUnlock();
+    setCreator(false);
+    setToast(t(locale, "Modo creador desactivado.", "Creator mode disabled.", "Modo criador desativado."));
   };
 
   const toggleWakeLock = async (): Promise<void> => {
@@ -201,9 +227,18 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
           </nav>
           <button
             type="button"
+            aria-label={creator ? t(locale, "Modo creador activo. Desactivar", "Creator mode active. Disable", "Modo criador ativo. Desativar") : t(locale, "Introducir clave de creador", "Enter creator key", "Inserir chave do criador")}
+            aria-pressed={creator}
+            onClick={() => { if (creator) { relockCreator(); } else { setKeyOpen(true); setKeyError(false); } }}
+            className={`ml-auto rounded border px-2 py-1 text-[10px] font-bold ${creator ? "border-volt bg-volt text-obsidian" : "border-white/15 text-white/60 hover:text-white"}`}
+          >
+            {creator ? t(locale, "Creador", "Creator", "Criador") : "***"}
+          </button>
+          <button
+            type="button"
             aria-pressed={contrast}
             onClick={() => setContrast((value) => !value)}
-            className={`ml-auto rounded border px-2 py-1 text-[10px] font-bold ${contrast ? "border-volt bg-volt text-obsidian" : "border-white/15 text-white/60 hover:text-white"}`}
+            className={`rounded border px-2 py-1 text-[10px] font-bold ${contrast ? "border-volt bg-volt text-obsidian" : "border-white/15 text-white/60 hover:text-white"}`}
           >
             {t(locale, "Alto contraste", "High contrast", "Alto contraste")}
           </button>
@@ -380,7 +415,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
         <div className="mx-auto max-w-6xl scroll-mt-20 px-4 py-12">
           <h2 className="text-2xl font-black tracking-tight md:text-3xl">{copy.pricing}</h2>
           <p className="mt-1 text-xs text-white/50">
-            {paywallEnabled()
+            {locked
               ? t(locale, "Pago único por evento vía Stripe. La app libre nunca se bloquea.", "One-time payment per event via Stripe. The free app is never locked.", "Pagamento único por evento via Stripe. O app livre nunca é bloqueado.")
               : t(locale, "Build F-Droid: todos los módulos libres, sin cuentas ni pagos.", "F-Droid build: every module free, no accounts, no payments.", "Build F-Droid: todos os módulos livres, sem contas nem pagamentos.")}
           </p>
@@ -400,7 +435,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                     <li key={feature}>✓ {feature}</li>
                   ))}
                 </ul>
-                {paywallEnabled() ? (
+                {locked ? (
                   <button
                     type="button"
                     onClick={() => setCheckout(plan)}
@@ -446,6 +481,63 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
       </footer>
 
       <EphemeralVaultBar locale={locale} />
+      {keyOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={t(locale, "Clave de creador", "Creator key", "Chave do criador")}
+          className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
+          onClick={() => setKeyOpen(false)}
+        >
+          <form
+            className="w-full max-w-sm rounded-2xl border border-white/15 bg-panel p-5 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+            onSubmit={(event) => { event.preventDefault(); void submitCreatorKey(); }}
+          >
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-crimson">
+              {t(locale, "Acceso de creador", "Creator access", "Acesso do criador")}
+            </p>
+            <h3 className="mt-1 text-xl font-black">{t(locale, "Clave maestra", "Master key", "Chave mestra")}</h3>
+            <p className="mt-2 text-[11px] leading-relaxed text-white/60">
+              {t(
+                locale,
+                "La app compara un hash SHA-256 en tu dispositivo. La clave no se envía ni se guarda en el código.",
+                "The app compares a SHA-256 hash on your device. The key is never sent or stored in the source.",
+                "O app compara um hash SHA-256 no seu dispositivo. A chave nunca é enviada nem guardada no código.",
+              )}
+            </p>
+            <input
+              type="password"
+              autoFocus
+              autoComplete="off"
+              spellCheck={false}
+              value={keyValue}
+              onChange={(event) => { setKeyValue(event.target.value); setKeyError(false); }}
+              aria-invalid={keyError}
+              aria-label={t(locale, "Clave de creador", "Creator key", "Chave do criador")}
+              className="mt-4 w-full rounded-lg border border-white/15 bg-obsidian px-3 py-2 text-sm text-white outline-none focus:border-volt"
+            />
+            {keyError ? (
+              <p role="alert" className="mt-2 text-[11px] font-semibold text-crimson">
+                {t(locale, "Clave incorrecta.", "Wrong key.", "Chave incorreta.")}
+              </p>
+            ) : null}
+            <button
+              type="submit"
+              className="mt-4 w-full rounded-lg bg-crimson px-3 py-2 text-[11px] font-black uppercase tracking-wider text-white transition hover:bg-imperial"
+            >
+              {t(locale, "Desbloquear", "Unlock", "Desbloquear")}
+            </button>
+            <button
+              type="button"
+              className="mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-white hover:border-volt hover:text-volt"
+              onClick={() => setKeyOpen(false)}
+            >
+              {t(locale, "Cerrar", "Close", "Fechar")}
+            </button>
+          </form>
+        </div>
+      ) : null}
       {checkout ? (
         <div
           role="dialog"

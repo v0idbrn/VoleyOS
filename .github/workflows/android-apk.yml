@@ -27,19 +27,21 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Static export
+      - name: Static export (public, paywall on)
         working-directory: frontend
         env:
           VOLEYOS_STATIC_EXPORT: "true"
-          NEXT_PUBLIC_BUILD_TARGET: fdroid
+          NEXT_PUBLIC_BUILD_TARGET: cloud
+          NEXT_PUBLIC_DEV_UNLOCK: "false"
+          NEXT_PUBLIC_CREATOR_KEY_SHA256: ${{ vars.CREATOR_KEY_SHA256 }}
           NEXT_TELEMETRY_DISABLED: "1"
         run: npm run build
 
-      - name: Check static export
+      - name: Check public static export
         run: |
           test -f frontend/out/index.html
           test -d frontend/out/_next
-          echo "static files: $(find frontend/out -type f | wc -l)"
+          echo "public static files: $(find frontend/out -type f | wc -l)"
 
       - name: Setup JDK
         uses: actions/setup-java@v4
@@ -57,14 +59,14 @@ jobs:
         with:
           gradle-version: 8.10.2
 
-      - name: Copy web build into APK assets
+      - name: Copy public build into APK assets
         run: |
           rm -rf android/app/src/main/assets/public
           mkdir -p android/app/src/main/assets/public
           cp -R frontend/out/. android/app/src/main/assets/public/
           test -f android/app/src/main/assets/public/index.html
           test -d android/app/src/main/assets/public/_next
-          echo "assets copies: $(find android/app/src/main/assets/public -type f | wc -l)"
+          echo "public assets: $(find android/app/src/main/assets/public -type f | wc -l)"
 
       - name: Provision release keystore
         env:
@@ -93,7 +95,7 @@ jobs:
           fi
           ls -l "$KEYSTORE"
 
-      - name: Build release APK
+      - name: Build public release APK
         working-directory: android
         env:
           VOLEYOS_KEYSTORE: ${{ github.workspace }}/android/release.keystore
@@ -102,38 +104,92 @@ jobs:
           VOLEYOS_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASS || 'voleyos-ci' }}
         run: gradle assembleRelease --no-daemon
 
-      - name: Verify APK payload and signature
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          APK=android/app/build/outputs/apk/release/app-release.apk
-          test -f "$APK"
-          "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" verify --verbose "$APK"
-          fingerprint=$("$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" verify --print-certs "$APK" \
-            | grep -m1 'certificate SHA-256 digest' | awk '{print $NF}')
-          echo "signing certificate SHA-256: $fingerprint"
-          if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
-            test "$fingerprint" = "d11a1e87ee86f9046bd150188222c44f20afefea5e9668be6511c6f81501acb2"
-          fi
-          unzip -Z1 "$APK" | grep -q "^assets/public/index.html$"
-          unzip -Z1 "$APK" | grep -q "^assets/public/es/index.html$"
-          chunks=$(unzip -Z1 "$APK" | grep -cE "^assets/public/_next/static/chunks/.+[.]js$")
-          echo "Next.js chunks inside APK: $chunks"
-          test "$chunks" -ge 5
-
-      - name: Rename APK
+      - name: Stage public APK
         run: |
           cp android/app/build/outputs/apk/release/app-release.apk voleyos-universal.apk
           ls -lh voleyos-universal.apk
 
-      - name: Upload artifact
+      - name: Static export (creator, unlocked)
+        working-directory: frontend
+        env:
+          VOLEYOS_STATIC_EXPORT: "true"
+          NEXT_PUBLIC_BUILD_TARGET: cloud
+          NEXT_PUBLIC_DEV_UNLOCK: "true"
+          NEXT_PUBLIC_CREATOR_KEY_SHA256: ${{ vars.CREATOR_KEY_SHA256 }}
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npm run build
+
+      - name: Check creator static export
+        run: |
+          test -f frontend/out/index.html
+          test -d frontend/out/_next
+          echo "creator static files: $(find frontend/out -type f | wc -l)"
+
+      - name: Copy creator build into APK assets
+        run: |
+          rm -rf android/app/src/main/assets/public
+          mkdir -p android/app/src/main/assets/public
+          cp -R frontend/out/. android/app/src/main/assets/public/
+          test -f android/app/src/main/assets/public/index.html
+          test -d android/app/src/main/assets/public/_next
+          echo "creator assets: $(find android/app/src/main/assets/public -type f | wc -l)"
+
+      - name: Build creator release APK
+        working-directory: android
+        env:
+          VOLEYOS_KEYSTORE: ${{ github.workspace }}/android/release.keystore
+          VOLEYOS_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASS || 'voleyos-ci' }}
+          VOLEYOS_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || 'voleyos' }}
+          VOLEYOS_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASS || 'voleyos-ci' }}
+        run: gradle clean assembleRelease --no-daemon
+
+      - name: Stage creator APK
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk voleyos-creator-unlocked.apk
+          ls -lh voleyos-creator-unlocked.apk
+
+      - name: Verify APKs, payload and signature
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          APKSIGNER="$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner"
+          for APK in voleyos-universal.apk voleyos-creator-unlocked.apk; do
+            test -f "$APK"
+            "$APKSIGNER" verify --verbose "$APK"
+            fingerprint=$("$APKSIGNER" verify --print-certs "$APK" \
+              | grep -m1 'certificate SHA-256 digest' | awk '{print $NF}')
+            echo "$APK signing certificate SHA-256: $fingerprint"
+            if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+              test "$fingerprint" = "d11a1e87ee86f9046bd150188222c44f20afefea5e9668be6511c6f81501acb2"
+            fi
+            unzip -Z1 "$APK" | grep -q "^assets/public/index.html$"
+            unzip -Z1 "$APK" | grep -q "^assets/public/es/index.html$"
+            chunks=$(unzip -Z1 "$APK" | grep -cE "^assets/public/_next/static/chunks/.+[.]js$")
+            echo "$APK Next.js chunks: $chunks"
+            test "$chunks" -ge 5
+          done
+          cmp -s voleyos-universal.apk voleyos-creator-unlocked.apk && {
+            echo "::error::Creator APK is identical to the public APK; the DEV_UNLOCK build flag did not change the bundle."
+            exit 1
+          }
+
+      - name: Upload public APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: voleyos-universal-apk
           path: voleyos-universal.apk
           if-no-files-found: error
 
-      - name: Attach APK to GitHub Release
+      - name: Upload creator APK (private, expires in 1 day)
+        uses: actions/upload-artifact@v4
+        with:
+          name: voleyos-creator-unlocked-apk
+          path: voleyos-creator-unlocked.apk
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Attach public APK to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
