@@ -10,18 +10,29 @@ android {
         applicationId "org.voleyos.global"
         minSdk 24
         targetSdk 35
-        versionCode 500
-        versionName "5.0.0"
+        versionCode 600
+        versionName "6.0.0"
+    }
+
+    // Android's asset merger ignores directories whose name starts with an underscore
+    // (<dir>_* in its default ignore pattern), which silently dropped Next.js `_next`
+    // chunks and left the WebView with HTML but no JavaScript. Keep the other default
+    // exclusions, but drop that directory rule.
+    androidResources {
+        ignoreAssetsPatterns.addAll(
+                "!.svn", "!.git", "!.ds_store", "!*.scc", ".*",
+                "!CVS", "!thumbs.db", "!picasa.ini", "!*~")
     }
 
     def keystorePath = System.getenv("VOLEYOS_KEYSTORE")
-    if (keystorePath) {
+    def hasReleaseKeystore = keystorePath != null && !keystorePath.trim().isEmpty()
+    if (hasReleaseKeystore) {
         signingConfigs {
             release {
                 storeFile file(keystorePath)
-                storePassword System.getenv("VOLEYOS_KEYSTORE_PASSWORD")
-                keyAlias System.getenv("VOLEYOS_KEY_ALIAS")
-                keyPassword System.getenv("VOLEYOS_KEY_PASSWORD")
+                storePassword System.getenv("VOLEYOS_KEYSTORE_PASSWORD") ?: "voleyos-ci"
+                keyAlias System.getenv("VOLEYOS_KEY_ALIAS") ?: "voleyos"
+                keyPassword System.getenv("VOLEYOS_KEY_PASSWORD") ?: "voleyos-ci"
             }
         }
     }
@@ -29,9 +40,8 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            if (keystorePath) {
-                signingConfig signingConfigs.release
-            }
+            // Never emit an unsigned APK: Android rejects those at install time.
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
         }
     }
 

@@ -27,3 +27,9 @@ Thumbs.db
 
 # Build artifacts
 frontend/tsconfig.tsbuildinfo
+android/.gradle/
+android/app/build/
+android/app/src/main/assets/
+android/local.properties
+*.keystore
+*.jks
