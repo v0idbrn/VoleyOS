@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">VoleyOS Global</string>
+    <string name="app_name">VoleyOS</string>
+    <color name="obsidian">#070709</color>
+    <string name="color_obsidian">Obsidian Night</string>
+    <string name="color_amber">Amber Volt</string>
+    <string name="color_crimson">Crimson Red</string>
 </resources>

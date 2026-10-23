@@ -36,7 +36,7 @@ const ROLE_SETUP: Record<string, { profile: Profile; tab: Tab; slugs: string[] }
 type Tab = "home" | "court" | "board" | "lab" | "settings";
 
 const TAB_GROUP: Record<Exclude<Tab, "home" | "settings">, string[]> = {
-  court: ["scoreboard", "beach", "referee-console", "var", "timeout-chalkboard", "substitution-tracker"],
+  court: ["scoreboard", "beach", "referee-console", "var", "timeout-chalkboard", "substitution-tracker", "gym-screen"],
   board: ["rotation", "block-shadow", "seam-radar", "system-transition", "blockout-lab", "matchup-matrix"],
   lab: ["biomechanics", "serve-radar", "ball-aerodynamics", "volleycard", "scouting", "acwr"],
 };

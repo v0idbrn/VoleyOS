@@ -113,6 +113,7 @@ import {
   acwrSample,
 } from "@/lib/samples";
 import type { ModuleMeta } from "@/lib/modules";
+import { GymScreenModule } from "@/components/GymScreenModule";
 
 export interface StationProps {
   meta: ModuleMeta;
@@ -2604,6 +2605,13 @@ export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
     </StationShell>
   );
 }
+export function GymScreenStation({ meta, locale, onSave }: StationProps) {
+  return (
+    <StationShell meta={meta} locale={locale} rows={1} onSave={onSave} onExample={() => undefined}>
+      <GymScreenModule locale={locale} onClose={() => {}} />
+    </StationShell>
+  );
+}
 
 export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   biomechanics: BiomechanicsStation,
@@ -2654,4 +2662,5 @@ export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   "arena-dj": EnginePreviewStation,
   "court-slang": EnginePreviewStation,
   "qr-sync": QrSyncStation,
+  "gym-screen": GymScreenStation,
 };

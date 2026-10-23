@@ -75,9 +75,18 @@ export interface ShellCopy {
   tabCourt: string;
   tabBoard: string;
   tabLab: string;
-  tabSettings: string;
-  search: string;
-  searchPlaceholder: string;
+  gymTab: string;
+  settingsTab: string;
+  gymScreen: string;
+  gymScreenHint: string;
+  fivbEscoresheet: string;
+  fivbEscoresheetHint: string;
+  videoTelestrator: string;
+  videoTelestratorHint: string;
+  playbookAnimator: string;
+  playbookAnimatorHint: string;
+  settings: string;
+  scrollPlaceholder: string;
   favorites: string;
   recents: string;
   allModules: string;
@@ -148,7 +157,7 @@ export const SHELL: Record<Locale, ShellCopy> = {
     tabLab: "Lab & IA",
     tabSettings: "Ajustes",
     search: "Buscar módulo",
-    searchPlaceholder: "Buscar módulo (Ctrl+K)",
+    scrollPlaceholder: "Buscar módulo (Ctrl+K)",
     favorites: "Mis favoritos",
     recents: "Usados recientemente",
     allModules: "Todos los módulos",
@@ -173,7 +182,7 @@ export const SHELL: Record<Locale, ShellCopy> = {
     themeSolar: "Solar Outdoor",
     courtAudio: "Audio de cancha",
     voice: "Locutor por voz (TTS)",
-    license: "Licencia",
+    rollAnimation: "Animación de dominance roll",
     licenseCreator: "Creador Pro activo",
     licenseLocked: "Versión libre",
     unlockCreator: "Desbloquear con clave",
@@ -217,7 +226,7 @@ export const SHELL: Record<Locale, ShellCopy> = {
     tabLab: "Lab & AI",
     tabSettings: "Settings",
     search: "Search modules",
-    searchPlaceholder: "Search modules (Ctrl+K)",
+    scrollPlaceholder: "Search modules (Ctrl+K)",
     favorites: "My favorites",
     recents: "Recently used",
     allModules: "All modules",
@@ -242,7 +251,7 @@ export const SHELL: Record<Locale, ShellCopy> = {
     themeSolar: "Solar Outdoor",
     courtAudio: "Court audio",
     voice: "Voice announcer (TTS)",
-    license: "Licence",
+    rollAnimation: "Dominance roll animation",
     licenseCreator: "Creator Pro active",
     licenseLocked: "Free build",
     unlockCreator: "Unlock with key",
@@ -286,7 +295,7 @@ export const SHELL: Record<Locale, ShellCopy> = {
     tabLab: "Lab & IA",
     tabSettings: "Ajustes",
     search: "Buscar módulo",
-    searchPlaceholder: "Buscar módulo (Ctrl+K)",
+    scrollPlaceholder: "Buscar módulo (Ctrl+K)",
     favorites: "Meus favoritos",
     recents: "Usados recentemente",
     allModules: "Todos os módulos",
@@ -311,7 +320,7 @@ export const SHELL: Record<Locale, ShellCopy> = {
     themeSolar: "Solar Outdoor",
     courtAudio: "Áudio de quadra",
     voice: "Locutor por voz (TTS)",
-    license: "Licença",
+    rollAnimation: "Animação de dominância",
     licenseCreator: "Criador Pro ativo",
     licenseLocked: "Versão livre",
     unlockCreator: "Desbloquear com chave",
@@ -344,6 +353,7 @@ export const SHELL: Record<Locale, ShellCopy> = {
     wakeOff: "Wake Lock liberado.",
     voiceOn: "Narrador pronto.",
     voiceOff: "Narrador desligado.",
+    rollAnimation: "Animação de dominância",
     fullScreenHint: "Toque em um módulo para abrir em tela cheia.",
     favoritesHint: "Marque módulos com a estrela para ter à mão.",
   },

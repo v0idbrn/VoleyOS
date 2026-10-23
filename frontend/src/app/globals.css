@@ -1,202 +1,79 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 :root {
-  color-scheme: dark;
-  --vos-bg: #070709;
-  --vos-panel: #121218;
-  --vos-safe-top: env(safe-area-inset-top, 0px);
-  --vos-safe-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-* {
-  -webkit-tap-highlight-color: transparent;
-  box-sizing: border-box;
+  --volt: #eab308;
+  --crimson: #e11d48;
+  --obsidian: #070709;
 }
 
 html {
-  scroll-behavior: smooth;
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
+  color-scheme: dark;
+}
+
+/* Allow native copy/paste inside text inputs on Android and iOS. */
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
 }
 
 body {
-  background-color: var(--vos-bg);
-  color: #f8fafc;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  overscroll-behavior-y: none;
+  background: var(--obsidian);
+  color: #f7f6f4;
 }
 
-/* The app shell owns the viewport: fixed chassis, inner panes scroll. */
-html.app-shell,
-html.app-shell body {
-  height: 100dvh;
-  overflow: hidden;
-  overscroll-behavior: none;
-  touch-action: manipulation;
-  background-color: var(--vos-bg);
-  color: #fafafa;
+.app-shell {
+  background: var(--obsidian);
 }
 
-html.app-shell body,
-html.app-shell button,
-html.app-shell nav,
-html.app-shell header,
-html.app-shell svg,
-html.app-shell span,
-html.app-shell div,
-html.app-shell p {
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
+  color-scheme: dark;
+  --color-page: #070709;
+  --color-surface: #0e0e12;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-volt: #eab308;
+  --color-crimson: #e11d48;
+  --color-text: #f7f6f4;
+  --color-text-soft: rgba(247, 246, 244, 0.7);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-text);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
 }
 
 input,
 textarea,
 [contenteditable="true"] {
-  -webkit-user-select: text;
-  user-select: text;
-  -webkit-touch-callout: default;
-}
-
-.safe-top {
-  padding-top: var(--vos-safe-top);
-}
-
-.safe-bottom {
-  padding-bottom: var(--vos-safe-bottom);
-}
-
-.no-scrollbar {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-.tap {
-  transition:
-    transform 75ms ease,
-    border-color 150ms ease,
-    background-color 150ms ease,
-    color 150ms ease,
-    opacity 150ms ease;
-}
-
-.tap:active {
-  transform: scale(0.97);
-}
-
-.snap-row {
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-}
-
-.snap-row > * {
-  scroll-snap-align: start;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
 }
 
 ::selection {
-  background: #e11d48;
-  color: #fff;
+  background: var(--color-volt);
+  color: #070709;
 }
 
-.checker {
-  background-color: #121218;
-  background-image:
-    linear-gradient(45deg, #1b1b22 25%, transparent 25%, transparent 75%, #1b1b22 75%),
-    linear-gradient(45deg, #1b1b22 25%, transparent 25%, transparent 75%, #1b1b22 75%);
-  background-size: 24px 24px;
-  background-position: 0 0, 12px 12px;
-}
-
-.hero-grid {
-  background-image:
-    radial-gradient(circle at 18% 12%, rgba(225, 29, 72, 0.28), transparent 42%),
-    radial-gradient(circle at 82% 8%, rgba(245, 158, 11, 0.18), transparent 38%),
-    radial-gradient(circle at 50% 90%, rgba(16, 185, 129, 0.12), transparent 46%);
-}
-
-.station-card {
-  transition: transform 180ms ease, border-color 180ms ease;
-}
-
-.station-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(245, 158, 11, 0.35);
-}
-
-input[type="range"] {
-  accent-color: #e11d48;
-}
-
-/* Outdoor sunlight mode: maximum contrast, no decorative glow. */
-html.solar {
-  --vos-bg: #000000;
-}
-
-html.solar body {
-  background-color: #000 !important;
-  color: #fff;
-}
-
-html.solar .hero-grid {
-  background-image: none;
-}
-
-html.solar .text-white\/35,
-html.solar .text-white\/40,
-html.solar .text-white\/45,
-html.solar .text-white\/50,
-html.solar .text-white\/55,
-html.solar .text-white\/60,
-html.solar .text-white\/65,
-html.solar .text-white\/70 {
-  color: #f1f5f9 !important;
-}
-
-html.solar .bg-panel,
-html.solar .bg-panel\/40,
-html.solar .bg-panel\/50,
-html.solar .bg-panel\/60,
-html.solar .bg-panel\/70,
-html.solar .bg-panel\/80,
-html.solar .bg-obsidian\/60,
-html.solar .bg-obsidian\/40,
-html.solar .bg-obsidian\/95 {
-  background-color: #0a0a0a !important;
-}
-
-html.solar .border-white\/10,
-html.solar .border-white\/15 {
-  border-color: rgba(255, 255, 255, 0.45) !important;
-}
-
-html.solar :focus-visible {
-  outline: 3px solid #facc15 !important;
+:focus-visible {
+  outline: 2px solid var(--color-volt);
   outline-offset: 2px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-
-  .station-card:hover,
-  .tap:active {
-    transform: none;
-  }
+.hidden-by-default {
+  display: none;
 }

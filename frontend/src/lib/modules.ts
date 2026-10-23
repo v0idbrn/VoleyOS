@@ -586,6 +586,54 @@ export const MODULES: ModuleMeta[] = [
       pt: "Token assinado HMAC e matriz SVG 21x21 ou 29x29, sem internet.",
     },
   },
+  {
+    slug: "gym-screen",
+    number: 49,
+    icon: "🏟️",
+    profiles: ["court"],
+    name: { es: "Pantalla Gigante de Gimnasio", en: "Gym Giant Screen", pt: "Tela Gigante do Ginásio" },
+    tagline: {
+      es: "Marcador a pantalla completa para leer el partido a 30 metros sin tocar la pantalla.",
+      en: "Full-screen scoreboard to read the match from 30 meters without touching the screen.",
+      pt: "Placar em tela cheia para ler a partida a 30 metros sem tocar na tela.",
+    },
+  },
+  {
+    slug: "fivb-escoresheet",
+    number: 50,
+    icon: "📋",
+    profiles: ["referees", "tournaments"],
+    name: { es: "Planilla FIVB", en: "FIVB Scoresheet", pt: "Planilha FIVB" },
+    tagline: {
+      es: "Acta A4 impresa con sets, cambios, sanciones y firmas.",
+      en: "Printable A4 acta with sets, subs, sanctions and signatures.",
+      pt: "Ata A4 impressa com sets, subs, sancoes e assinaturas.",
+    },
+  },
+  {
+    slug: "video-telestrator",
+    number: 51,
+    icon: "🎬",
+    profiles: ["lab"],
+    name: { es: "Telestrador de Video", en: "Video Telestrator", pt: "Telestrador de Video" },
+    tagline: {
+      es: "Angles, jump height and vectors sobre el video desde tu galeria.",
+      en: "Angles, jump height and vectors over video from your gallery.",
+      pt: "Angulos, altura do salto e vetores sobre o video da sua galeria.",
+    },
+  },
+  {
+    slug: "playbook-animator",
+    number: 52,
+    icon: "🏀",
+    profiles: ["lab"],
+    name: { es: "Animador de Jugadas", en: "Playbook Animator", pt: "Animador de Jogadas" },
+    tagline: {
+      es: "Secuencias en 3 fases: saque, transicion y ataque.",
+      en: "Sequences in 3 phases: serve, transition and attack.",
+      pt: "Sequencias em 3 fases: saque, transicao e ataque.",
+    },
+  },
 ];
 
 export const MODULE_BY_SLUG = new Map(MODULES.map((module) => [module.slug, module]));
