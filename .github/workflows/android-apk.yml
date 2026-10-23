@@ -169,10 +169,10 @@ jobs:
             echo "$APK Next.js chunks: $chunks"
             test "$chunks" -ge 5
           done
-          cmp -s voleyos-universal.apk voleyos-creator-unlocked.apk && {
+          if cmp -s voleyos-universal.apk voleyos-creator-unlocked.apk; then
             echo "::error::Creator APK is identical to the public APK; the DEV_UNLOCK build flag did not change the bundle."
             exit 1
-          }
+          fi
 
       - name: Upload public APK artifact
         uses: actions/upload-artifact@v4
