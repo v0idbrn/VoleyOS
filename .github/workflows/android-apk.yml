@@ -185,13 +185,13 @@ jobs:
               test "$fingerprint" = "d11a1e87ee86f9046bd150188222c44f20afefea5e9668be6511c6f81501acb2"
             fi
             # Android 14+ REQUIRES V2 (APK Signing Block v2) in addition to V1.
-            # apksigner verify --verbose prints "V2: true" when V2 signing is present.
-            v2=$("$APKSIGNER" verify --verbose "$APK" 2>&1 | grep -ciE "v2: true|v2 signing" || true)
+            # apksigner verify --verbose prints "Verified using v2 scheme...: true"
+            v2=$("$APKSIGNER" verify --verbose "$APK" 2>&1 | grep -ciE "v2 scheme.*: true" || true)
             echo "$APK V2 signing lines: $v2"
             if [ "$v2" -lt 1 ]; then
               echo "::warning::$APK lacks V2 signing block; re-signing with V1+V2+V3 via apksigner"
               "$APKSIGNER" sign --ks "$KEYSTORE" --ks-key-alias "$KEYALIAS" \
-                --store-pass "$KEYPASS" --key-pass "$KEYPASS" \
+                --ks-pass "pass:$KEYPASS" --key-pass "pass:$KEYPASS" \
                 --v1-signing-enabled true --v2-signing-enabled true \
                 "$APK"
               # Re-verify after re-sign
