@@ -173,9 +173,8 @@ jobs:
             if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
               test "$fingerprint" = "d11a1e87ee86f9046bd150188222c44f20afefea5e9668be6511c6f81501acb2"
             fi
-            unzip -Z1 "$APK" | grep -q "^assets/public/index.html$"
-            unzip -Z1 "$APK" | grep -q "^assets/public/es/index.html$"
-            chunks=$(unzip -Z1 "$APK" | grep -cE "^assets/public/_next/static/chunks/.+[.]js$")
+            unzip -Z1 "$APK" | grep -q "^assets/index.html$"
+            chunks=$(unzip -Z1 "$APK" | grep -cE "^assets/_next/static/chunks/.+[.]js$")
             echo "$APK Next.js chunks: $chunks"
             test "$chunks" -ge 5
           done
