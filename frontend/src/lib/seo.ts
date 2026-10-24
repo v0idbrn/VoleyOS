@@ -17,9 +17,9 @@ export const SECTION_LABELS: Record<SeoSection, Record<Locale, string>> = {
 
 export const SECTION_INTROS: Record<SeoSection, Record<Locale, string>> = {
   modules: {
-    es: "Cuarenta y ocho estaciones offline que cubren cancha, cuerpo técnico, arbitraje, tribuna y transmisión. Todas funcionan sin internet y sin cuentas.",
-    en: "Forty-eight offline stations covering the court, coaching staff, refereeing, fans and streaming. All work without internet or accounts.",
-    pt: "Quarenta e oito estações offline que cobrem quadra, comissão técnica, arbitragem, torcida e transmissão. Todas funcionam sem internet e sem contas.",
+    es: "Sesenta estaciones offline que cubren cancha, cuerpo técnico, arbitraje, tribuna y transmisión. Todas funcionan sin internet y sin cuentas.",
+    en: "Sixty offline stations covering the court, coaching staff, refereeing, fans and streaming. All work without internet or accounts.",
+    pt: "Sessenta estações offline que cobrem quadra, comissão técnica, arbitragem, torcida e transmissão. Todas funcionam sem internet e sem contas.",
   },
   positions: {
     es: "Roles, zonas y responsabilidades de cada posición del vóley indoor, con métricas que podés medir en VolleyOS.",
@@ -293,7 +293,8 @@ const MODULE_FACTS: Record<string, LArr> = {
     ["Firma el payload canonico con HMAC-SHA256.", "Genera matrices SVG de 21x21 o 29x29.", "Sincroniza partido, rotacion o jugador sin internet."],
     ["Signs canonical JSON payloads with HMAC-SHA256.", "Generates 21x21 or 29x29 SVG matrices.", "Syncs match, rotation or player data without internet."],
     ["Assina payloads JSON canonicos com HMAC-SHA256.", "Gera matrizes SVG de 21x21 ou 29x29.", "Sincroniza partida, rotacao ou jogador sem internet."],
-  ),  "gym-screen": la(
+  ),
+  "gym-screen": la(
     ["Marcador gigante en horizontal con numeros legibles a 30 metros.", "Muestra sets, sets anteriores, saque y cronometro del partido.", "Abre en pantalla completa y respeta el bloqueo de rotacion del telefono."],
     ["Giant landscape scoreboard readable from 30 metres.", "Shows sets, previous sets, server and match timer.", "Opens full screen and respects the phone rotation lock."],
     ["Placar gigante em paisagem legivel a 30 metros.", "Mostra sets, sets anteriores, saque e cronometro da partida.", "Abre em tela cheia e respeita o bloqueio de rotacao do celular."],
@@ -312,7 +313,8 @@ const MODULE_FACTS: Record<string, LArr> = {
     ["Anima saque, transicao e ataque en tres fases.", "Usa la plantilla activa y las seis zonas del campo.", "Exporta la secuencia como SVG para la pizarra."],
     ["Animates serve, transition and attack in three phases.", "Uses the active roster and the six court zones.", "Exports the sequence as SVG for the chalkboard."],
     ["Anima saque, transicao e ataque em tres fases.", "Usa o elenco ativo e as seis zonas da quadra.", "Exporta a sequencia como SVG para o quadro."],
-  ),  "player-career": la(
+  ),
+  "player-career": la(
     ["Deltas de salto, alcance, saque, ataque y recepcion.", "Indice 0-100 con 70% absoluto y 30% progreso.", "Detecta el cuello de botella y la brecha a la proxima categoria."],
     ["Deltas for jump, reach, serve, attack and reception.", "0-100 index with 70% absolute and 30% progress.", "Finds the bottleneck and the gap to the next category."],
     ["Deltas de salto, alcance, saque, ataque e recepcao.", "Indice 0-100 com 70% absoluto e 30% progresso.", "Detecta o gargalo e a distancia para a proxima categoria."],

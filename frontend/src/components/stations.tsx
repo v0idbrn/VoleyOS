@@ -68,14 +68,21 @@ import {
   analyzeTelestration,
   buildAdaptiveRulebook,
   buildArenaCue,
+  buildBracket,
   buildClipPlan,
+  buildHeadToHead,
   buildPlaybookAnimation,
   buildShotHeatmap,
   buildQrSync,
   buildRecruitingDossier,
+  buildSponsorDeck,
   buildTreasury,
   calculateElo,
+  commandTiebreak,
+  assessPrehab,
+  planMatchNutrition,
   readDeception,
+  scoreReflex,
   translateSlang,
   validateHouseRules,
   type AttackZone,
@@ -2933,7 +2940,7 @@ export function ShotHeatmapStation({ meta, locale, onSave }: StationProps) {
         ))}
       </div>
       <p className="mt-2 text-[11px]">
-        {t(locale, "Zona caliente", "Hot zone", "Zona quente")}: <strong className="text-volt">Z{report.hotZone}</strong> · {report.total} {t(locale, "remates", "shots", "ataques")} · {t(locale, "eficiencia", "efficiency", "eficiencia")} {report.efficiencyPct}%
+        {t(locale, "Zona caliente", "Hot zone", "Zona quente")}: <strong className="text-volt">Z{report.hotZone}</strong> · {report.total} {t(locale, "remates", "shots", "ataques")} · {t(locale, "eficiencia", "efficiency", "eficiência")} {report.efficiencyPct}%
       </p>
       <p className="mt-1 text-[10px] text-white/40">{t(locale, "Tocá una zona para sumar un remate con el resultado elegido.", "Tap a zone to add a shot with the selected result.", "Toque uma zona para somar um ataque com o resultado escolhido.")}</p>
     </StationShell>
@@ -2958,6 +2965,13 @@ export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
         "arena-dj": () => buildArenaCue({ event: "MONSTER_BLOCK" }) as unknown as Record<string, unknown>,
         "court-slang": () => translateSlang({ term: "pipe", origin: "AR" }) as unknown as Record<string, unknown>,
         "qr-sync": () => buildQrSync({ kind: "match", payload: { home: "Tiburones", score_a: 24 }, matrixSize: 21 }) as unknown as Promise<Record<string, unknown>>,
+        "tournament-nutrition": () => planMatchNutrition({ weightKg: 78, matches: 2, minutesPerMatch: 90, tempC: 31, sweatRateLh: 1.1 }) as unknown as Record<string, unknown>,
+        "injury-prehab": () => assessPrehab({ weeklyJumps: 420, weeklySpikes: 260, sleepHours: 6.5, kneePain: 3, shoulderPain: 0, priorInjury: true }) as unknown as Record<string, unknown>,
+        "tiebreak-commander": () => commandTiebreak({ scoreA: 13, scoreB: 12, serving: "A", bestOf: 3, goldenPoint: true }) as unknown as Record<string, unknown>,
+        "bracket-architect": () => buildBracket({ teams: ["Tiburones", "Lobos", "Titanes", "Vinchas", "Piranhas"] }) as unknown as Record<string, unknown>,
+        "sponsor-deck": () => buildSponsorDeck({ impressions: 24000, reach: 8000, cpm: 12, engagementPct: 6, currency: "USD" }) as unknown as Record<string, unknown>,
+        "head-to-head": () => buildHeadToHead({ teamA: "Tiburones", teamB: "Lobos", matches: [{ setsA: 3, setsB: 1 }, { setsA: 2, setsB: 3 }, { setsA: 3, setsB: 0 }] }) as unknown as Record<string, unknown>,
+        "peripheral-reflex": () => scoreReflex({ timesMs: [210, 195, 240, 205, 220] }) as unknown as Record<string, unknown>,
       };
       const preview = previews[meta.slug];
       if (!preview) return;

@@ -1,5 +1,5 @@
 /**
- * Offline-first TypeScript mirror of the 48 VolleyOS Python engines.
+ * Offline-first TypeScript mirror of the 60 VolleyOS Python engines.
  * Runs in the browser with zero network and zero telemetry.
  */
 
@@ -4366,6 +4366,380 @@ export function buildShotHeatmap(input: ShotHeatmapInput): ShotHeatmapReport {
     hotZone,
     cells: counts.map((count, index) => ({ zone: index + 1, count, sharePct: round2((count * 100) / total) })),
     message: `Zona caliente ${hotZone} con ${counts[hotZone - 1]} de ${total} remates.`,
+  };
+}
+
+/* --------------------------------------------------------------- modules 54-60 */
+
+export interface NutritionInput {
+  weightKg: number;
+  matches?: number;
+  minutesPerMatch?: number;
+  tempC?: number;
+  sweatRateLh?: number;
+}
+
+export interface NutritionReport {
+  carbsG: number;
+  fluidMl: number;
+  sodiumMg: number;
+  carbsPerHour: number;
+  fluidPerHourMl: number;
+  heatNote: string;
+  message: string;
+}
+
+export function planMatchNutrition(input: NutritionInput): NutritionReport {
+  if (!(input.weightKg > 0 && input.weightKg <= 200)) throw new Error("weight must be 0-200 kg");
+  const matches = (input.matches ?? 1) | 0;
+  const minutesPerMatch = input.minutesPerMatch ?? 90;
+  const tempC = input.tempC ?? 24;
+  const sweatRateLh = input.sweatRateLh ?? 0.8;
+  if (matches < 1 || matches > 6) throw new Error("matches must be 1-6");
+  if (minutesPerMatch < 10 || minutesPerMatch > 300) throw new Error("minutes must be 10-300");
+  if (!(sweatRateLh > 0 && sweatRateLh <= 3)) throw new Error("sweat rate must be 0-3 L/h");
+  const totalMinutes = minutesPerMatch * matches;
+  const carbsG = round2(input.weightKg * 1.2 * matches);
+  const fluidMl = round2((sweatRateLh * totalMinutes) / 60 * 1000 + 500 * matches);
+  const hours = Math.max(1 / 60, totalMinutes / 60);
+  const heatNote = tempC >= 30 ? "Calor alto: suma 300 ml y electrolitos." : "Clima templado: plan base.";
+  return {
+    carbsG,
+    fluidMl,
+    sodiumMg: round2((fluidMl / 1000) * 500),
+    carbsPerHour: round2(carbsG / hours),
+    fluidPerHourMl: round2(fluidMl / hours),
+    heatNote,
+    message: `${matches} partidos: ${carbsG} g de carbohidratos y ${fluidMl} ml de liquido.`,
+  };
+}
+
+export interface PrehabInput {
+  weeklyJumps: number;
+  weeklySpikes: number;
+  sleepHours: number;
+  kneePain?: number;
+  shoulderPain?: number;
+  priorInjury?: boolean;
+}
+
+export interface PrehabReport {
+  riskScore: number;
+  risk: string;
+  jumpLimit: number;
+  drills: string[];
+  message: string;
+}
+
+export function assessPrehab(input: PrehabInput): PrehabReport {
+  if (input.weeklyJumps < 0 || input.weeklyJumps > 1000) throw new Error("jumps must be 0-1000");
+  if (input.weeklySpikes < 0 || input.weeklySpikes > 1500) throw new Error("spikes must be 0-1500");
+  if (input.sleepHours < 0 || input.sleepHours > 14) throw new Error("sleep must be 0-14 h");
+  const kneePain = input.kneePain ?? 0;
+  const shoulderPain = input.shoulderPain ?? 0;
+  if (kneePain < 0 || kneePain > 10 || shoulderPain < 0 || shoulderPain > 10) throw new Error("pain must be 0-10");
+  let score = 100;
+  if (input.weeklyJumps > 300) score -= Math.min(25, Math.floor((input.weeklyJumps - 300) / 10));
+  if (input.weeklySpikes > 150) score -= Math.min(20, Math.floor((input.weeklySpikes - 150) / 15));
+  if (input.sleepHours < 7) score -= round2((7 - input.sleepHours) * 4);
+  score -= kneePain * 6 + shoulderPain * 6;
+  if (input.priorInjury) score -= 10;
+  score = Math.max(0, Math.min(100, score));
+  const drills = ["Movilidad de tobillo y cadera", "Face pull y rotadores externos"];
+  if (kneePain >= 3) drills.push("Isometrico de cuadriceps y control de aterrizaje");
+  if (shoulderPain >= 3) drills.push("Scapular push-up y sleeper stretch");
+  const risk = score >= 80 ? "BAJO" : score >= 55 ? "MEDIO" : "ALTO";
+  const jumpLimit = Math.max(0, 350 - Math.floor(input.weeklyJumps / 20));
+  return { riskScore: round2(score), risk, jumpLimit, drills, message: `Riesgo ${risk}: score ${round2(score)}/100. Limite sugerido ${jumpLimit} saltos.` };
+}
+
+export interface TiebreakInput {
+  scoreA: number;
+  scoreB: number;
+  serving: Side;
+  bestOf?: 3 | 5;
+  goldenPoint?: boolean;
+}
+
+export interface TiebreakReport {
+  target: number;
+  phase: string;
+  matchPoint: boolean;
+  sideSwitchDue: boolean;
+  recommendation: string;
+  message: string;
+}
+
+export function commandTiebreak(input: TiebreakInput): TiebreakReport {
+  const bestOf = input.bestOf ?? 3;
+  if (bestOf !== 3 && bestOf !== 5) throw new Error("best_of must be 3 or 5");
+  const { scoreA, scoreB, serving } = input;
+  if (scoreA < 0 || scoreA > 99 || scoreB < 0 || scoreB > 99) throw new Error("scores must be 0-99");
+  const tied = scoreA === scoreB;
+  const phase = tied && scoreA >= 14 && (input.goldenPoint ?? false) ? "golden_point" : "normal";
+  const target = 15;
+  const own = serving === "A" ? scoreA : scoreB;
+  const rival = serving === "A" ? scoreB : scoreA;
+  const matchPoint = own >= target - 1 && own > rival;
+  const sideSwitchDue = scoreA + scoreB === 8;
+  const recommendation =
+    phase === "golden_point"
+      ? `Punto de oro: saque agresivo de ${serving} y bloqueo 1-1.`
+      : matchPoint
+        ? `Match point ${serving}: saque al mejor receptor y cobertura lista.`
+        : "Jugar saque seguro, cerrar con pipe y defender la diagonal.";
+  return { target, phase, matchPoint, sideSwitchDue, recommendation, message: `${scoreA}-${scoreB} desde 15, fase ${phase}.` };
+}
+
+export interface BracketInput {
+  teams: string[];
+}
+
+export interface BracketMatch {
+  slot: number;
+  home: string | null;
+  away: string | null;
+  bye: boolean;
+}
+
+export interface BracketReport {
+  bracketSize: number;
+  byes: number;
+  rounds: Array<{ name: string; matches: BracketMatch[] }>;
+  message: string;
+}
+
+export function buildBracket(input: BracketInput): BracketReport {
+  const teams = input.teams.map((team) => team.trim());
+  if (teams.length < 4 || teams.length > 32) throw new Error("brackets need 4 to 32 teams");
+  if (teams.some((team) => team.length === 0)) throw new Error("team names cannot be blank");
+  if (new Set(teams).size !== teams.length) throw new Error("team names must be unique");
+  let size = 4;
+  while (size < teams.length) size *= 2;
+  const byes = size - teams.length;
+  const first: BracketMatch[] = [];
+  for (let index = 0; index < size / 2; index += 1) {
+    const awayIndex = size - 1 - index;
+    const home = index < teams.length ? teams[index]! : null;
+    const away = awayIndex < teams.length ? teams[awayIndex]! : null;
+    first.push({ slot: index + 1, home, away, bye: home === null || away === null });
+  }
+  const rounds: Array<{ name: string; matches: BracketMatch[] }> = [{ name: "R1", matches: first }];
+  let remaining = size / 2;
+  let roundIndex = 2;
+  while (remaining > 1) {
+    const matches: BracketMatch[] = [];
+    for (let slot = 0; slot < remaining / 2; slot += 1) {
+      matches.push({ slot: slot + 1, home: null, away: null, bye: false });
+    }
+    rounds.push({ name: `R${roundIndex}`, matches });
+    remaining /= 2;
+    roundIndex += 1;
+  }
+  return { bracketSize: size, byes, rounds, message: `Llave de ${size} con ${byes} byes y ${rounds.length} rondas.` };
+}
+
+export interface SponsorInput {
+  impressions: number;
+  reach: number;
+  cpm: number;
+  engagementPct?: number;
+  currency?: string;
+}
+
+export interface SponsorReport {
+  value: number;
+  effectiveCpm: number;
+  engagementValue: number;
+  tier: string;
+  message: string;
+}
+
+export function buildSponsorDeck(input: SponsorInput): SponsorReport {
+  if (input.impressions < 0 || input.reach < 0 || input.cpm < 0) throw new Error("values must be non negative");
+  const engagementPct = input.engagementPct ?? 0;
+  if (engagementPct < 0 || engagementPct > 100) throw new Error("engagement must be 0-100%");
+  const value = round2((input.impressions / 1000) * input.cpm);
+  const effectiveCpm = input.reach > 0 ? round2(value / (input.reach / 1000)) : 0;
+  const engagementValue = round2((value * engagementPct) / 100);
+  const tier = value >= 1000 ? "ORO" : value >= 400 ? "PLATA" : "BRONCE";
+  const currency = input.currency ?? "USD";
+  return { value, effectiveCpm, engagementValue, tier, message: `Deck ${tier}: ${currency} ${value} por ${input.impressions} impresiones.` };
+}
+
+export interface HeadToHeadInput {
+  teamA: string;
+  teamB: string;
+  matches: Array<{ setsA: number; setsB: number }>;
+}
+
+export interface HeadToHeadReport {
+  winsA: number;
+  winsB: number;
+  setsA: number;
+  setsB: number;
+  leader: string;
+  streak: string;
+  message: string;
+}
+
+export function buildHeadToHead(input: HeadToHeadInput): HeadToHeadReport {
+  if (input.teamA.trim().length === 0 || input.teamB.trim().length === 0) throw new Error("both team names are required");
+  if (input.matches.length === 0) throw new Error("at least one match is required");
+  for (const match of input.matches) {
+    if (match.setsA < 0 || match.setsA > 5 || match.setsB < 0 || match.setsB > 5) throw new Error("sets must be 0-5");
+  }
+  const winsA = input.matches.filter((match) => match.setsA > match.setsB).length;
+  const winsB = input.matches.filter((match) => match.setsB > match.setsA).length;
+  const setsA = input.matches.reduce((sum, match) => sum + match.setsA, 0);
+  const setsB = input.matches.reduce((sum, match) => sum + match.setsB, 0);
+  const leader = winsA >= winsB ? input.teamA : input.teamB;
+  const last = input.matches[input.matches.length - 1]!;
+  const streakTeam = last.setsA > last.setsB ? input.teamA : input.teamB;
+  let streak = 1;
+  for (let index = input.matches.length - 2; index >= 0; index -= 1) {
+    const match = input.matches[index]!;
+    const winner = match.setsA > match.setsB ? input.teamA : input.teamB;
+    if (winner !== streakTeam) break;
+    streak += 1;
+  }
+  return {
+    winsA,
+    winsB,
+    setsA,
+    setsB,
+    leader,
+    streak: `${streakTeam} x${streak}`,
+    message: `${leader} lidera ${Math.max(winsA, winsB)}-${Math.min(winsA, winsB)} en ${input.matches.length} partidos.`,
+  };
+}
+
+export interface ReflexInput {
+  timesMs: number[];
+}
+
+export interface ReflexReport {
+  meanMs: number;
+  bestMs: number;
+  spreadMs: number;
+  consistencyPct: number;
+  rating: string;
+  message: string;
+}
+
+export function scoreReflex(input: ReflexInput): ReflexReport {
+  if (input.timesMs.length === 0 || input.timesMs.length > 50) throw new Error("1 to 50 reaction times");
+  for (const value of input.timesMs) {
+    if (value < 80 || value > 1200) throw new Error("reaction times must be between 80 and 1200 ms");
+  }
+  const mean = input.timesMs.reduce((sum, value) => sum + value, 0) / input.timesMs.length;
+  const spread = Math.max(...input.timesMs) - Math.min(...input.timesMs);
+  const consistency = Math.max(0, Math.min(100, 100 - (spread * 100) / mean));
+  const rating = mean <= 220 && consistency >= 85 ? "ELITE" : mean <= 280 ? "ALTO" : "MEDIO";
+  return {
+    meanMs: round2(mean),
+    bestMs: Math.min(...input.timesMs),
+    spreadMs: spread,
+    consistencyPct: round2(consistency),
+    rating,
+    message: `${input.timesMs.length} tests: ${round2(mean)} ms y consistencia ${round2(consistency)}%.`,
+  };
+}
+
+export interface WhiteLabelInput {
+  club: string;
+  primary: string;
+  secondary: string;
+  accent: string;
+}
+
+export interface WhiteLabelReport {
+  club: string;
+  cssVars: Record<string, string>;
+  textOnPrimary: string;
+  readable: boolean;
+  message: string;
+}
+
+function hexBrightness(color: string): number {
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) throw new Error("colors must be #rrggbb");
+  const red = parseInt(color.slice(1, 3), 16);
+  const green = parseInt(color.slice(3, 5), 16);
+  const blue = parseInt(color.slice(5, 7), 16);
+  return (red * 299 + green * 587 + blue * 114) / 1000;
+}
+
+export function buildWhiteLabel(input: WhiteLabelInput): WhiteLabelReport {
+  const club = input.club.trim();
+  if (club.length < 2 || club.length > 40) throw new Error("club name must be 2-40 characters");
+  for (const color of [input.primary, input.secondary, input.accent]) {
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) throw new Error("colors must be #rrggbb");
+  }
+  const brightness = hexBrightness(input.primary);
+  const textOnPrimary = brightness >= 140 ? "#070709" : "#f7f6f4";
+  const readable = brightness >= 140 || brightness <= 80;
+  const quality = readable ? "valido" : "ajustable";
+  return {
+    club,
+    cssVars: {
+      "--club-primary": input.primary,
+      "--club-secondary": input.secondary,
+      "--club-accent": input.accent,
+      "--club-text": textOnPrimary,
+    },
+    textOnPrimary,
+    readable,
+    message: `Tema de ${club} listo con contraste ${quality}.`,
+  };
+}
+
+export interface GymScreenPayload {
+  title?: string;
+  scoreA?: number;
+  scoreB?: number;
+  setA?: number;
+  setB?: number;
+  serving?: Side;
+  timer?: string;
+  setter?: string;
+}
+
+export interface GymScreenPayloadReport {
+  title: string;
+  scoreA: number;
+  scoreB: number;
+  setA: number;
+  setB: number;
+  serving: Side;
+  timer: string;
+  setter: string;
+  fullScreen: boolean;
+  message: string;
+}
+
+export function buildGymScreenPayload(input: GymScreenPayload): GymScreenPayloadReport {
+  const title = input.title ?? "Gym Scoreboard";
+  const scoreA = input.scoreA ?? 0;
+  const scoreB = input.scoreB ?? 0;
+  const setA = input.setA ?? 0;
+  const setB = input.setB ?? 0;
+  const serving = input.serving ?? "A";
+  const timer = input.timer ?? "00:00";
+  const setter = input.setter ?? "";
+  if (scoreA < 0 || scoreA > 99 || scoreB < 0 || scoreB > 99) throw new Error("scores must be 0-99");
+  if (setA < 0 || setA > 3 || setB < 0 || setB > 3) throw new Error("sets must be 0-3");
+  if (timer.split(":").length !== 2) throw new Error("timer must be mm:ss");
+  return {
+    title,
+    scoreA,
+    scoreB,
+    setA,
+    setB,
+    serving,
+    timer,
+    setter,
+    fullScreen: true,
+    message: `${title}: ${scoreA}-${scoreB} set ${setA}-${setB}.`,
   };
 }
 

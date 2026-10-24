@@ -268,13 +268,13 @@ function sheetTable(sheet: SheetSpec): string {
 
 const DEFAULT_PRINT_COPY = {
   print: "Imprimir / Guardar PDF",
-  footer: "48 motores locales · 0 telemetría · Sello SHA-256 sobre el contenido del reporte.",
+  footer:  "60 motores locales · 0 telemetría · Sello SHA-256 sobre el contenido del reporte.",
 };
 
 const PRINT_COPY: Record<string, typeof DEFAULT_PRINT_COPY> = {
   es: DEFAULT_PRINT_COPY,
-  en: { print: "Print / Save as PDF", footer: "48 local engines · 0 telemetry · SHA-256 seal over the report content." },
-  pt: { print: "Imprimir / Salvar PDF", footer: "48 motores locais · 0 telemetria · Selo SHA-256 sobre o conteúdo do relatório." },
+  en: { print: "Print / Save as PDF", footer:  "60 local engines · 0 telemetry · SHA-256 seal over the report content." },
+  pt: { print: "Imprimir / Salvar PDF", footer:  "60 motores locais · 0 telemetria · Selo SHA-256 sobre o conteúdo do relatório." },
 };
 
 /** Printable A4 report with a VOS-SEAL derived from every cell. */

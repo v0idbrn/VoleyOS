@@ -12,9 +12,9 @@ from app.security import SecurityShieldMiddleware
 
 app = FastAPI(
     title="VolleyOS Global API",
-    version="7.0.0",
+    version="8.0.0",
     description=(
-        "48 volleyball engines: biomechanics, rotations, scouting, scoreboards, "
+        "60 volleyball engines: biomechanics, rotations, scouting, scoreboards, "
         "tournaments, pickup, OBS overlay, pocket VAR, beach, volleycards, tempo, "
         "ACWR, block shadow, seams, setter IQ, lineup slips, integrity seals, "
         "offline capsules, referee cards, substitutions, court split, fan signals, "
@@ -24,7 +24,10 @@ app = FastAPI(
         "play-by-play narration, player career passports, aerodynamics, rally "
         "clipping, recruiting dossiers, system transitions, deception reading, "
         "inclusive adaptive volleyball, ELO ranking, team treasury, house rules, "
-        "arena DJ cues, court slang and air-gapped QR sync. "
+        "arena DJ cues, court slang, air-gapped QR sync, gym screens, FIVB "
+        "scoresheets, offline video telestration, playbook animation, shot heatmaps, "
+        "tournament nutrition, injury prehab, tiebreak command, bracket design, "
+        "sponsor decks, head-to-head history and peripheral reflex tests. "
         "Decimal-only maths, no telemetry."
     ),
     contact={"name": "VolleyOS Global", "url": "https://github.com/v0idbrn/VoleyOS"},

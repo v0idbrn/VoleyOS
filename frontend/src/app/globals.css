@@ -26,6 +26,7 @@ body {
   background: var(--obsidian);
 }
 
+:root {
   color-scheme: dark;
   --color-page: #070709;
   --color-surface: #0e0e12;

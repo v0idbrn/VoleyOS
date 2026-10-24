@@ -64,7 +64,7 @@ describe("offline xlsx", () => {
   it("localises the printed chrome", async () => {
     const printable = await buildPrintableReport({ ...report, locale: "en" });
     expect(printable.html).toContain("Print / Save as PDF");
-    expect(printable.html).toContain("48 local engines");
+    expect(printable.html).toContain("60 local engines");
     expect(printable.html).not.toContain("Guardar PDF");
   });
 

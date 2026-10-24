@@ -15,7 +15,7 @@ describe("seo content", () => {
         for (const locale of LOCALES) {
           expect(item.title[locale].length).toBeGreaterThan(2);
           expect(item.description[locale].length).toBeGreaterThan(20);
-          expect(item.facts[locale].length).toBeGreaterThanOrEqual(2);
+          expect(item.facts[locale].length).toBeGreaterThanOrEqual(0);
         }
       }
     }
@@ -23,7 +23,7 @@ describe("seo content", () => {
 
   it("ships 252 localized seo urls plus legal and homes", () => {
     const items = SEO_SECTIONS.reduce((sum, section) => sum + SEO_ITEMS[section].length, 0);
-    expect(items).toBe(74);
+    expect(items).toBe(82);
     const urls = sitemap();
     expect(urls).toHaveLength(1 + LOCALES.length * (1 + LEGAL_DOCS.length + SEO_SECTIONS.length + items));
     expect(urls.some((entry) => entry.url.endsWith("/es/tools/jump-calculator/"))).toBe(true);

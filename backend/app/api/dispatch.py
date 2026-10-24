@@ -16,16 +16,28 @@ from app.services.beach_engine import award_point as beach_point
 from app.services.biomechanics import PoseSequence, analyze_sequence
 from app.services.block_shadow import BlockShadowRequest, compute_block_shadow
 from app.services.blockout_lab import BlockoutRequest, evaluate_blockout
+from app.services.bracket_architect import BracketRequest
+from app.services.bracket_architect import analyze as build_bracket
 from app.services.capsule_io import CapsuleRequest, run_capsule
 from app.services.captain_draft import DraftRequest, snake_draft
+from app.services.club_white_label import WhiteLabelRequest
+from app.services.club_white_label import analyze as build_white_label
 from app.services.court_slang import SlangRequest, translate_slang
 from app.services.court_split import CourtSplitRequest, split_costs
 from app.services.deception_reader import DeceptionRequest, read_deception
 from app.services.elo_ranking import EloRequest, calculate_elo
 from app.services.equipment_inspector import EquipmentRequest, inspect_equipment
 from app.services.fan_companion import FanRequest, fan_report
+from app.services.fivb_escoresheet import ScoresheetRequest
+from app.services.fivb_escoresheet import analyze as build_scoresheet
+from app.services.gym_screen import GymScreenRequest
+from app.services.gym_screen import analyze as build_gym_screen
+from app.services.head_to_head import H2HRequest
+from app.services.head_to_head import analyze as build_head_to_head
 from app.services.house_rules import HouseRulesRequest, validate_house_rules
 from app.services.inclusive_adaptive import AdaptiveRequest, build_adaptive_rulebook
+from app.services.injury_prehab import PrehabRequest
+from app.services.injury_prehab import analyze as assess_prehab
 from app.services.integrity_seal import (
     SealRequest,
     VerifySealRequest,
@@ -39,6 +51,8 @@ from app.services.matchup_matrix import MatchupRequest, build_matchup_matrix
 from app.services.momentum_coach import MomentumRequest, analyze_momentum
 from app.services.mvp_awards import MvpRequest, award_mvp
 from app.services.obs_overlay import build_overlay
+from app.services.peripheral_reflex import ReflexRequest
+from app.services.peripheral_reflex import analyze as score_reflex
 from app.services.pickup_balancer import (
     PickupPlayer,
     balance_teams,
@@ -46,6 +60,8 @@ from app.services.pickup_balancer import (
     next_challenger,
 )
 from app.services.play_by_play import PlayByPlayRequest, build_play_by_play
+from app.services.playbook_animator import PlaybookRequest
+from app.services.playbook_animator import analyze as animate_playbook
 from app.services.player_career import CareerRequest, build_career_report
 from app.services.pocket_var import analyze_play, toss_coin, whistle
 from app.services.practice_planner import PracticeRequest, plan_practice
@@ -80,9 +96,15 @@ from app.services.seam_radar import SeamRadarRequest, compute_seam
 from app.services.serve_radar import ServeRadarRequest, analyze_serve
 from app.services.setter_iq import SetterIQRequest, compute_setter_iq
 from app.services.setter_signals import SetterSignalRequest, build_signal_sheet
+from app.services.shot_heatmap import ShotRequest
+from app.services.shot_heatmap import analyze as build_shot_heatmap
+from app.services.sponsor_deck import SponsorRequest
+from app.services.sponsor_deck import analyze as build_sponsor_deck
 from app.services.substitution_tracker import SubstitutionRequest, track_substitutions
 from app.services.system_transition import SystemRequest, analyze_system
 from app.services.team_treasury import TreasuryRequest, build_treasury
+from app.services.tiebreak_commander import TiebreakRequest
+from app.services.tiebreak_commander import analyze as command_tiebreak
 from app.services.timeout_chalkboard import ChalkboardRequest, build_chalkboard
 from app.services.tournament_engine import (
     MatchResult,
@@ -91,6 +113,10 @@ from app.services.tournament_engine import (
     schedule,
     standings,
 )
+from app.services.tournament_nutrition import NutritionRequest
+from app.services.tournament_nutrition import analyze as plan_nutrition
+from app.services.video_telestrator import TelestrationRequest
+from app.services.video_telestrator import analyze as telestrate
 from app.services.volleycard_generator import VolleyCardRequest, build_volleycard
 
 
@@ -492,6 +518,102 @@ MODULES: tuple[ModuleInfo, ...] = (
         profiles=["referees"],
         description="Token firmado HMAC y matriz SVG 21x21/29x29 sin internet.",
     ),
+    ModuleInfo(
+        slug="gym-screen",
+        name="Pantalla Gigante de Gimnasio",
+        name_en="Gym Giant Screen",
+        profile="court",
+        profiles=["court"],
+        description="Marcador horizontal a pantalla completa legible a 30 metros.",
+    ),
+    ModuleInfo(
+        slug="fivb-escoresheet",
+        name="Planilla FIVB",
+        name_en="FIVB Scoresheet",
+        profile="referees",
+        profiles=["referees"],
+        description="Acta A4 con sets, cambios, sanciones y ganador.",
+    ),
+    ModuleInfo(
+        slug="video-telestrator",
+        name="Telestrador de Video Offline",
+        name_en="Offline Video Telestrator",
+        profile="players",
+        profiles=["players"],
+        description="Trazos, angulos y altura de salto sin subir el video.",
+    ),
+    ModuleInfo(
+        slug="playbook-animator",
+        name="Animador de Jugadas en 3 Fases",
+        name_en="Three-Phase Playbook Animator",
+        profile="players",
+        profiles=["players"],
+        description="Saque, transicion y ataque con vectores por jugador.",
+    ),
+    ModuleInfo(
+        slug="shot-heatmap",
+        name="Mapa de Calor de Remates",
+        name_en="Shot Heatmap",
+        profile="tournaments",
+        profiles=["tournaments"],
+        description="Nueve zonas, zona caliente y eficiencia de ataque.",
+    ),
+    ModuleInfo(
+        slug="tournament-nutrition",
+        name="Nutricion de Torneo",
+        name_en="Tournament Nutrition",
+        profile="coaches",
+        profiles=["coaches"],
+        description="Carbohidratos, liquido y sodio por partido y clima.",
+    ),
+    ModuleInfo(
+        slug="injury-prehab",
+        name="Prehab de Hombro y Rodilla",
+        name_en="Shoulder & Knee Prehab",
+        profile="coaches",
+        profiles=["coaches"],
+        description="Riesgo por carga, sueno y dolor con drills preventivos.",
+    ),
+    ModuleInfo(
+        slug="tiebreak-commander",
+        name="Comandante de Tie-Break",
+        name_en="Tiebreak Commander",
+        profile="referees",
+        profiles=["referees"],
+        description="Punto de oro, cambio de lado y decision a 14-14.",
+    ),
+    ModuleInfo(
+        slug="bracket-architect",
+        name="Arquitecto de Llaves",
+        name_en="Bracket Architect",
+        profile="tournaments",
+        profiles=["tournaments"],
+        description="Llave sembrada por ranking con byes y rondas.",
+    ),
+    ModuleInfo(
+        slug="sponsor-deck",
+        name="Deck de Sponsors",
+        name_en="Sponsor Deck",
+        profile="fans",
+        profiles=["fans"],
+        description="Valor por impresiones, alcance y engagement.",
+    ),
+    ModuleInfo(
+        slug="head-to-head",
+        name="Cara a Cara",
+        name_en="Head to Head",
+        profile="fans",
+        profiles=["fans"],
+        description="Historial, racha y dominio por sets entre equipos.",
+    ),
+    ModuleInfo(
+        slug="peripheral-reflex",
+        name="Reflejo Periferico",
+        name_en="Peripheral Reflex",
+        profile="court",
+        profiles=["court"],
+        description="Tiempos de reaccion, consistencia y rating.",
+    ),
 )
 
 
@@ -856,6 +978,58 @@ def _run_qr_sync(payload: dict[str, Any]) -> dict[str, Any]:
     return _dump(build_qr_sync(QrSyncRequest.model_validate(payload)))
 
 
+def _run_gym_screen(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_gym_screen(GymScreenRequest.model_validate(payload)))
+
+
+def _run_scoresheet(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_scoresheet(ScoresheetRequest.model_validate(payload)))
+
+
+def _run_telestrator(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(telestrate(TelestrationRequest.model_validate(payload)))
+
+
+def _run_playbook(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(animate_playbook(PlaybookRequest.model_validate(payload)))
+
+
+def _run_shot_heatmap(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_shot_heatmap(ShotRequest.model_validate(payload)))
+
+
+def _run_nutrition(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(plan_nutrition(NutritionRequest.model_validate(payload)))
+
+
+def _run_prehab(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(assess_prehab(PrehabRequest.model_validate(payload)))
+
+
+def _run_tiebreak(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(command_tiebreak(TiebreakRequest.model_validate(payload)))
+
+
+def _run_bracket(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_bracket(BracketRequest.model_validate(payload)))
+
+
+def _run_sponsor(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_sponsor_deck(SponsorRequest.model_validate(payload)))
+
+
+def _run_head_to_head(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_head_to_head(H2HRequest.model_validate(payload)))
+
+
+def _run_reflex(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(score_reflex(ReflexRequest.model_validate(payload)))
+
+
+def _run_white_label(payload: dict[str, Any]) -> dict[str, Any]:
+    return _dump(build_white_label(WhiteLabelRequest.model_validate(payload)))
+
+
 RUNNERS = {
     "biomechanics": _run_biomechanics,
     "rotation": _run_rotation,
@@ -905,6 +1079,18 @@ RUNNERS = {
     "arena-dj": _run_arena_dj,
     "court-slang": _run_court_slang,
     "qr-sync": _run_qr_sync,
+    "gym-screen": _run_gym_screen,
+    "fivb-escoresheet": _run_scoresheet,
+    "video-telestrator": _run_telestrator,
+    "playbook-animator": _run_playbook,
+    "shot-heatmap": _run_shot_heatmap,
+    "tournament-nutrition": _run_nutrition,
+    "injury-prehab": _run_prehab,
+    "tiebreak-commander": _run_tiebreak,
+    "bracket-architect": _run_bracket,
+    "sponsor-deck": _run_sponsor,
+    "head-to-head": _run_head_to_head,
+    "peripheral-reflex": _run_reflex,
 }
 
 

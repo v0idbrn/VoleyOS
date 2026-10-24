@@ -178,6 +178,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     board: TAB_GROUP.board[0] ?? "",
     lab: TAB_GROUP.lab[0] ?? "",
   });
+  const [teamColor, setTeamColor] = useState<string>("#eab308");
   const [profile, setProfile] = useState<Profile | "all">("all");
   const [favOnly, setFavOnly] = useState(false);
   const [query, setQuery] = useState("");
@@ -384,7 +385,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const shareWhatsApp = async (slug: string): Promise<void> => {
     const meta = MODULE_BY_SLUG.get(slug);
     if (!meta) return;
-    const text = `${meta.icon} ${meta.name[locale]} — VolleyOS\n${meta.tagline[locale]}\n${t(locale, "48 módulos offline en tu cancha.", "48 offline modules on your court.", "48 módulos offline na sua quadra.")}`;
+    const text = `${meta.icon} ${meta.name[locale]} — VolleyOS\n${meta.tagline[locale]}\n${t(locale, "60 módulos offline en tu cancha.", "60 offline modules on your court.", "60 módulos offline na sua quadra.")}`;
     try {
       await navigator.clipboard.writeText(text);
       setToast(shell.copied);
@@ -747,7 +748,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                     <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
                       {favOnly ? shell.favorites : shell.allModules}
                     </h2>
-                    <span className="text-[10px] font-bold text-emerald">{visible.length}/48</span>
+                    <span className="text-[10px] font-bold text-emerald">{visible.length}/{MODULES.length}</span>
                   </div>
                   {visible.length === 0 ? (
                     <p className="mt-6 rounded-2xl border border-white/10 bg-panel px-4 py-6 text-center text-[12px] text-white/50">
@@ -790,7 +791,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 </section>
 
                 <p className="mt-6 text-center text-[9px] uppercase tracking-[0.18em] text-white/25">
-                  {t(locale, "48 motores locales · 0 telemetría · AGPL-3.0", "48 local engines · 0 telemetry · AGPL-3.0", "48 motores locais · 0 telemetria · AGPL-3.0")}
+                  {t(locale, "60 motores locales · 0 telemetría · AGPL-3.0", "60 local engines · 0 telemetry · AGPL-3.0", "60 motores locais · 0 telemetria · AGPL-3.0")}
                 </p>
               </div>
             ) : null}

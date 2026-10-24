@@ -1,7 +1,7 @@
 /**
  * Engine output localisation.
  *
- * The 48 engines return diagnostic prose in Spanish (their canonical language).
+ * The 60 engines return diagnostic prose in Spanish (their canonical language).
  * StationShell renders that prose through this translator, so an EN/PT user
  * reads authentic court language instead of Spanish leftovers. Structured
  * codes, numbers and team names pass through untouched.

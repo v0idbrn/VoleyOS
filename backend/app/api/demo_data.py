@@ -58,6 +58,18 @@ MODULE_SLUGS = (
     "arena-dj",
     "court-slang",
     "qr-sync",
+    "gym-screen",
+    "fivb-escoresheet",
+    "video-telestrator",
+    "playbook-animator",
+    "shot-heatmap",
+    "tournament-nutrition",
+    "injury-prehab",
+    "tiebreak-commander",
+    "bracket-architect",
+    "sponsor-deck",
+    "head-to-head",
+    "peripheral-reflex",
 )
 
 
@@ -1026,6 +1038,171 @@ def qr_sync_demo() -> dict[str, Any]:
     }
 
 
+def gym_screen_demo() -> dict[str, Any]:
+    return {
+        "title": "Final Liga Metropolitana",
+        "score_a": 22,
+        "score_b": 20,
+        "set_a": 1,
+        "set_b": 1,
+        "serving": "A",
+        "timer": "00:42",
+        "setter": "Sofia",
+    }
+
+
+def fivb_escoresheet_demo() -> dict[str, Any]:
+    return {
+        "match_no": "M-104",
+        "team_a": "Tiburones",
+        "team_b": "Condores",
+        "sets": [{"a": 25, "b": 21}, {"a": 23, "b": 25}, {"a": 15, "b": 12}],
+        "substitutions": 5,
+        "sanctions": 1,
+    }
+
+
+def video_telestrator_demo() -> dict[str, Any]:
+    return {
+        "frame_width": "1920",
+        "frame_height": "1080",
+        "scale_cm_per_px": "0.5",
+        "strokes": [
+            {
+                "points": [
+                    {"x": "100", "y": "900"},
+                    {"x": "420", "y": "640"},
+                    {"x": "760", "y": "300"},
+                ]
+            },
+            {"points": [{"x": "760", "y": "300"}, {"x": "1180", "y": "520"}]},
+        ],
+        "takeoff": {"x": "700", "y": "900"},
+        "apex": {"x": "700", "y": "540"},
+    }
+
+
+def playbook_animator_demo() -> dict[str, Any]:
+    return {
+        "phases": [
+            {
+                "phase": "serve",
+                "duration_ms": 1200,
+                "target_zone": 1,
+                "players": [
+                    {"number": 7, "x": "50", "y": "90"},
+                    {"number": 11, "x": "30", "y": "70"},
+                ],
+            },
+            {
+                "phase": "transition",
+                "duration_ms": 1800,
+                "target_zone": 5,
+                "players": [
+                    {"number": 7, "x": "45", "y": "80"},
+                    {"number": 11, "x": "35", "y": "55"},
+                ],
+            },
+            {
+                "phase": "attack",
+                "duration_ms": 1000,
+                "target_zone": 9,
+                "players": [
+                    {"number": 7, "x": "40", "y": "70"},
+                    {"number": 11, "x": "55", "y": "35"},
+                ],
+            },
+        ]
+    }
+
+
+def shot_heatmap_demo() -> dict[str, Any]:
+    return {
+        "shots": [
+            {"x": "18", "y": "18", "result": "kill"},
+            {"x": "48", "y": "20", "result": "kill"},
+            {"x": "52", "y": "15", "result": "kill"},
+            {"x": "82", "y": "22", "result": "blocked"},
+            {"x": "20", "y": "52", "result": "error"},
+            {"x": "55", "y": "55", "result": "kill"},
+            {"x": "86", "y": "48", "result": "kill"},
+            {"x": "22", "y": "86", "result": "in_play"},
+            {"x": "62", "y": "84", "result": "kill"},
+        ]
+    }
+
+
+def tournament_nutrition_demo() -> dict[str, Any]:
+    return {
+        "weight_kg": "72",
+        "matches": 2,
+        "minutes_per_match": 95,
+        "temp_c": "31",
+        "sweat_rate_lh": "1.1",
+    }
+
+
+def injury_prehab_demo() -> dict[str, Any]:
+    return {
+        "weekly_jumps": 380,
+        "weekly_spikes": 210,
+        "sleep_hours": "6.5",
+        "knee_pain": 2,
+        "shoulder_pain": 4,
+        "prior_injury": True,
+    }
+
+
+def tiebreak_commander_demo() -> dict[str, Any]:
+    return {
+        "score_a": 14,
+        "score_b": 14,
+        "serving": "B",
+        "best_of": 5,
+        "golden_point": True,
+    }
+
+
+def bracket_architect_demo() -> dict[str, Any]:
+    return {"teams": ["Tiburones", "Condores", "Panteras", "Halcones", "Lobos", "Aguilas"]}
+
+
+def sponsor_deck_demo() -> dict[str, Any]:
+    return {
+        "impressions": 48000,
+        "reach": 26000,
+        "cpm": "7.5",
+        "engagement_pct": "4.2",
+        "currency": "USD",
+    }
+
+
+def head_to_head_demo() -> dict[str, Any]:
+    return {
+        "team_a": "Tiburones",
+        "team_b": "Condores",
+        "matches": [
+            {"sets_a": 3, "sets_b": 1},
+            {"sets_a": 2, "sets_b": 3},
+            {"sets_a": 3, "sets_b": 0},
+            {"sets_a": 3, "sets_b": 2},
+        ],
+    }
+
+
+def peripheral_reflex_demo() -> dict[str, Any]:
+    return {"times_ms": [212, 198, 225, 240, 205, 219, 231, 208]}
+
+
+def club_white_label_demo() -> dict[str, Any]:
+    return {
+        "club": "Tiburones Voley",
+        "primary": "#0f766e",
+        "secondary": "#111827",
+        "accent": "#f59e0b",
+    }
+
+
 DEMOS = {
     "biomechanics": biomechanics_demo,
     "rotation": rotation_demo,
@@ -1075,4 +1252,16 @@ DEMOS = {
     "arena-dj": arena_dj_demo,
     "court-slang": court_slang_demo,
     "qr-sync": qr_sync_demo,
+    "gym-screen": gym_screen_demo,
+    "fivb-escoresheet": fivb_escoresheet_demo,
+    "video-telestrator": video_telestrator_demo,
+    "playbook-animator": playbook_animator_demo,
+    "shot-heatmap": shot_heatmap_demo,
+    "tournament-nutrition": tournament_nutrition_demo,
+    "injury-prehab": injury_prehab_demo,
+    "tiebreak-commander": tiebreak_commander_demo,
+    "bracket-architect": bracket_architect_demo,
+    "sponsor-deck": sponsor_deck_demo,
+    "head-to-head": head_to_head_demo,
+    "peripheral-reflex": peripheral_reflex_demo,
 }

@@ -23,7 +23,7 @@ interface Copy {
 
 export const COPY: Record<Locale, Copy> = {
   es: {
-    heroKicker: "48 módulos · 3 idiomas · 0 telemetría",
+    heroKicker: "60 módulos · 3 idiomas · 0 telemetría",
     heroTitle: "El sistema operativo del vóley",
     heroSubtitle:
       "Biomecánica, táctica, arbitraje, torneos y streaming en una sola app. Corre sin señal en el gimnasio y sincroniza cuando vuelve el WiFi.",
@@ -38,7 +38,7 @@ export const COPY: Record<Locale, Copy> = {
     cloudPro: "Cloud Pro",
   },
   en: {
-    heroKicker: "48 modules · 3 languages · 0 telemetry",
+    heroKicker: "60 modules · 3 languages · 0 telemetry",
     heroTitle: "The operating system for volleyball",
     heroSubtitle:
       "Biomechanics, tactics, officiating, tournaments and streaming in one app. Runs without signal in the gym and syncs when the WiFi is back.",
@@ -53,7 +53,7 @@ export const COPY: Record<Locale, Copy> = {
     cloudPro: "Cloud Pro",
   },
   pt: {
-    heroKicker: "48 módulos · 3 idiomas · 0 telemetria",
+    heroKicker: "60 módulos · 3 idiomas · 0 telemetria",
     heroTitle: "O sistema operacional do vôlei",
     heroSubtitle:
       "Biomecânica, tática, arbitragem, torneios e streaming em um só app. Roda sem sinal no ginásio e sincroniza quando o Wi-Fi volta.",
@@ -153,7 +153,7 @@ export const SHELL: Record<Locale, ShellCopy> = {
     favorites: "Mis favoritos",
     recents: "Usados recientemente",
     allModules: "Todos los módulos",
-    local: "48 Local",
+    local: "60 Local",
     pro: "Pro",
     whistle: "Silbato rápido",
     sun: "Modo Sol",
@@ -224,7 +224,7 @@ export const SHELL: Record<Locale, ShellCopy> = {
     favorites: "My favorites",
     recents: "Recently used",
     allModules: "All modules",
-    local: "48 Local",
+    local: "60 Local",
     pro: "Pro",
     whistle: "Quick whistle",
     sun: "Sun mode",
@@ -294,7 +294,7 @@ export const SHELL: Record<Locale, ShellCopy> = {
     favorites: "Meus favoritos",
     recents: "Usados recentemente",
     allModules: "Todos os módulos",
-    local: "48 Local",
+    local: "60 Local",
     pro: "Pro",
     whistle: "Apito rápido",
     sun: "Modo Sol",
