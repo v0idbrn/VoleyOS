@@ -1,0 +1,8 @@
+Versi�n v9.0.9 "EDICI�N TITAN — UI RESTAURADA".
+- Interfaz restaurada a la versi�n v7.1.0: desplazamiento, tarjetas, navegaci�n de 5 pesta�as y rejilla de m�dulos funcionando sin problemas.
+- Cat�logo expandido a 60 m�dulos sin conexi�n: planilla FIVB, telestrador de video, animador de jugadas, mapa de calor, nutrici�n de torneo, prehab de lesiones, comandante de tie-break, arquitecto de llaves, deck de sponsors, cara a cara y reflejo perif�rico.
+- Barra de filtros horizontales sobre la rejilla: Todos / Novato / Avanzado / Árbitro / DT / Torneos.
+- Guía de m�dulo colapsable (¿Para qué sirve y c�mo se usa?) dentro de cada vista.
+- Cancha: Picadito a 15 pts, Rey de la Cancha, Oficial Bo3/Bo5 con deuce 24-24, botón de cambio de cancha, seleccionador de plantilla y sonidos WebAudio de estudio.
+- Licencia VOS-PRO vinculada al dispositivo (huella ANDROID_ID), precios en ARS/USD/EUR/BRL, alias de Mercado Pago y checkout de Ko-fi.
+- Consola keygen de creador y recibo por WhatsApp con ID del dispositivo y plan.

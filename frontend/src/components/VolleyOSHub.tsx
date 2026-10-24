@@ -7,15 +7,14 @@ import { buildTarget, paywallEnabled, type Locale, type Profile } from "@/lib/lo
 import { clearCreatorUnlock, creatorUnlocked, matchesCreatorKey, persistCreatorToken } from "@/lib/creator-unlock";
 import { clearLicenseToken, unlockCreatorOnServer } from "@/lib/api-client";
 import { MODULES, MODULE_BY_SLUG, PROFILE_LABELS } from "@/lib/modules";
-import { DIFFICULTY_BADGES, GUIDED_MODES, GUIDED_MODE_BY_ID, type GuidedModeId } from "@/lib/guided-modes";
-import { ModuleGuideBanner } from "@/components/ModuleGuideBanner";
 import { addVaultEntry, loadVault } from "@/lib/vault";
 import { downloadXlsx, openPrintableReport, type ReportSpec } from "@/lib/offline-xlsx";
 import { announceScoreTTS, requestCourtWakeLock, triggerCourtHaptics } from "@/lib/court-ux";
 import { playWhistle, setCourtAudioEnabled } from "@/lib/court-audio";
 import { EphemeralVaultBar } from "@/components/EphemeralVaultBar";
+import { ModuleGuideBanner } from "@/components/ModuleGuideBanner";
+import { MonetizationModal } from "@/components/MonetizationModal";
 import { STATIONS } from "@/components/stations";
-import { GymScreenModule } from "@/components/GymScreenModule";
 
 const FILTERS: Array<Profile | "all"> = ["all", "players", "coaches", "court", "referees", "fans", "tournaments"];
 const LOCALES: Locale[] = ["es", "en", "pt"];
@@ -39,7 +38,7 @@ const ROLE_SETUP: Record<string, { profile: Profile; tab: Tab; slugs: string[] }
 type Tab = "home" | "court" | "board" | "lab" | "settings";
 
 const TAB_GROUP: Record<Exclude<Tab, "home" | "settings">, string[]> = {
-  court: ["scoreboard", "beach", "referee-console", "var", "timeout-chalkboard", "substitution-tracker", "gym-screen"],
+  court: ["scoreboard", "beach", "referee-console", "var", "timeout-chalkboard", "substitution-tracker"],
   board: ["rotation", "block-shadow", "seam-radar", "system-transition", "blockout-lab", "matchup-matrix"],
   lab: ["biomechanics", "serve-radar", "ball-aerodynamics", "volleycard", "scouting", "acwr"],
 };
@@ -180,12 +179,10 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     board: TAB_GROUP.board[0] ?? "",
     lab: TAB_GROUP.lab[0] ?? "",
   });
-  const [teamColor, setTeamColor] = useState<string>("#eab308");
   const [profile, setProfile] = useState<Profile | "all">("all");
   const [favOnly, setFavOnly] = useState(false);
-  const [guidedMode, setGuidedMode] = useState<GuidedModeId | null>(null);
-  const [openDrawers, setOpenDrawers] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState("");
+  const [levelFilter, setLevelFilter] = useState<"all" | "novato" | "avanzado" | "arbitro" | "dt" | "torneos">("all");
   const [pinned, setPinned] = useState<string[]>([]);
   const [recent, setRecent] = useState<string[]>([]);
   const [solar, setSolar] = useState(false);
@@ -200,6 +197,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [keyValue, setKeyValue] = useState("");
   const [keyError, setKeyError] = useState(false);
   const [checkout, setCheckout] = useState<Plan | null>(null);
+  const [monetizationOpen, setMonetizationOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const target = buildTarget();
@@ -208,9 +206,18 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
 
   const visible = useMemo(() => {
     const needle = query.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const levelMap: Record<string, Profile | "all"> = {
+      all: "all",
+      novato: "players",
+      avanzado: "coaches",
+      arbitro: "referees",
+      dt: "coaches",
+      torneos: "tournaments",
+    };
+    const activeProfile = levelFilter !== "all" ? (levelMap[levelFilter] ?? "all") : profile;
     return MODULES.filter((module) => {
       if (favOnly && !pinned.includes(module.slug)) return false;
-      if (!favOnly && profile !== "all" && !module.profiles.includes(profile)) return false;
+      if (activeProfile !== "all" && !module.profiles.includes(activeProfile)) return false;
       if (!needle) return true;
       return `${module.name[locale]} ${module.tagline[locale]} ${module.slug}`
         .normalize("NFD")
@@ -218,27 +225,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
         .toLowerCase()
         .includes(needle);
     });
-  }, [locale, profile, query, favOnly, pinned]);
-
-  const chooseMode = (id: GuidedModeId): void => {
-    if (guidedMode === id) {
-      setGuidedMode(null);
-      window.localStorage.removeItem("volleyos.guided");
-      return;
-    }
-    const mode = GUIDED_MODE_BY_ID.get(id);
-    if (!mode) return;
-    setGuidedMode(id);
-    setFavOnly(false);
-    setProfile("all");
-    setOpenDrawers(Object.fromEntries(mode.drawers.map((drawer) => [drawer.id, drawer.openByDefault ?? false])));
-    window.localStorage.setItem("volleyos.guided", id);
-    triggerCourtHaptics(22);
-  };
-
-  const toggleDrawer = (drawerId: string): void => {
-    setOpenDrawers((current) => ({ ...current, [drawerId]: !current[drawerId] }));
-  };
+  }, [locale, profile, query, favOnly, pinned, levelFilter]);
 
   useEffect(() => {
     document.documentElement.classList.add("app-shell");
@@ -252,14 +239,6 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     });
     const storedRole = window.localStorage.getItem(ROLE_KEY);
     if (isProfile(storedRole)) setProfile(storedRole);
-    const storedGuided = window.localStorage.getItem("volleyos.guided");
-    if (storedGuided && GUIDED_MODE_BY_ID.has(storedGuided as GuidedModeId)) {
-      const mode = GUIDED_MODE_BY_ID.get(storedGuided as GuidedModeId);
-      if (mode) {
-        setGuidedMode(mode.id);
-        setOpenDrawers(Object.fromEntries(mode.drawers.map((drawer) => [drawer.id, drawer.openByDefault ?? false])));
-      }
-    }
     setSolar(window.localStorage.getItem(THEME_KEY) === "solar");
     setVoice(window.localStorage.getItem(VOICE_KEY) === "1");
     setCourtAudio(window.localStorage.getItem(AUDIO_KEY) !== "0");
@@ -382,6 +361,16 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     setToast(shell.creatorOff);
   };
 
+  const activateLicense = async (license: string): Promise<void> => {
+    const trimmed = license.trim();
+    await persistCreatorToken(trimmed);
+    void unlockCreatorOnServer(trimmed);
+    setCreator(true);
+    setMonetizationOpen(false);
+    setToast(shell.creatorOn);
+    triggerCourtHaptics([40, 30, 60]);
+  };
+
   const toggleWakeLock = async (): Promise<void> => {
     if (awake) {
       setAwake(false);
@@ -417,7 +406,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const shareWhatsApp = async (slug: string): Promise<void> => {
     const meta = MODULE_BY_SLUG.get(slug);
     if (!meta) return;
-    const text = `${meta.icon} ${meta.name[locale]} — VolleyOS\n${meta.tagline[locale]}\n${t(locale, "60 módulos offline en tu cancha.", "60 offline modules on your court.", "60 módulos offline na sua quadra.")}`;
+    const text = `${meta.icon} ${meta.name[locale]} — VolleyOS\n${meta.tagline[locale]}\n${t(locale, "48 módulos offline en tu cancha.", "48 offline modules on your court.", "48 módulos offline na sua quadra.")}`;
     try {
       await navigator.clipboard.writeText(text);
       setToast(shell.copied);
@@ -652,8 +641,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
           <>
             <div className="h-full overflow-y-auto no-scrollbar px-3 pb-28 pt-3">
               <div className="mx-auto w-full max-w-2xl">
+                <ModuleGuideBanner slug={activeMeta.slug} locale={locale} />
                 {(() => {
-                  if (activeMeta.slug === "gym-screen") return <GymScreenModule locale={locale} onClose={closeModule} />;
                   const Station = STATIONS[activeMeta.slug];
                   return Station ? <Station meta={activeMeta} locale={locale} onSave={handleSave} /> : null;
                 })()}
@@ -710,24 +699,76 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   />
                 </label>
 
-                <div className="snap-row mt-3 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={t(locale, "Modos guiados", "Guided modes", "Modos guiados")}>
-                  {GUIDED_MODES.map((mode) => (
-                    <button
-                      key={mode.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={guidedMode === mode.id}
-                      onClick={() => chooseMode(mode.id)}
-                      className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
-                        guidedMode === mode.id ? "border-crimson bg-crimson text-white" : "border-white/10 text-white/60"
-                      }`}
-                    >
-                      {mode.icon} {mode.label[locale]}
-                    </button>
-                  ))}
+                <div className="snap-row mt-3 flex gap-1 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={t(locale, "Nivel", "Level", "Nível")}>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={levelFilter === "all"}
+                    onClick={() => { setLevelFilter("all"); setFavOnly(false); triggerCourtHaptics(18); }}
+                    className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+                      levelFilter === "all" ? "border-volt bg-volt text-obsidian" : "border-white/10 text-white/60"
+                    }`}
+                  >
+                    🌐 {t(locale, "Todos", "All", "Todos")} ({visible.length})
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={levelFilter === "novato"}
+                    onClick={() => { setLevelFilter("novato"); setFavOnly(false); triggerCourtHaptics(18); }}
+                    className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+                      levelFilter === "novato" ? "border-volt bg-volt text-obsidian" : "border-white/10 text-white/60"
+                    }`}
+                  >
+                    🌱 {t(locale, "Novato", "Novice", "Iniciante")}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={levelFilter === "avanzado"}
+                    onClick={() => { setLevelFilter("avanzado"); setFavOnly(false); triggerCourtHaptics(18); }}
+                    className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+                      levelFilter === "avanzado" ? "border-volt bg-volt text-obsidian" : "border-white/10 text-white/60"
+                    }`}
+                  >
+                    🔥 {t(locale, "Avanzado", "Advanced", "Avançado")}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={levelFilter === "arbitro"}
+                    onClick={() => { setLevelFilter("arbitro"); setFavOnly(false); triggerCourtHaptics(18); }}
+                    className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+                      levelFilter === "arbitro" ? "border-volt bg-volt text-obsidian" : "border-white/10 text-white/60"
+                    }`}
+                  >
+                    🟨🟥 {t(locale, "Árbitro", "Referee", "Árbitro")}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={levelFilter === "dt"}
+                    onClick={() => { setLevelFilter("dt"); setFavOnly(false); triggerCourtHaptics(18); }}
+                    className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+                      levelFilter === "dt" ? "border-volt bg-volt text-obsidian" : "border-white/10 text-white/60"
+                    }`}
+                  >
+                    📋 {t(locale, "DT", "Coach", "DT")}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={levelFilter === "torneos"}
+                    onClick={() => { setLevelFilter("torneos"); setFavOnly(false); triggerCourtHaptics(18); }}
+                    className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+                      levelFilter === "torneos" ? "border-volt bg-volt text-obsidian" : "border-white/10 text-white/60"
+                    }`}
+                  >
+                    🏆 {t(locale, "Torneos", "Tournaments", "Torneios")}
+                  </button>
                 </div>
 
-                <div className="snap-row mt-1.5 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={shell.allModules}>
+                <div className="snap-row mt-3 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={shell.allModules}>
                   <button
                     type="button"
                     role="tab"
@@ -769,66 +810,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   ))}
                 </div>
 
-                {guidedMode && GUIDED_MODE_BY_ID.has(guidedMode) ? (
-                  <section className="mt-5 space-y-3" data-testid="guided-drawers">
-                    <ModuleGuideBanner slug="home" locale={locale} defaultOpen={guidedMode === "novice"} />
-                    {GUIDED_MODE_BY_ID.get(guidedMode)?.drawers.map((drawer) => (
-                      <div key={drawer.id} className="vos-section-card vos-stack">
-                        <button
-                          type="button"
-                          aria-expanded={openDrawers[drawer.id] ?? false}
-                          onClick={() => toggleDrawer(drawer.id)}
-                          className="flex w-full items-center justify-between gap-2 text-left"
-                        >
-                          <span className="text-[12px] font-black uppercase tracking-wider text-white">
-                            {drawer.title[locale]}
-                            {drawer.badge ? (
-                              <span className="ml-2 rounded-full bg-volt/15 px-2 py-0.5 text-[9px] text-volt">
-                                {DIFFICULTY_BADGES[drawer.badge][locale]}
-                              </span>
-                            ) : null}
-                          </span>
-                          <span className="flex items-center gap-2 text-[10px] text-white/45">
-                            {drawer.slugs.length} {t(locale, "herramientas", "tools", "ferramentas")}
-                            <span aria-hidden>{openDrawers[drawer.id] ? "▲" : "▼"}</span>
-                          </span>
-                        </button>
-                        {openDrawers[drawer.id] ? (
-                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                            {drawer.slugs.map((slug) => {
-                              const meta = MODULE_BY_SLUG.get(slug);
-                              if (!meta) return null;
-                              return (
-                                <button
-                                  key={slug}
-                                  type="button"
-                                  data-testid="guided-tool"
-                                  onClick={() => openModule(slug)}
-                                  className="tap flex w-full items-center gap-2 rounded-xl border border-white/10 bg-panel p-2 text-left active:border-volt/50"
-                                >
-                                  <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-obsidian text-base ring-1 ring-white/10">
-                                    {meta.icon}
-                                  </span>
-                                  <span className="line-clamp-2 text-[11px] font-bold leading-tight">{meta.name[locale]}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ) : null}
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      data-testid="all-tools-toggle"
-                      onClick={() => chooseMode(guidedMode)}
-                      className="tap w-full rounded-xl border border-white/15 bg-panel px-3 py-2.5 text-[11px] font-black uppercase tracking-wider text-white/70"
-                    >
-                      📂 {t(locale, "Ver / Buscar las 60 Herramientas", "Browse / Search all 60 Tools", "Ver / Buscar as 60 Ferramentas")}
-                    </button>
-                  </section>
-                ) : null}
-
-                {recent.length > 0 && !guidedMode ? (
+                {recent.length > 0 ? (
                   <section className="mt-5">
                     <h2 className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.recents}</h2>
                     <div className="snap-row mt-2 flex gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -856,7 +838,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                     <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
                       {favOnly ? shell.favorites : shell.allModules}
                     </h2>
-                    <span className="text-[10px] font-bold text-emerald">{visible.length}/{MODULES.length}</span>
+                    <span className="text-[10px] font-bold text-emerald">{visible.length}/60</span>
                   </div>
                   {visible.length === 0 ? (
                     <p className="mt-6 rounded-2xl border border-white/10 bg-panel px-4 py-6 text-center text-[12px] text-white/50">
@@ -1024,6 +1006,13 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                     }
                   }}
                 />
+                <button
+                  type="button"
+                  onClick={() => setMonetizationOpen(true)}
+                  className="tap w-full rounded-xl border border-white/10 bg-panel px-4 py-3 text-left"
+                >
+                  {t(locale, "Licencias, donaciones y keygen", "Licences, donations & keygen", "Licenças, doações e keygen")}
+                </button>
 
                 <h2 className="mt-5 px-1 pb-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.vaultSection}</h2>
                 <EphemeralVaultBar locale={locale} embedded />
@@ -1071,6 +1060,13 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 <p className="mt-6 text-center text-[9px] text-white/30">
                   © {new Date().getFullYear()} VolleyOS Global · AGPL-3.0-or-later · {t(locale, "hecho para canchas reales", "built for real courts", "feito para quadras reais")}
                 </p>
+                {monetizationOpen && (
+                  <MonetizationModal
+                    locale={locale}
+                    onClose={() => setMonetizationOpen(false)}
+                    onActivated={activateLicense}
+                  />
+                )}
               </div>
             ) : null}
           </div>

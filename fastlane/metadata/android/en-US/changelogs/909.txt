@@ -1,0 +1,8 @@
+Release v9.0.9 "TITAN EDITION — UI RESTORED".
+- Restored clean v7.1.0 UI shell: working scrolling, card layout, 5-tab navigation, and module grid.
+- Catalogue expanded to 60 offline modules: FIVB scoresheet, video telestrator, playbook animator, shot heatmap, tournament nutrition, injury prehab, tiebreak commander, bracket architect, sponsor deck, head-to-head and peripheral reflex.
+- Horizontal filter pills over the module grid: All / Novice / Advanced / Referee / DT / Tournaments.
+- Compact Module Guide toggle (¿Para qué sirve y cómo se usa?) inside every module view.
+- Cancha: Picadito 15 pts, Rey de la Cancha, Oficial Bo3/Bo5 with 24-24 deuce, court-swap button, roster selector and studio WebAudio sounds.
+- Device-bound VOS-PRO licensing (ANDROID_ID fingerprint), multi-currency pricing (ARS/USD/EUR/BRL), Mercado Pago alias and Ko-fi checkout.
+- Creator keygen console and WhatsApp receipt with device ID and plan.

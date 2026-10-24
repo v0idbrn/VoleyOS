@@ -1,0 +1,8 @@
+Vers�o v9.0.9 "EDI��O TITAN — UI RESTAURADA".
+- Interface restaurada à v7.1.0: rolagem, cartões, navegação de 5 abas e grade de m�dulos funcionando sem problemas.
+- Cat�logo expandido para 60 m�dulos offline: planilha FIVB, telestrador de v�deo, animador de jogadas, mapa de calor, nutri��o de torneio, prehab de les�es, comandante de tie-break, arquiteto de chaves, deck de patrocinadores, cara a cara e reflexo perif�rico.
+- Barra de filtros horizontais sobre a grade: Todos / Iniciante / Avançado / Árbitro / DT / Torneios.
+- Guia de m�dulo colaps�vel (¿Para quê serve e c�mo usar?) dentro de cada vista.
+- Cancha: Picadinho a 15 pts, Rei da Quadra, Oficial Bo3/Bo5 com deuce 24-24, botão de troca de lado, selecionador de elenco e sons WebAudio de estúdio.
+- Licen�a VOS-PRO vinculada ao dispositivo (impress�o ANDROID_ID), pre�os em ARS/USD/EUR/BRL, alias do Mercado Pago e checkout do Ko-fi.
+- Console de keygen do criador e recibo pelo WhatsApp com ID do dispositivo e plano.
