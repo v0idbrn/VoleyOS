@@ -192,7 +192,7 @@ jobs:
               echo "::warning::$APK lacks V2 signing block; re-signing with V1+V2+V3 via apksigner"
               "$APKSIGNER" sign --ks "$KEYSTORE" --ks-key-alias "$KEYALIAS" \
                 --store-pass "$KEYPASS" --key-pass "$KEYPASS" \
-                --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
+                --v1-signing-enabled true --v2-signing-enabled true \
                 "$APK"
               # Re-verify after re-sign
               "$APKSIGNER" verify --verbose "$APK"
