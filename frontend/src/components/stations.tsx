@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import jsQR from "jsqr";
 
 import { playWhistle } from "@/lib/court-audio";
-import { playBuzzer, playScorePop, playSetWinFanfare } from "@/lib/sound-effects";
 import { triggerCourtHaptics } from "@/lib/court-ux";
 import { clearClonedScoreboard, createQrFrames, emptyIngest, ingestQrFrame, readClonedScoreboard, renderQrSvg, storeClonedScoreboard, type IngestResult, type QrFrame } from "@/lib/qr-transfer";
 import { localizeReactTree } from "@/lib/engine-l10n";
@@ -41,21 +40,17 @@ import {
   importCapsule,
   inspectEquipment,
   jumpLoad,
-  kingAwardWin,
   newBeach,
-  newKingOfCourt,
   newScoreboard,
   newScoreboardHistory,
   overlayFromScoreboard,
   parsePlay,
-  point8SwitchDue,
   refereeReport,
   redoScoreboard,
   scoutingReport,
   snakeDraft,
   splitCosts,
   standings,
-  swapCourt,
   tempoWindow,
   trackSubstitutions,
   undoScoreboard,
@@ -70,24 +65,14 @@ import {
   serveRadar,
   analyzeAerodynamics,
   analyzeSystem,
-  analyzeTelestration,
   buildAdaptiveRulebook,
   buildArenaCue,
-  buildBracket,
   buildClipPlan,
-  buildHeadToHead,
-  buildPlaybookAnimation,
-  buildShotHeatmap,
   buildQrSync,
   buildRecruitingDossier,
-  buildSponsorDeck,
   buildTreasury,
   calculateElo,
-  commandTiebreak,
-  assessPrehab,
-  planMatchNutrition,
   readDeception,
-  scoreReflex,
   translateSlang,
   validateHouseRules,
   type AttackZone,
@@ -103,7 +88,6 @@ import {
   type LineupNumbers,
   type Locale,
   type MvpPlayer,
-  type PlaybookPhaseInput,
   type PosterTheme,
   type RefereeEvent,
   type RefereeGesture,
@@ -113,7 +97,6 @@ import {
   type SetDistribution,
   type SetterGesture,
   type SetterPlay,
-  type ShotResult,
   type SixAttributes,
   type SubEvent,
   type TempoCode,
@@ -121,14 +104,6 @@ import {
   type BlockoutDecision,
   type PracticeFocus,
   type ScoreboardState,
-  type TeamRoster,
-  type TelestrationPoint,
-  loadTeams,
-  saveTeam,
-  deleteTeam,
-  newTeam,
-  teamFromRosterSheet,
-  type KingOfCourtState,
 } from "@/lib/local-engines";
 import {
   PICKUP_SAMPLE,
@@ -139,7 +114,6 @@ import {
 } from "@/lib/samples";
 import type { ModuleMeta } from "@/lib/modules";
 import { GymScreenModule } from "@/components/GymScreenModule";
-import { ModuleGuideBanner } from "@/components/ModuleGuideBanner";
 
 export interface StationProps {
   meta: ModuleMeta;
@@ -156,11 +130,6 @@ const BTN_PRIMARY =
 const INPUT =
   "w-full rounded-lg border border-white/15 bg-obsidian px-3 py-2 text-sm text-white outline-none focus:border-volt";
 const LABEL = "text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50";
-
-function defaultOpenGuide(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem("volleyos.guided") === "novice";
-}
 
 function StationShell({
   meta,
@@ -200,7 +169,6 @@ function StationShell({
           {t(locale, "Local", "Local", "Local")}
         </span>
       </header>
-      <ModuleGuideBanner slug={meta.slug} locale={locale} defaultOpen={defaultOpenGuide()} />
       <div className="flex-1 text-sm text-white/80">{localizeReactTree(children, locale)}</div>
       <footer className="flex flex-wrap gap-2 border-t border-white/10 pt-3">
         <button type="button" className={BTN_PRIMARY} onClick={onExample}>
@@ -544,82 +512,14 @@ function pressurePoint(state: ScoreboardState): boolean {
 }
 
 export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
-  const [matchFormat, setMatchFormat] = useState<"bo3" | "bo5" | "short15">("bo3");
-  const [preset, setPreset] = useState<"picadito" | "king" | "oficial">("oficial");
-  const [picaditoTarget, setPicaditoTarget] = useState<11 | 15 | 21 | 25>(15);
-  const [goldenPoint, setGoldenPoint] = useState(false);
-  const [kingInput, setKingInput] = useState("");
-  const [king, setKing] = useState<KingOfCourtState | null>(null);
-  const [flashSwap, setFlashSwap] = useState(false);
-  const [teams, setTeams] = useState<TeamRoster[]>([]);
-  const [teamAId, setTeamAId] = useState<string | null>(null);
-  const [teamBId, setTeamBId] = useState<string | null>(null);
-  const [history, setHistory] = useState(() => {
-    const saved = readClonedScoreboard();
-    if (saved) return newScoreboardHistory(saved);
-    return newScoreboardHistory(newScoreboard("Tiburones", "Cóndores", 3, { matchFormat: "bo3" }));
-  });
+  const [history, setHistory] = useState(() => newScoreboardHistory(readClonedScoreboard() ?? newScoreboard("Tiburones", "Cóndores", 3)));
   const [message, setMessage] = useState(t(locale, "Elegí un equipo para sumar.", "Pick a team to score.", "Escolha um time para pontuar."));
   const [hardwareMode, setHardwareMode] = useState(false);
-  const [rosterOpen, setRosterOpen] = useState(false);
-  const [rosterName, setRosterName] = useState("");
-  const [rosterCode, setRosterCode] = useState("");
-  const [rosterSheet, setRosterSheet] = useState("");
-  const [rosterError, setRosterError] = useState<string | null>(null);
   const state = history.present;
-
-  useEffect(() => {
-    setTeams(loadTeams());
-  }, []);
-
-  const applyRoster = (team: TeamRoster, side: "A" | "B"): void => {
-    if (side === "A") setTeamAId(team.id);
-    else setTeamBId(team.id);
-    setHistory(newScoreboardHistory({
-      ...state,
-      teamA: side === "A" ? team.name : state.teamA,
-      teamB: side === "B" ? team.name : state.teamB,
-      lineupA: side === "A" && team.starters.length === 6 ? team.starters : state.lineupA,
-      lineupB: side === "B" && team.starters.length === 6 ? team.starters : state.lineupB,
-      rosterA: side === "A" ? team : state.rosterA,
-      rosterB: side === "B" ? team : state.rosterB,
-    }));
-    setMessage(t(locale, `${team.name} cargado en ${side}.`, `${team.name} loaded on ${side}.`, `${team.name} carregado em ${side}.`));
-    triggerCourtHaptics(20);
-  };
-
-  const saveRoster = (): void => {
-    try {
-      const team = teamFromRosterSheet(rosterName, rosterCode, rosterSheet);
-      setTeams(saveTeam(team));
-      applyRoster(team, teamAId ? "B" : "A");
-      setRosterError(null);
-      setRosterOpen(false);
-      setRosterName("");
-      setRosterCode("");
-      setRosterSheet("");
-    } catch (error) {
-      setRosterError(error instanceof Error ? error.message : "Error");
-    }
-  };
 
   const point = (team: "A" | "B"): void => {
     try {
       const result = awardIndoorPoint(state, team);
-      if (result.matchFinished || result.setFinished) playSetWinFanfare();
-      else playScorePop();
-      if (result.matchFinished && preset === "king" && king) {
-        const nextKing = kingAwardWin(king, result.state.winner ?? "A");
-        setKing(nextKing);
-        const winnerName = result.state.winner === "A" ? result.state.teamA : result.state.teamB;
-        const challenger = nextKing.courtA === winnerName ? nextKing.courtB : nextKing.courtA;
-        setHistory(newScoreboardHistory(newScoreboard(nextKing.courtA, nextKing.courtB, 1, { matchFormat: "short15", targetPoints: 15, goldenPoint: false })));
-        setMessage(
-          t(locale, `👑 ${winnerName} queda en cancha (racha ${nextKing.streak}) — entra ${challenger}.`, `👑 ${winnerName} stays on court (streak ${nextKing.streak}) — ${challenger} enters.`, `👑 ${winnerName} fica na quadra (sequência ${nextKing.streak}) — ${challenger} entra.`),
-        );
-        triggerCourtHaptics([50, 40, 50]);
-        return;
-      }
       setHistory(commitScoreboard(history, result.state));
       setMessage(
         `${result.message}${result.rotated ? t(locale, " · rotación", " · rotation", " · rotação") : ""}${
@@ -630,43 +530,6 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Error");
     }
-  };
-
-  const startPicadito = (target: 11 | 15 | 21 | 25 = picaditoTarget, golden: boolean = goldenPoint): void => {
-    setPreset("picadito");
-    setPicaditoTarget(target);
-    setGoldenPoint(golden);
-    setMatchFormat("short15");
-    setKing(null);
-    setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 1, { matchFormat: "short15", targetPoints: target, goldenPoint: golden })));
-    setMessage(
-      t(locale, `⚡ Picadito a ${target} pts ${golden ? "· punto de oro" : "· ventaja de 2"}.`, `⚡ Pickup to ${target} pts ${golden ? "· golden point" : "· win by 2"}.`, `⚡ Rachinha a ${target} pts ${golden ? "· ponto de ouro" : "· vantagem de 2"}.`),
-    );
-    triggerCourtHaptics(25);
-  };
-
-  const startKing = (): void => {
-    const names = kingInput.split(/[,;\n]/).map((name) => name.trim()).filter((name) => name.length > 0);
-    try {
-      const fresh = newKingOfCourt(names);
-      setPreset("king");
-      setKing(fresh);
-      setMatchFormat("short15");
-      setHistory(newScoreboardHistory(newScoreboard(fresh.courtA, fresh.courtB, 1, { matchFormat: "short15", targetPoints: 15, goldenPoint: false })));
-      setMessage(t(locale, `👑 ${fresh.teams.length} equipos en cola. ¡A jugar!`, `👑 ${fresh.teams.length} teams in the queue. Play!`, `👑 ${fresh.teams.length} times na fila. Vamos!`));
-      triggerCourtHaptics([30, 25, 30]);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Error");
-    }
-  };
-
-  const swapSides = (): void => {
-    setHistory((previous) => commitScoreboard(previous, swapCourt(previous.present)));
-    playWhistle("double");
-    triggerCourtHaptics([40, 30, 40]);
-    setFlashSwap(true);
-    window.setTimeout(() => setFlashSwap(false), 450);
-    setMessage(t(locale, "🔄 Cancha cambiada — columnas invertidas.", "🔄 Sides swapped — columns inverted.", "🔄 Quadra trocada — colunas invertidas."));
   };
 
   const undo = (): void => {
@@ -724,7 +587,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         playWhistle("short");
       } else if (key === "b") {
         event.preventDefault();
-        playBuzzer();
+        playWhistle("long");
       } else if (key === "c") {
         event.preventDefault();
         const next = !document.documentElement.classList.contains("high-contrast");
@@ -737,15 +600,6 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [locale]);
 
-  const swapped = state.isCourtSwapped === true;
-  const left = swapped
-    ? { name: state.teamB, score: state.scoreB, sets: state.setsB, serving: state.serving === "B" }
-    : { name: state.teamA, score: state.scoreA, sets: state.setsA, serving: state.serving === "A" };
-  const right = swapped
-    ? { name: state.teamA, score: state.scoreA, sets: state.setsA, serving: state.serving === "A" }
-    : { name: state.teamB, score: state.scoreB, sets: state.setsB, serving: state.serving === "B" };
-  const showPoint8 = point8SwitchDue(state);
-
   return (
     <StationShell
       meta={meta}
@@ -757,126 +611,6 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         setMessage(t(locale, "Ejemplo cargado: set decisivo 22-20.", "Example loaded: decider 22-20.", "Exemplo carregado: set decisivo 22-20."));
       }}
     >
-      <div className="mb-2 flex flex-wrap gap-1">
-        <button type="button" onClick={() => startPicadito()} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "picadito" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>⚡ {t(locale, "Picadito", "Pickup", "Rachinha")}</button>
-        <button type="button" onClick={() => setPreset("king")} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "king" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>👑 {t(locale, "Ganador en cancha", "Winner stays", "Vencedor fica")}</button>
-        <button type="button" onClick={() => { setPreset("oficial"); setKing(null); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "oficial" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>🏆 {t(locale, "Oficial", "Official", "Oficial")}</button>
-      </div>
-      {preset === "picadito" ? (
-        <div className="vos-item-card mb-2 space-y-2">
-          <div className="flex flex-wrap gap-1">
-            {([11, 15, 21, 25] as const).map((target) => (
-              <button
-                key={target}
-                type="button"
-                onClick={() => startPicadito(target)}
-                className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${picaditoTarget === target && matchFormat === "short15" ? "border-volt bg-volt/15 text-volt" : "border-white/10 text-white/50"}`}
-              >
-                {target} {t(locale, "pts", "pts", "pts")}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-1">
-            <button
-              type="button"
-              onClick={() => startPicadito(picaditoTarget, false)}
-              className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${!goldenPoint ? "border-volt text-volt" : "border-white/10 text-white/50"}`}
-            >
-              {t(locale, "Diferencia de 2 (14-14 / 24-24)", "Win by 2 (14-14 / 24-24)", "Vantagem de 2 (14-14 / 24-24)")}
-            </button>
-            <button
-              type="button"
-              onClick={() => startPicadito(picaditoTarget, true)}
-              className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${goldenPoint ? "border-volt text-volt" : "border-white/10 text-white/50"}`}
-            >
-              {t(locale, "Punto de oro (muere en el target)", "Golden point (dies at target)", "Ponto de ouro (morre no alvo)")}
-            </button>
-          </div>
-        </div>
-      ) : null}
-      {preset === "king" ? (
-        <div className="vos-item-card mb-2 space-y-1">
-          <input
-            value={kingInput}
-            onChange={(event) => setKingInput(event.target.value)}
-            placeholder={t(locale, "Tiburones, Lobos, Titanes, Vinchas… (3-5 equipos)", "Sharks, Wolves, Titans, Vinchas… (3-5 teams)", "Tubarões, Lobos, Titanes, Vinchas… (3-5 times)")}
-            className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px]"
-          />
-          <button type="button" className={`${BTN} w-full`} onClick={startKing}>
-            ▶ {t(locale, "Arrancar Rey de la Cancha (3-5 equipos)", "Start King of the Court (3-5 teams)", "Começar Rei da Quadra (3-5 times)")}
-          </button>
-          {king ? (
-            <p className="text-[9px] text-volt">
-              🔥 {t(locale, "Racha", "Streak", "Sequência")}: {king.streakTeam ?? "—"} ×{king.streak} · {t(locale, "cola", "queue", "fila")}: {king.queue.join(", ") || "—"}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-      {preset === "oficial" ? (
-        <div className="mb-2 flex flex-wrap gap-1">
-          <button type="button" onClick={() => { setMatchFormat("bo3"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 3, { matchFormat: "bo3" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo3" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 3 (25/15)", "Best of 3 (25/15)", "Melhor de 3 (25/15)")}</button>
-          <button type="button" onClick={() => { setMatchFormat("bo5"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 5, { matchFormat: "bo5" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo5" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 5 (25/15)", "Best of 5 (25/15)", "Melhor de 5 (25/15)")}</button>
-        </div>
-      ) : null}
-      <div className="mb-2 grid grid-cols-2 gap-1">
-        <select
-          aria-label={t(locale, "Equipo local", "Home team", "Time da casa")}
-          value={teamAId ?? ""}
-          onChange={(event) => {
-            const team = teams.find((item) => item.id === event.target.value);
-            if (team) applyRoster(team, "A");
-          }}
-          className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px] text-white"
-        >
-          <option value="">{t(locale, "Equipo A", "Team A", "Time A")}</option>
-          {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
-        </select>
-        <select
-          aria-label={t(locale, "Equipo visitante", "Away team", "Time visitante")}
-          value={teamBId ?? ""}
-          onChange={(event) => {
-            const team = teams.find((item) => item.id === event.target.value);
-            if (team) applyRoster(team, "B");
-          }}
-          className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px] text-white"
-        >
-          <option value="">{t(locale, "Equipo B", "Team B", "Time B")}</option>
-          {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
-        </select>
-        <button type="button" className={`${BTN} col-span-2`} onClick={() => setRosterOpen((open) => !open)}>
-          {t(locale, "Administrar plantillas", "Manage rosters", "Gerenciar elencos")}
-        </button>
-      </div>
-      {rosterOpen ? (
-        <div className="mb-2 space-y-1 rounded-xl border border-white/10 bg-obsidian/80 p-2">
-          <div className="grid grid-cols-[1fr_4rem] gap-1">
-            <input value={rosterName} onChange={(event) => setRosterName(event.target.value)} placeholder={t(locale, "Nombre del equipo", "Team name", "Nome do time")} className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px]" />
-            <input value={rosterCode} onChange={(event) => setRosterCode(event.target.value)} placeholder="ABC" maxLength={3} className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px] uppercase" />
-          </div>
-          <textarea
-            value={rosterSheet}
-            onChange={(event) => setRosterSheet(event.target.value)}
-            rows={5}
-            placeholder={"1 Sofia S C\n7 Martina L\n4 Valentina OH\n9 Renata MB\n11 Carla OPP\n14 Julieta MB"}
-            className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 font-mono text-[10px]"
-          />
-          <p className="text-[9px] text-white/40">{t(locale, "Dorsal nombre rol (S OH MB OPP L) y C/L para capitan o libero.", "Number name role (S OH MB OPP L), C/L for captain or libero.", "Numero nome posicao (S OH MB OPP L), C/L para capitao ou libero.")}</p>
-          {rosterError ? <p className="text-[10px] text-crimson">{rosterError}</p> : null}
-          <button type="button" className={`${BTN} w-full`} onClick={saveRoster}>{t(locale, "Guardar plantilla", "Save roster", "Salvar elenco")}</button>
-          {teams.length > 0 ? (
-            <div className="space-y-1">
-              {teams.map((team) => (
-                <div key={team.id} className="flex items-center gap-1 text-[10px]">
-                  <span className="flex-1 truncate">{team.name} ({team.players.length})</span>
-                  <button type="button" className={BTN} onClick={() => applyRoster(team, "A")}>A</button>
-                  <button type="button" className={BTN} onClick={() => applyRoster(team, "B")}>B</button>
-                  <button type="button" className={BTN} onClick={() => setTeams(deleteTeam(team.id))}>×</button>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
       <div data-hardware-volume-score={hardwareMode ? "true" : "false"} className="relative rounded-xl">
       <button
         type="button"
@@ -895,42 +629,32 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       >
         🔒 {t(locale, "Modo Partido (botones de volumen)", "Match mode (volume keys)", "Modo Partida (botões de volume)")}
       </button>
-      <div className={`rounded-xl border border-white/10 bg-obsidian/80 p-3 ${flashSwap ? "vos-flash" : ""}`}>
+      <div className="rounded-xl border border-white/10 bg-obsidian/80 p-3">
         <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/50">
-          <span>Set {state.setNumber} / {state.bestOf} {state.matchFormat === "short15" ? "(15)" : state.setNumber === state.bestOf || state.isDecider ? "(15 TB)" : "(25)"}</span>
+          <span>Set {state.setNumber} / {state.bestOf}</span>
           <span>{state.status === "finished" ? "FINAL" : `${state.streak} ${t(locale, "en racha", "run", "em sequência")}`}</span>
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2 text-center">
-          <div className={`rounded-lg py-2 ${left.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
-            <p className="truncate text-xs font-bold">{left.name}</p>
-            <p data-testid={swapped ? "score-b" : "score-a"} className="text-4xl font-black tabular-nums">{left.score}</p>
-            <p className="text-[10px] text-volt">Sets {left.sets}</p>
+          <div className={`rounded-lg py-2 ${state.serving === "A" ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
+            <p className="truncate text-xs font-bold">{state.teamA}</p>
+            <p data-testid="score-a" className="text-4xl font-black tabular-nums">{state.scoreA}</p>
+            <p className="text-[10px] text-volt">Sets {state.setsA}</p>
           </div>
-          <div className={`rounded-lg py-2 ${right.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
-            <p className="truncate text-xs font-bold">{right.name}</p>
-            <p data-testid={swapped ? "score-a" : "score-b"} className="text-4xl font-black tabular-nums">{right.score}</p>
-            <p className="text-[10px] text-volt">Sets {right.sets}</p>
+          <div className={`rounded-lg py-2 ${state.serving === "B" ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
+            <p className="truncate text-xs font-bold">{state.teamB}</p>
+            <p data-testid="score-b" className="text-4xl font-black tabular-nums">{state.scoreB}</p>
+            <p className="text-[10px] text-volt">Sets {state.setsB}</p>
           </div>
-        </div>
-        <div className="mt-2 flex flex-col items-center gap-1">
-          <button type="button" className={BTN} onClick={swapSides}>
-            🔄 {t(locale, "Cambio de Cancha", "Swap Sides", "Troca de Lado")}
-          </button>
-          {showPoint8 ? (
-            <button type="button" onClick={swapSides} className="rounded-full bg-volt/15 px-2 py-0.5 text-[9px] font-bold text-volt">
-              💡 {t(locale, "Punto 8: ¿Cambiar de cancha?", "Point 8: swap sides?", "Ponto 8: trocar de lado?")}
-            </button>
-          ) : null}
         </div>
         <div className="mt-2 flex justify-center gap-2">
-          <button type="button" className={BTN_PRIMARY} onClick={() => point(swapped ? "B" : "A")}>+ {left.name} [A]</button>
-          <button type="button" className={BTN_PRIMARY} onClick={() => point(swapped ? "A" : "B")}>+ {right.name} [L]</button>
+          <button type="button" className={BTN_PRIMARY} onClick={() => point("A")}>+ {state.teamA} [A]</button>
+          <button type="button" className={BTN_PRIMARY} onClick={() => point("B")}>+ {state.teamB} [L]</button>
         </div>
         <div className="mt-2 flex flex-wrap justify-center gap-1">
           <button type="button" className={BTN} onClick={undo} disabled={history.past.length === 0}>[Z] {t(locale, "Deshacer", "Undo", "Desfazer")} ({history.past.length})</button>
           <button type="button" className={BTN} onClick={redo} disabled={history.future.length === 0}>[Y] {t(locale, "Rehacer", "Redo", "Refazer")}</button>
           <button type="button" className={BTN} onClick={() => playWhistle("short")}>[W] {t(locale, "Silbato", "Whistle", "Apito")}</button>
-          <button type="button" className={BTN} onClick={() => playBuzzer()}>[B] {t(locale, "Buzzer", "Buzzer", "Buzzer")}</button>
+          <button type="button" className={BTN} onClick={() => playWhistle("long")}>[B] {t(locale, "Buzzer", "Buzzer", "Buzzer")}</button>
           <button type="button" className={BTN} onClick={() => {
             const next = !document.documentElement.classList.contains("high-contrast");
             document.documentElement.classList.toggle("high-contrast", next);
@@ -2837,261 +2561,6 @@ export function QrSyncStation({ meta, locale, onSave }: StationProps) {
   );
 }
 
-export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) {
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [strokes, setStrokes] = useState<TelestrationPoint[][]>([]);
-  const [drawing, setDrawing] = useState<TelestrationPoint[] | null>(null);
-  const report = useMemo(
-    () => (strokes.length > 0 ? analyzeTelestration({ frameWidth: 100, frameHeight: 100, strokes, scaleCmPerPx: 1 }) : null),
-    [strokes],
-  );
-
-  useEffect(() => () => { if (videoUrl) URL.revokeObjectURL(videoUrl); }, [videoUrl]);
-
-  const pointFrom = (event: ReactPointerEvent<SVGSVGElement>): TelestrationPoint => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    return {
-      x: Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100)),
-      y: Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100)),
-    };
-  };
-
-  const finish = (): void => {
-    if (drawing && drawing.length >= 2) setStrokes((previous) => [...previous, drawing]);
-    setDrawing(null);
-  };
-
-  return (
-    <StationShell meta={meta} locale={locale} rows={6} onSave={onSave} onExample={() => setStrokes([])}>
-      <input
-        type="file"
-        accept="video/*"
-        aria-label={t(locale, "Video local", "Local video", "Video local")}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (!file) return;
-          setVideoUrl(URL.createObjectURL(file));
-          setStrokes([]);
-        }}
-        className="mb-2 w-full text-[10px]"
-      />
-      <div className="relative aspect-video overflow-hidden rounded-xl border border-white/10 bg-black">
-        {videoUrl ? <video src={videoUrl} controls playsInline className="h-full w-full object-contain" /> : (
-          <p className="grid h-full place-items-center px-4 text-center text-[11px] text-white/45">
-            {t(locale, "Elegí un video de tu galería. Nada sale del teléfono.", "Pick a video from your gallery. Nothing leaves the phone.", "Escolha um video da galeria. Nada sai do telefone.")}
-          </p>
-        )}
-        <svg
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          className="absolute inset-0 h-full w-full touch-none"
-          onPointerDown={(event) => {
-            event.currentTarget.setPointerCapture(event.pointerId);
-            setDrawing([pointFrom(event)]);
-          }}
-          onPointerMove={(event) => {
-            if (!drawing) return;
-            setDrawing((previous) => (previous ? [...previous, pointFrom(event)] : previous));
-          }}
-          onPointerUp={finish}
-          onPointerCancel={finish}
-        >
-          {strokes.map((stroke, index) => (
-            <polyline
-              key={`stroke-${index}`}
-              points={stroke.map((point) => `${point.x},${point.y}`).join(" ")}
-              fill="none"
-              stroke="#e11d48"
-              strokeWidth="0.8"
-              vectorEffect="non-scaling-stroke"
-            />
-          ))}
-          {drawing ? (
-            <polyline
-              points={drawing.map((point) => `${point.x},${point.y}`).join(" ")}
-              fill="none"
-              stroke="#c8ff00"
-              strokeWidth="0.8"
-              vectorEffect="non-scaling-stroke"
-            />
-          ) : null}
-        </svg>
-      </div>
-      <div className="mt-2 flex flex-wrap gap-1">
-        <button type="button" className={BTN} onClick={() => setStrokes([])}>{t(locale, "Borrar trazos", "Clear strokes", "Apagar tracos")}</button>
-        <span className={BTN}>{strokes.length} {t(locale, "trazos", "strokes", "tracos")}</span>
-      </div>
-      {report ? (
-        <div className="mt-2 rounded-xl border border-white/10 p-2 text-[10px]">
-          <p>{report.message}</p>
-          <p className="text-white/50">
-            {t(locale, "Angulo medio", "Mean angle", "Angulo medio")}: {report.meanAngleDeg}° · {t(locale, "Maximo", "Max", "Maximo")}: {report.maxAngleDeg}°
-          </p>
-        </div>
-      ) : null}
-    </StationShell>
-  );
-}
-
-const PLAYBOOK_SAMPLE: PlaybookPhaseInput[] = [
-  {
-    phase: "serve",
-    durationMs: 1200,
-    targetZone: 1,
-    players: [
-      { number: 1, x: 50, y: 90 }, { number: 4, x: 30, y: 70 }, { number: 7, x: 70, y: 70 },
-      { number: 9, x: 20, y: 50 }, { number: 11, x: 50, y: 55 }, { number: 14, x: 80, y: 50 },
-    ],
-  },
-  {
-    phase: "transition",
-    durationMs: 1800,
-    targetZone: 5,
-    players: [
-      { number: 1, x: 45, y: 85 }, { number: 4, x: 25, y: 60 }, { number: 7, x: 65, y: 55 },
-      { number: 9, x: 30, y: 40 }, { number: 11, x: 55, y: 45 }, { number: 14, x: 75, y: 40 },
-    ],
-  },
-  {
-    phase: "attack",
-    durationMs: 1000,
-    targetZone: 9,
-    players: [
-      { number: 1, x: 40, y: 80 }, { number: 4, x: 20, y: 50 }, { number: 7, x: 60, y: 45 },
-      { number: 9, x: 35, y: 30 }, { number: 11, x: 60, y: 25 }, { number: 14, x: 80, y: 30 },
-    ],
-  },
-];
-
-export function PlaybookAnimatorStation({ meta, locale, onSave }: StationProps) {
-  const [phases] = useState(PLAYBOOK_SAMPLE);
-  const [index, setIndex] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const report = useMemo(() => buildPlaybookAnimation(phases), [phases]);
-  const phase = phases[index] ?? phases[0];
-
-  useEffect(() => {
-    if (!playing) return;
-    const timer = setInterval(() => {
-      setIndex((current) => {
-        if (current >= phases.length - 1) {
-          setPlaying(false);
-          return current;
-        }
-        return current + 1;
-      });
-    }, 900);
-    return () => clearInterval(timer);
-  }, [playing, phases.length]);
-
-  const vectors = report.phases[index]?.vectors ?? [];
-  const previous = phases[index - 1];
-
-  return (
-    <StationShell meta={meta} locale={locale} rows={5} onSave={onSave} onExample={() => { setIndex(0); setPlaying(false); }}>
-      <div className="relative aspect-[3/2] overflow-hidden rounded-xl border border-white/10 bg-obsidian">
-        <svg viewBox="0 0 100 100" className="h-full w-full">
-          <rect width="100" height="100" fill="#101010" />
-          <line x1="50" y1="0" x2="50" y2="100" stroke="#ffffff22" />
-          <line x1="0" y1="50" x2="100" y2="50" stroke="#ffffff22" strokeDasharray="2 2" />
-          {previous ? previous.players.map((player) => {
-            const now = phase?.players.find((item) => item.number === player.number);
-            if (!now) return null;
-            return <line key={`vector-${player.number}`} x1={player.x} y1={player.y} x2={now.x} y2={now.y} stroke="#c8ff00" strokeWidth="0.7" markerEnd="url(#arrow)" />;
-          }) : null}
-          <defs>
-            <marker id="arrow" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto">
-              <path d="M0,0 L4,2 L0,4 z" fill="#c8ff00" />
-            </marker>
-          </defs>
-          {phase?.players.map((player) => (
-            <g key={`player-${player.number}`}>
-              <circle cx={player.x} cy={player.y} r="3" fill="#e11d48" />
-              <text x={player.x} y={player.y + 1.2} textAnchor="middle" fontSize="2.6" fill="white">{player.number}</text>
-            </g>
-          ))}
-        </svg>
-      </div>
-      <div className="mt-2 flex items-center gap-1">
-        <button type="button" className={BTN} onClick={() => { setIndex(0); setPlaying((value) => !value); }}>
-          {playing ? t(locale, "Pausar", "Pause", "Pausar") : t(locale, "Reproducir", "Play", "Reproduzir")}
-        </button>
-        {report.phases.map((frame) => (
-          <button key={frame.phase} type="button" className={`${BTN} ${index === frame.order - 1 ? "border-volt text-volt" : ""}`} onClick={() => setIndex(frame.order - 1)}>
-            {frame.phase}
-          </button>
-        ))}
-      </div>
-      <p className="mt-2 text-[10px] text-white/60">
-        {t(locale, "Fase", "Phase", "Fase")} {index + 1}/3 · {phase?.durationMs} ms · {t(locale, "Zona", "Zone", "Zona")} {phase?.targetZone} · {vectors.length} {t(locale, "vectores", "vectors", "vetores")}
-      </p>
-      <p className="mt-1 text-[10px] text-white/40">{report.message}</p>
-    </StationShell>
-  );
-}
-
-const HEATMAP_SAMPLE = [
-  { x: 16, y: 16, result: "kill" as ShotResult },
-  { x: 50, y: 16, result: "kill" as ShotResult },
-  { x: 50, y: 16, result: "kill" as ShotResult },
-  { x: 84, y: 16, result: "blocked" as ShotResult },
-  { x: 16, y: 50, result: "error" as ShotResult },
-  { x: 50, y: 50, result: "kill" as ShotResult },
-  { x: 84, y: 50, result: "kill" as ShotResult },
-  { x: 16, y: 84, result: "in_play" as ShotResult },
-  { x: 50, y: 84, result: "error" as ShotResult },
-  { x: 84, y: 84, result: "kill" as ShotResult },
-];
-
-export function ShotHeatmapStation({ meta, locale, onSave }: StationProps) {
-  const [shots, setShots] = useState(HEATMAP_SAMPLE);
-  const [result, setResult] = useState<ShotResult>("kill");
-  const report = useMemo(
-    () => (shots.length > 0
-      ? buildShotHeatmap({ shots })
-      : { total: 0, kills: 0, errors: 0, blocked: 0, efficiencyPct: 0, hotZone: 1, cells: Array.from({ length: 9 }, (_, index) => ({ zone: index + 1, count: 0, sharePct: 0 })), message: "Sin remates." }),
-    [shots],
-  );
-
-  return (
-    <StationShell meta={meta} locale={locale} rows={5} onSave={onSave} onExample={() => setShots(HEATMAP_SAMPLE)}>
-      <div className="mb-1 flex flex-wrap items-center gap-1">
-        <select value={result} onChange={(event) => setResult(event.target.value as ShotResult)} className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px]">
-          <option value="kill">Kill</option>
-          <option value="error">Error</option>
-          <option value="blocked">Blocked</option>
-          <option value="in_play">In play</option>
-        </select>
-        <button type="button" className={BTN} onClick={() => setShots([])}>{t(locale, "Limpiar", "Clear", "Limpar")}</button>
-        <button type="button" className={BTN} onClick={() => setShots(HEATMAP_SAMPLE)}>{t(locale, "Ejemplo", "Example", "Exemplo")}</button>
-      </div>
-      <div className="grid grid-cols-3 gap-1">
-        {report.cells.map((cell) => (
-          <button
-            key={cell.zone}
-            type="button"
-            aria-label={`Zona ${cell.zone}`}
-            onClick={() => {
-              const column = (cell.zone - 1) % 3;
-              const row = Math.floor((cell.zone - 1) / 3);
-              setShots((previous) => [...previous, { x: column * 33.4 + 16.7, y: row * 33.4 + 16.7, result }]);
-            }}
-            className="relative h-16 rounded-lg border border-white/10 text-left"
-            style={{ backgroundColor: `rgba(225, 29, 72, ${Math.max(0.08, cell.sharePct / 100)})` }}
-          >
-            <span className="absolute left-1 top-1 text-[9px] text-white/50">Z{cell.zone}</span>
-            <span className="absolute bottom-1 right-1 text-sm font-black tabular-nums">{cell.count}</span>
-          </button>
-        ))}
-      </div>
-      <p className="mt-2 text-[11px]">
-        {t(locale, "Zona caliente", "Hot zone", "Zona quente")}: <strong className="text-volt">Z{report.hotZone}</strong> · {report.total} {t(locale, "remates", "shots", "ataques")} · {t(locale, "eficiencia", "efficiency", "eficiência")} {report.efficiencyPct}%
-      </p>
-      <p className="mt-1 text-[10px] text-white/40">{t(locale, "Tocá una zona para sumar un remate con el resultado elegido.", "Tap a zone to add a shot with the selected result.", "Toque uma zona para somar um ataque com o resultado escolhido.")}</p>
-    </StationShell>
-  );
-}
-
 export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
   const [report, setReport] = useState<Record<string, unknown> | null>(null);
   useEffect(() => {
@@ -3110,13 +2579,6 @@ export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
         "arena-dj": () => buildArenaCue({ event: "MONSTER_BLOCK" }) as unknown as Record<string, unknown>,
         "court-slang": () => translateSlang({ term: "pipe", origin: "AR" }) as unknown as Record<string, unknown>,
         "qr-sync": () => buildQrSync({ kind: "match", payload: { home: "Tiburones", score_a: 24 }, matrixSize: 21 }) as unknown as Promise<Record<string, unknown>>,
-        "tournament-nutrition": () => planMatchNutrition({ weightKg: 78, matches: 2, minutesPerMatch: 90, tempC: 31, sweatRateLh: 1.1 }) as unknown as Record<string, unknown>,
-        "injury-prehab": () => assessPrehab({ weeklyJumps: 420, weeklySpikes: 260, sleepHours: 6.5, kneePain: 3, shoulderPain: 0, priorInjury: true }) as unknown as Record<string, unknown>,
-        "tiebreak-commander": () => commandTiebreak({ scoreA: 13, scoreB: 12, serving: "A", bestOf: 3, goldenPoint: true }) as unknown as Record<string, unknown>,
-        "bracket-architect": () => buildBracket({ teams: ["Tiburones", "Lobos", "Titanes", "Vinchas", "Piranhas"] }) as unknown as Record<string, unknown>,
-        "sponsor-deck": () => buildSponsorDeck({ impressions: 24000, reach: 8000, cpm: 12, engagementPct: 6, currency: "USD" }) as unknown as Record<string, unknown>,
-        "head-to-head": () => buildHeadToHead({ teamA: "Tiburones", teamB: "Lobos", matches: [{ setsA: 3, setsB: 1 }, { setsA: 2, setsB: 3 }, { setsA: 3, setsB: 0 }] }) as unknown as Record<string, unknown>,
-        "peripheral-reflex": () => scoreReflex({ timesMs: [210, 195, 240, 205, 220] }) as unknown as Record<string, unknown>,
       };
       const preview = previews[meta.slug];
       if (!preview) return;
@@ -3140,13 +2602,6 @@ export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
       ) : (
         <p className="text-[11px] text-white/55">{t(locale, "Calculando...", "Computing...", "Calculando...")}</p>
       )}
-    </StationShell>
-  );
-}
-export function GymScreenStation({ meta, locale, onSave }: StationProps) {
-  return (
-    <StationShell meta={meta} locale={locale} rows={1} onSave={onSave} onExample={() => undefined}>
-      <GymScreenModule locale={locale} onClose={() => {}} />
     </StationShell>
   );
 }
@@ -3200,11 +2655,13 @@ export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   "arena-dj": EnginePreviewStation,
   "court-slang": EnginePreviewStation,
   "qr-sync": QrSyncStation,
-  "gym-screen": GymScreenStation,
+  "gym-screen": ({ meta, locale, onSave }: StationProps) => (
+    <GymScreenModule locale={locale} onClose={() => {}} />
+  ),
   "fivb-escoresheet": EnginePreviewStation,
-  "video-telestrator": VideoTelestratorStation,
-  "playbook-animator": PlaybookAnimatorStation,
-  "shot-heatmap": ShotHeatmapStation,
+  "video-telestrator": EnginePreviewStation,
+  "playbook-animator": EnginePreviewStation,
+  "shot-heatmap": EnginePreviewStation,
   "tournament-nutrition": EnginePreviewStation,
   "injury-prehab": EnginePreviewStation,
   "tiebreak-commander": EnginePreviewStation,
@@ -3212,5 +2669,4 @@ export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   "sponsor-deck": EnginePreviewStation,
   "head-to-head": EnginePreviewStation,
   "peripheral-reflex": EnginePreviewStation,
-  "club-white-label": EnginePreviewStation,
 };
