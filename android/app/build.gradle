@@ -42,7 +42,6 @@ android {
             v3SigningEnabled true
         }
     }
-    }
 
     buildTypes {
         release {
