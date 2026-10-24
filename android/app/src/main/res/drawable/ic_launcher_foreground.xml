@@ -5,60 +5,13 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- shipping bench guards -->
+    <!-- amber volt volleyball -->
     <path
         android:fillColor="#EAB308"
-        android:pathData="M41,36 L67,36 L67,72 L41,72 Z"
-        android:strokeWidth="0" />
+        android:pathData="M54,24 L76,44 L54,76 L32,44 Z" />
 
-    <!-- cell shape -->
-    <path
-        android:fillColor="#EAB308"
-        android:pathData="M54,24 L76,44 L54,76 L32,44 Z"
-        android:strokeWidth="0" />
-
-    <!-- breach point -->
+    <!-- crimson net line -->
     <path
         android:fillColor="#E11D48"
-        android:pathData="M56,48 L72,52 L66,60 L50,56 Z"
-        android:strokeWidth="0" />
-
-    <!-- breach trail -->
-    <path
-        android:strokeColor="#E11D48"
-        android:strokeWidth="2.5"
-        android:strokeLineCap="round"
-        android:pathData="M56,48 L38,48" />
-
-    <!-- cell rails -->
-    <path
-        android:strokeColor="#EAB308"
-        android:strokeWidth="2.8"
-        android:strokeLineCap="round"
-        android:pathData="M54,24 L76,44 L54,76" />
-    <path
-        android:strokeColor="#EAB308"
-        android:strokeWidth="2.8"
-        android:strokeLineCap="round"
-        android:pathData="M54,24 L32,44 L54,76" />
-
-    <!-- diversion energy -->
-    <path
-        android:fillColor="#EAB308"
-        android:pathData="M0,-20 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 M14,8 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
-    <path
-        android:fillColor="#E11D48"
-        android:pathData="M0,18 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
-
-    <!-- breach pulse -->
-    <path
-        android:strokeColor="#EAB308"
-        android:strokeWidth="1"
-        android:pathData="M54,51 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0"
-        android:strokeAlpha="0.8" />
-    <path
-        android:strokeColor="#E11D48"
-        android:strokeWidth="1"
-        android:pathData="M54,51 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0"
-        android:strokeAlpha="0.95" />
+        android:pathData="M54,40 L72,48 L54,56 L36,48 Z" />
 </vector>

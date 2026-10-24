@@ -4,14 +4,14 @@ plugins {
 
 android {
     namespace "org.voleyos.global"
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "org.voleyos.global"
         minSdk 24
         targetSdk 34
-        versionCode 901
-        versionName "9.0.1"
+        versionCode 902
+        versionName "9.0.2"
     }
 
     // Android's asset merger ignores directories whose name starts with an underscore
