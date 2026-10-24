@@ -17,16 +17,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.VoleyOS">
 
-        <provider
-            android:name="androidx.startup.InitializationProvider"
-            android:authorities="${applicationId}.androidx-startup"
-            android:exported="false"
-            tools:node="merge">
-            <meta-data
-                android:name="androidx.startup.InitializationProvider"
-                android:value="androidx.startup" />
-        </provider>
-
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
@@ -38,18 +28,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <activity
-            android:name=".GymScreenActivity"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
-            android:screenOrientation="user"
-            android:exported="false" />
-
-        <activity
-            android:name=".gym.GymScreenActivity"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
-            android:screenOrientation="user"
-            android:exported="false" />
 
     </application>
 </manifest>

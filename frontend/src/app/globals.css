@@ -78,3 +78,44 @@ textarea,
 .hidden-by-default {
   display: none;
 }
+
+/* 3-Tier Spatial Separation System: sections sit on #0E1015, items on #161922,
+   so nested cards never blend into one another on small screens. */
+.vos-section-card {
+  background: #0e1015;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.5rem;
+  padding: 1.25rem;
+  gap: 0.875rem; /* gap-3.5 */
+}
+
+.vos-item-card {
+  background: #161922;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 1rem;
+  padding: 0.875rem;
+}
+
+.vos-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem; /* space-y-4 */
+}
+
+/* Keep the last stacked card clear of the fixed 5-tab dock. */
+.vos-scroll-pad {
+  padding-bottom: 7rem; /* pb-28 */
+}
+
+.vos-flash {
+  animation: vos-flash 0.45s ease-out;
+}
+
+@keyframes vos-flash {
+  0% {
+    box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.85);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(234, 179, 8, 0);
+  }
+}

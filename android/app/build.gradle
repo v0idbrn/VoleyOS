@@ -52,16 +52,32 @@ android {
     }
 }
 
-dependencies {
-    implementation "androidx.core:core:1.15.0"
-    implementation "androidx.appcompat:appcompat:1.7.0"
-    implementation "androidx.activity:activity:1.9.0"
-    implementation "androidx.webkit:webkit:1.12.1"
+// The WebView loads file:///android_asset/index.html: the static export MUST sit
+// at the ROOT of src/main/assets. If CI (or a local build) has a fresh
+// frontend/out, auto-copy it so assembleRelease can never ship without a shell.
+def frontendOut = file("../../frontend/out")
+def assetsIndex = file("src/main/assets/index.html")
+tasks.register("verifyWebAssets") {
+    doLast {
+        if (!assetsIndex.exists() && frontendOut.file("index.html").exists()) {
+            copy {
+                from frontendOut
+                into file("src/main/assets")
+            }
+        }
+        if (!assetsIndex.exists()) {
+            throw new GradleException(
+                "src/main/assets/index.html missing. Build the frontend first: " +
+                "cd frontend && VOLEYOS_STATIC_EXPORT=true npm run build")
+        }
+        logger.lifecycle("web assets OK: " + assetsIndex)
+    }
+}
+afterEvaluate {
+    tasks.named("preBuild").dependsOn(tasks.named("verifyWebAssets"))
 }
 
-// Kotlin stdlib 1.8+ already merges the jdk7/jdk8 extension content; keeping the
-// old variants on the classpath triggers duplicate-class failures at package time.
-configurations.configureEach {
-    exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk7"
-    exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk8"
+// Pure Android SDK shell: zero androidx / Kotlin dependencies, so AAR metadata and
+// compileSdk clashes can never break assembleRelease again.
+dependencies {
 }

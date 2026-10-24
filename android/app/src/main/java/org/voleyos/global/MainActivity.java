@@ -2,8 +2,8 @@ package org.voleyos.global;
 
 import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -13,46 +13,40 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
-import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsCompat;
-import androidx.core.view.WindowInsetsControllerCompat;
+import java.security.MessageDigest;
 
 public class MainActivity extends Activity {
-    private static final String GYM_PATH = "/gym-screen";
     private WebView webView;
 
+    /** Exposed to JavaScript as VoleyOSBridge. */
     public static class VosleyOSBridge {
-        private Context context;
+        private final Context context;
 
         VosleyOSBridge(Context context) {
             this.context = context;
         }
 
+        /**
+         * Deterministic 8-char uppercase hex device id (XXXX-XXXX) derived from
+         * ANDROID_ID via SHA-256. Used to bind licences to one phone.
+         */
         @JavascriptInterface
-        public void openGymScreen(String payloadJson) {
-            if (context != null) {
-                Intent i = new Intent(context, org.voleyos.global.gym.GymScreenActivity.class);
-                i.putExtra("gym_title", "Gym Screen");
-                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                context.startActivity(i);
+        public String getDeviceFingerprint() {
+            try {
+                String androidId = Settings.Secure.getString(
+                        context.getContentResolver(), Settings.Secure.ANDROID_ID);
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                byte[] hash = digest.digest(("voleyos:" + (androidId == null ? "" : androidId)).getBytes("UTF-8"));
+                StringBuilder sb = new StringBuilder(9);
+                for (int i = 0; i < 4; i += 1) {
+                    sb.append(String.format("%02X", hash[i]));
+                    if (i == 1) sb.append('-');
+                }
+                return sb.toString();
+            } catch (Exception e) {
+                return "0000-0000";
             }
         }
-    }
-
-    @JavascriptInterface
-    public void openGymScreen(String payloadJson) {
-        Intent i = new Intent(this, org.voleyos.global.gym.GymScreenActivity.class);
-        i.putExtra("gym_title", "Gym Screen");
-        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        startActivity(i);
-    }
-
-    public static void openGymScreen(Context context) {
-        if (context == null) return;
-        Intent i = new Intent(context, org.voleyos.global.gym.GymScreenActivity.class);
-        i.putExtra("gym_title", "Gym Screen");
-        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        context.startActivity(i);
     }
 
     @Override
@@ -61,12 +55,15 @@ public class MainActivity extends Activity {
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-        if (controller != null) {
-            controller.hide(WindowInsetsCompat.Type.systemBars());
-            controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-        }
+        // Pure SDK immersive fullscreen; the manifest's screenOrientation="user"
+        // keeps the phone's own rotation lock in charge.
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
         setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER);
 
         FrameLayout container = new FrameLayout(this);
@@ -79,28 +76,19 @@ public class MainActivity extends Activity {
         settings.setAllowFileAccess(true);
         webView.setWebViewClient(new WebViewClient());
         webView.addJavascriptInterface(new VosleyOSBridge(this), "VoleyOSBridge");
-        webView.addJavascriptInterface(this, "Android");
 
+        // Native Android copy/paste: let long-press on text inputs (and links) reach
+        // the system selection menu while still blocking random image/context menus.
         webView.setLongClickable(true);
         webView.setOnLongClickListener(v -> {
-            android.webkit.WebView.HitTestResult r = ((WebView) v).getHitTestResult();
-            return !(r != null && (r.getType() == android.webkit.WebView.HitTestResult.EDIT_TEXT_TYPE
-                    || r.getType() == android.webkit.WebView.HitTestResult.SRC_ANCHOR_TYPE));
+            WebView.HitTestResult r = ((WebView) v).getHitTestResult();
+            return !(r != null && (r.getType() == WebView.HitTestResult.EDIT_TEXT_TYPE
+                    || r.getType() == WebView.HitTestResult.SRC_ANCHOR_TYPE));
         });
 
         container.addView(webView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
-
-        Intent gym = getIntent();
-        if (gym != null && GYM_PATH.equals(gym.getAction())) {
-            openGymScreen(this);
-            return;
-        }
-        if (gym != null && "VoleyOSBridge.openGymScreen".equals(gym.getAction())) {
-            openGymScreen(this);
-            return;
-        }
 
         webView.loadUrl("file:///android_asset/index.html");
     }

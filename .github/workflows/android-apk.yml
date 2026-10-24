@@ -61,12 +61,17 @@ jobs:
 
       - name: Copy public build into APK assets
         run: |
-          rm -rf android/app/src/main/assets/public
-          mkdir -p android/app/src/main/assets/public
-          cp -R frontend/out/. android/app/src/main/assets/public/
-          test -f android/app/src/main/assets/public/index.html
-          test -d android/app/src/main/assets/public/_next
-          echo "public assets: $(find android/app/src/main/assets/public -type f | wc -l)"
+          rm -rf android/app/src/main/assets
+          mkdir -p android/app/src/main/assets
+          cp -R frontend/out/. android/app/src/main/assets/
+          test -f android/app/src/main/assets/index.html || (echo "ERROR: assets/index.html missing!" && exit 1)
+          test -d android/app/src/main/assets/_next
+          echo "public assets: $(find android/app/src/main/assets -type f | wc -l)"
+
+      - name: Assert assets/index.html exists before Gradle
+        run: |
+          test -f android/app/src/main/assets/index.html || (echo "ERROR: assets/index.html missing!" && exit 1)
+          echo "assets/index.html OK: $(wc -c < android/app/src/main/assets/index.html) bytes"
 
       - name: Provision release keystore
         env:
@@ -127,12 +132,17 @@ jobs:
 
       - name: Copy creator build into APK assets
         run: |
-          rm -rf android/app/src/main/assets/public
-          mkdir -p android/app/src/main/assets/public
-          cp -R frontend/out/. android/app/src/main/assets/public/
-          test -f android/app/src/main/assets/public/index.html
-          test -d android/app/src/main/assets/public/_next
-          echo "creator assets: $(find android/app/src/main/assets/public -type f | wc -l)"
+          rm -rf android/app/src/main/assets
+          mkdir -p android/app/src/main/assets
+          cp -R frontend/out/. android/app/src/main/assets/
+          test -f android/app/src/main/assets/index.html || (echo "ERROR: assets/index.html missing!" && exit 1)
+          test -d android/app/src/main/assets/_next
+          echo "creator assets: $(find android/app/src/main/assets -type f | wc -l)"
+
+      - name: Assert creator assets/index.html exists before Gradle
+        run: |
+          test -f android/app/src/main/assets/index.html || (echo "ERROR: assets/index.html missing!" && exit 1)
+          echo "assets/index.html OK: $(wc -c < android/app/src/main/assets/index.html) bytes"
 
       - name: Build creator release APK
         working-directory: android
