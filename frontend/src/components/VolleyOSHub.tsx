@@ -7,6 +7,8 @@ import { buildTarget, paywallEnabled, type Locale, type Profile } from "@/lib/lo
 import { clearCreatorUnlock, creatorUnlocked, matchesCreatorKey, persistCreatorToken } from "@/lib/creator-unlock";
 import { clearLicenseToken, unlockCreatorOnServer } from "@/lib/api-client";
 import { MODULES, MODULE_BY_SLUG, PROFILE_LABELS } from "@/lib/modules";
+import { DIFFICULTY_BADGES, GUIDED_MODES, GUIDED_MODE_BY_ID, type GuidedModeId } from "@/lib/guided-modes";
+import { ModuleGuideBanner } from "@/components/ModuleGuideBanner";
 import { addVaultEntry, loadVault } from "@/lib/vault";
 import { downloadXlsx, openPrintableReport, type ReportSpec } from "@/lib/offline-xlsx";
 import { announceScoreTTS, requestCourtWakeLock, triggerCourtHaptics } from "@/lib/court-ux";
@@ -181,6 +183,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [teamColor, setTeamColor] = useState<string>("#eab308");
   const [profile, setProfile] = useState<Profile | "all">("all");
   const [favOnly, setFavOnly] = useState(false);
+  const [guidedMode, setGuidedMode] = useState<GuidedModeId | null>(null);
+  const [openDrawers, setOpenDrawers] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState("");
   const [pinned, setPinned] = useState<string[]>([]);
   const [recent, setRecent] = useState<string[]>([]);
@@ -216,6 +220,26 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     });
   }, [locale, profile, query, favOnly, pinned]);
 
+  const chooseMode = (id: GuidedModeId): void => {
+    if (guidedMode === id) {
+      setGuidedMode(null);
+      window.localStorage.removeItem("volleyos.guided");
+      return;
+    }
+    const mode = GUIDED_MODE_BY_ID.get(id);
+    if (!mode) return;
+    setGuidedMode(id);
+    setFavOnly(false);
+    setProfile("all");
+    setOpenDrawers(Object.fromEntries(mode.drawers.map((drawer) => [drawer.id, drawer.openByDefault ?? false])));
+    window.localStorage.setItem("volleyos.guided", id);
+    triggerCourtHaptics(22);
+  };
+
+  const toggleDrawer = (drawerId: string): void => {
+    setOpenDrawers((current) => ({ ...current, [drawerId]: !current[drawerId] }));
+  };
+
   useEffect(() => {
     document.documentElement.classList.add("app-shell");
     return () => document.documentElement.classList.remove("app-shell");
@@ -228,6 +252,14 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     });
     const storedRole = window.localStorage.getItem(ROLE_KEY);
     if (isProfile(storedRole)) setProfile(storedRole);
+    const storedGuided = window.localStorage.getItem("volleyos.guided");
+    if (storedGuided && GUIDED_MODE_BY_ID.has(storedGuided as GuidedModeId)) {
+      const mode = GUIDED_MODE_BY_ID.get(storedGuided as GuidedModeId);
+      if (mode) {
+        setGuidedMode(mode.id);
+        setOpenDrawers(Object.fromEntries(mode.drawers.map((drawer) => [drawer.id, drawer.openByDefault ?? false])));
+      }
+    }
     setSolar(window.localStorage.getItem(THEME_KEY) === "solar");
     setVoice(window.localStorage.getItem(VOICE_KEY) === "1");
     setCourtAudio(window.localStorage.getItem(AUDIO_KEY) !== "0");
@@ -678,7 +710,24 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   />
                 </label>
 
-                <div className="snap-row mt-3 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={shell.allModules}>
+                <div className="snap-row mt-3 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={t(locale, "Modos guiados", "Guided modes", "Modos guiados")}>
+                  {GUIDED_MODES.map((mode) => (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={guidedMode === mode.id}
+                      onClick={() => chooseMode(mode.id)}
+                      className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+                        guidedMode === mode.id ? "border-crimson bg-crimson text-white" : "border-white/10 text-white/60"
+                      }`}
+                    >
+                      {mode.icon} {mode.label[locale]}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="snap-row mt-1.5 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={shell.allModules}>
                   <button
                     type="button"
                     role="tab"
@@ -720,7 +769,66 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   ))}
                 </div>
 
-                {recent.length > 0 ? (
+                {guidedMode && GUIDED_MODE_BY_ID.has(guidedMode) ? (
+                  <section className="mt-5 space-y-3" data-testid="guided-drawers">
+                    <ModuleGuideBanner slug="home" locale={locale} defaultOpen={guidedMode === "novice"} />
+                    {GUIDED_MODE_BY_ID.get(guidedMode)?.drawers.map((drawer) => (
+                      <div key={drawer.id} className="vos-section-card vos-stack">
+                        <button
+                          type="button"
+                          aria-expanded={openDrawers[drawer.id] ?? false}
+                          onClick={() => toggleDrawer(drawer.id)}
+                          className="flex w-full items-center justify-between gap-2 text-left"
+                        >
+                          <span className="text-[12px] font-black uppercase tracking-wider text-white">
+                            {drawer.title[locale]}
+                            {drawer.badge ? (
+                              <span className="ml-2 rounded-full bg-volt/15 px-2 py-0.5 text-[9px] text-volt">
+                                {DIFFICULTY_BADGES[drawer.badge][locale]}
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="flex items-center gap-2 text-[10px] text-white/45">
+                            {drawer.slugs.length} {t(locale, "herramientas", "tools", "ferramentas")}
+                            <span aria-hidden>{openDrawers[drawer.id] ? "▲" : "▼"}</span>
+                          </span>
+                        </button>
+                        {openDrawers[drawer.id] ? (
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                            {drawer.slugs.map((slug) => {
+                              const meta = MODULE_BY_SLUG.get(slug);
+                              if (!meta) return null;
+                              return (
+                                <button
+                                  key={slug}
+                                  type="button"
+                                  data-testid="guided-tool"
+                                  onClick={() => openModule(slug)}
+                                  className="tap flex w-full items-center gap-2 rounded-xl border border-white/10 bg-panel p-2 text-left active:border-volt/50"
+                                >
+                                  <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-obsidian text-base ring-1 ring-white/10">
+                                    {meta.icon}
+                                  </span>
+                                  <span className="line-clamp-2 text-[11px] font-bold leading-tight">{meta.name[locale]}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      data-testid="all-tools-toggle"
+                      onClick={() => chooseMode(guidedMode)}
+                      className="tap w-full rounded-xl border border-white/15 bg-panel px-3 py-2.5 text-[11px] font-black uppercase tracking-wider text-white/70"
+                    >
+                      📂 {t(locale, "Ver / Buscar las 60 Herramientas", "Browse / Search all 60 Tools", "Ver / Buscar as 60 Ferramentas")}
+                    </button>
+                  </section>
+                ) : null}
+
+                {recent.length > 0 && !guidedMode ? (
                   <section className="mt-5">
                     <h2 className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.recents}</h2>
                     <div className="snap-row mt-2 flex gap-2 overflow-x-auto no-scrollbar pb-1">

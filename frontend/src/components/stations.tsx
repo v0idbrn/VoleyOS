@@ -139,6 +139,7 @@ import {
 } from "@/lib/samples";
 import type { ModuleMeta } from "@/lib/modules";
 import { GymScreenModule } from "@/components/GymScreenModule";
+import { ModuleGuideBanner } from "@/components/ModuleGuideBanner";
 
 export interface StationProps {
   meta: ModuleMeta;
@@ -155,6 +156,11 @@ const BTN_PRIMARY =
 const INPUT =
   "w-full rounded-lg border border-white/15 bg-obsidian px-3 py-2 text-sm text-white outline-none focus:border-volt";
 const LABEL = "text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50";
+
+function defaultOpenGuide(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem("volleyos.guided") === "novice";
+}
 
 function StationShell({
   meta,
@@ -194,6 +200,7 @@ function StationShell({
           {t(locale, "Local", "Local", "Local")}
         </span>
       </header>
+      <ModuleGuideBanner slug={meta.slug} locale={locale} defaultOpen={defaultOpenGuide()} />
       <div className="flex-1 text-sm text-white/80">{localizeReactTree(children, locale)}</div>
       <footer className="flex flex-wrap gap-2 border-t border-white/10 pt-3">
         <button type="button" className={BTN_PRIMARY} onClick={onExample}>
