@@ -25,8 +25,8 @@ android {
     }
 
     // The release keystore is always provisioned by CI (persisted secret or ephemeral
-    # fallback). signingConfigs.release is defined unconditionally below so assembleRelease
-    # can NEVER emit an unsigned APK.
+    // fallback). signingConfigs.release is defined unconditionally below so assembleRelease
+    // can NEVER emit an unsigned APK.
     def keystorePath = System.getenv("VOLEYOS_KEYSTORE")
     def keystoreFile = (keystorePath != null && !keystorePath.trim().isEmpty())
             ? file(keystorePath)
