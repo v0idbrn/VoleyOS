@@ -58,3 +58,10 @@ dependencies {
     implementation "androidx.activity:activity:1.9.0"
     implementation "androidx.webkit:webkit:1.12.1"
 }
+
+// Kotlin stdlib 1.8+ already merges the jdk7/jdk8 extension content; keeping the
+// old variants on the classpath triggers duplicate-class failures at package time.
+configurations.configureEach {
+    exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk7"
+    exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk8"
+}
