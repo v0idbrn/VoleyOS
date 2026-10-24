@@ -4,14 +4,14 @@ plugins {
 
 android {
     namespace "org.voleyos.global"
-    compileSdk 35
+    compileSdk 34
 
     defaultConfig {
         applicationId "org.voleyos.global"
         minSdk 24
-        targetSdk 35
-        versionCode 900
-        versionName "9.0.0"
+        targetSdk 34
+        versionCode 901
+        versionName "9.0.1"
     }
 
     // Android's asset merger ignores directories whose name starts with an underscore
@@ -24,25 +24,35 @@ android {
                 "!CVS", "!thumbs.db", "!picasa.ini", "!*~")
     }
 
+    // The release keystore is always provisioned by CI (persisted secret or ephemeral
+    # fallback). signingConfigs.release is defined unconditionally below so assembleRelease
+    # can NEVER emit an unsigned APK.
     def keystorePath = System.getenv("VOLEYOS_KEYSTORE")
-    def hasReleaseKeystore = keystorePath != null && !keystorePath.trim().isEmpty()
-    if (hasReleaseKeystore) {
-        signingConfigs {
-            release {
-                storeFile file(keystorePath)
-                storeType "PKCS12"
-                storePassword System.getenv("VOLEYOS_KEYSTORE_PASSWORD") ?: "voleyos-ci"
-                keyAlias System.getenv("VOLEYOS_KEY_ALIAS") ?: "voleyos"
-                keyPassword System.getenv("VOLEYOS_KEY_PASSWORD") ?: "voleyos-ci"
-            }
+    def keystoreFile = (keystorePath != null && !keystorePath.trim().isEmpty())
+            ? file(keystorePath)
+            : file("${projectDir}/debug.keystore")
+    def storePass = System.getenv("VOLEYOS_KEYSTORE_PASSWORD") ?: "voleyos-ci"
+    def keyAlias = System.getenv("VOLEYOS_KEY_ALIAS") ?: "voleyos"
+    def keyPass = System.getenv("VOLEYOS_KEY_PASSWORD") ?: "voleyos-ci"
+
+    signingConfigs {
+        release {
+            storeFile keystoreFile
+            storeType "PKCS12"
+            storePassword storePass
+            keyAlias keyAlias
+            keyPassword keyPass
+            // V1 (JAR) + V2 (APK Signing Block) are both mandatory on Android 14+.
+            v1SigningEnabled true
+            v2SigningEnabled true
         }
     }
 
     buildTypes {
         release {
             minifyEnabled false
-            // Never emit an unsigned APK: Android rejects those at install time.
-            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
+            // Always sign the release APK: never ship unsigned.
+            signingConfig signingConfigs.release
         }
     }
 
@@ -67,8 +77,8 @@ tasks.register("verifyWebAssets") {
         }
         if (!assetsIndex.exists()) {
             throw new GradleException(
-                "src/main/assets/index.html missing. Build the frontend first: " +
-                "cd frontend && VOLEYOS_STATIC_EXPORT=true npm run build")
+                    "src/main/assets/index.html missing. Build the frontend first: " +
+                    "cd frontend && VOLEYOS_STATIC_EXPORT=true npm run build")
         }
         logger.lifecycle("web assets OK: " + assetsIndex)
     }

@@ -163,7 +163,12 @@ jobs:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
-          APKSIGNER="$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner"
+          BUILD_TOOLS_DIR=$(ls -d "$ANDROID_HOME/build-tools/"* | sort -V | tail -n 1)
+          APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
+          AAPT2="$BUILD_TOOLS_DIR/aapt2"
+          test -x "$APKSIGNER"
+          test -x "$AAPT2"
+          echo "Using build-tools: $BUILD_TOOLS_DIR"
           for APK in voleyos-universal.apk voleyos-creator-unlocked.apk; do
             test -f "$APK"
             "$APKSIGNER" verify --verbose "$APK"
@@ -178,6 +183,8 @@ jobs:
             echo "$APK Next.js chunks: $chunks"
             test "$chunks" -ge 5
           done
+          echo "=== Creator APK badging (aapt2) ==="
+          "$AAPT2" dump badging voleyos-creator-unlocked.apk | head -n 30
           if cmp -s voleyos-universal.apk voleyos-creator-unlocked.apk; then
             echo "::error::Creator APK is identical to the public APK; the DEV_UNLOCK build flag did not change the bundle."
             exit 1
