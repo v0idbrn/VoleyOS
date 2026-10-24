@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.VoleyOS" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@color/obsidian</item>
+        <item name="android:windowBackground">#070709</item>
     </style>
 </resources>
