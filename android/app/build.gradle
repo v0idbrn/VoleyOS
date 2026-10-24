@@ -27,21 +27,13 @@ android {
     // The release keystore is always provisioned by CI (persisted secret or ephemeral
     // fallback). signingConfigs.release is defined unconditionally below so assembleRelease
     // can NEVER emit an unsigned APK.
-    def keystorePath = System.getenv("VOLEYOS_KEYSTORE")
-    def keystoreFile = (keystorePath != null && !keystorePath.trim().isEmpty())
-            ? file(keystorePath)
-            : file("${projectDir}/debug.keystore")
-    def storePass = System.getenv("VOLEYOS_KEYSTORE_PASSWORD") ?: "voleyos-ci"
-    def keyAlias = System.getenv("VOLEYOS_KEY_ALIAS") ?: "voleyos"
-    def keyPass = System.getenv("VOLEYOS_KEY_PASSWORD") ?: "voleyos-ci"
-
     signingConfigs {
         release {
-            storeFile keystoreFile
+            storeFile file(System.getenv("VOLEYOS_KEYSTORE") ?: "${projectDir}/debug.keystore")
             storeType "PKCS12"
-            storePassword storePass
-            keyAlias keyAlias
-            keyPassword keyPass
+            storePassword System.getenv("VOLEYOS_KEYSTORE_PASSWORD") ?: "voleyos-ci"
+            keyAlias System.getenv("VOLEYOS_KEY_ALIAS") ?: "voleyos"
+            keyPassword System.getenv("VOLEYOS_KEY_PASSWORD") ?: "voleyos-ci"
             // V1 (JAR) + V2 (APK Signing Block) are both mandatory on Android 14+.
             v1SigningEnabled true
             v2SigningEnabled true
