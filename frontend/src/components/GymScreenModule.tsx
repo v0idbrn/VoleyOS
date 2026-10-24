@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { playWhistle } from "@/lib/court-audio";
 import { DEFAULT_GYM_PAYLOAD, GYM_SCREEN } from "@/lib/gym-screen";
 import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/local-engines";
@@ -13,6 +14,7 @@ interface GymScreenModuleProps {
 
 export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
   const [payload, setPayload] = useState<typeof DEFAULT_GYM_PAYLOAD>(DEFAULT_GYM_PAYLOAD);
+  const [swapped, setSwapped] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -60,21 +62,21 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
         <div className="mt-6 grid aspect-video max-h-[70vh] grid-cols-3 gap-6">
           <div className="flex flex-col items-center gap-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
-              {t(locale, "Equipo A", "Team A", "Equipe A")}
+              {swapped ? t(locale, "Equipo B", "Team B", "Equipe B") : t(locale, "Equipo A", "Team A", "Equipe A")}
             </p>
-            <p className="text-8xl font-black text-crimson tabular-nums">{payload.scoreA}</p>
-            <p className="text-xl font-bold text-volt">Sets {payload.setA}</p>
+            <p className="text-8xl font-black text-crimson tabular-nums">{swapped ? payload.scoreB : payload.scoreA}</p>
+            <p className="text-xl font-bold text-volt">Sets {swapped ? payload.setB : payload.setA}</p>
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => bump("scoreA", 1)}
+                onClick={() => bump(swapped ? "scoreB" : "scoreA", 1)}
                 className="tap h-12 w-12 rounded-full bg-crimson/20 text-crimson text-2xl font-black hover:bg-crimson/40"
               >
                 +1
               </button>
               <button
                 type="button"
-                onClick={() => bump("scoreA", -1)}
+                onClick={() => bump(swapped ? "scoreB" : "scoreA", -1)}
                 className="tap h-12 w-12 rounded-full bg-white/10 text-white/70 text-2xl font-black"
               >
                 −1
@@ -84,6 +86,16 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
 
           <div className="flex flex-col items-center justify-center gap-3">
             <p className="text-7xl font-black text-white tabular-nums">{payload.timer}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setSwapped((current) => !current);
+                playWhistle("double");
+              }}
+              className="tap rounded-2xl bg-white/10 px-4 py-3 text-xl font-black text-volt hover:bg-white/20 vos-flash"
+            >
+              🔄 {t(locale, "Cambio de Cancha", "Swap Sides", "Troca de Lado")}
+            </button>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -104,21 +116,21 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
 
           <div className="flex flex-col items-center gap-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
-              {t(locale, "Equipo B", "Team B", "Equipe B")}
+              {swapped ? t(locale, "Equipo A", "Team A", "Equipe A") : t(locale, "Equipo B", "Team B", "Equipe B")}
             </p>
-            <p className="text-8xl font-black text-crimson tabular-nums">{payload.scoreB}</p>
-            <p className="text-xl font-bold text-volt">Sets {payload.setB}</p>
+            <p className="text-8xl font-black text-crimson tabular-nums">{swapped ? payload.scoreA : payload.scoreB}</p>
+            <p className="text-xl font-bold text-volt">Sets {swapped ? payload.setA : payload.setB}</p>
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => bump("scoreB", 1)}
+                onClick={() => bump(swapped ? "scoreA" : "scoreB", 1)}
                 className="tap h-12 w-12 rounded-full bg-crimson/20 text-crimson text-2xl font-black hover:bg-crimson/40"
               >
                 +1
               </button>
               <button
                 type="button"
-                onClick={() => bump("scoreB", -1)}
+                onClick={() => bump(swapped ? "scoreA" : "scoreB", -1)}
                 className="tap h-12 w-12 rounded-full bg-white/10 text-white/70 text-2xl font-black"
               >
                 −1

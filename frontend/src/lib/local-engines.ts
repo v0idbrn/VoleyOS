@@ -340,6 +340,9 @@ export interface ScoreboardState {
   isDecider?: boolean;
   isTieBreak?: boolean;
   sideSwitchedAt8?: boolean;
+  isCourtSwapped?: boolean;
+  targetPoints?: number;
+  goldenPoint?: boolean;
 }
 
 export interface PointResult {
@@ -376,6 +379,8 @@ export function newScoreboard(teamA = "Tiburones", teamB = "Cóndores", bestOf =
     isDecider: false,
     isTieBreak: false,
     sideSwitchedAt8: false,
+    isCourtSwapped: false,
+    goldenPoint: false,
     ...options,
   };
 }
@@ -403,16 +408,15 @@ export function awardIndoorPoint(state: ScoreboardState, team: Side): PointResul
   const format = next.matchFormat ?? (next.bestOf === 5 ? "bo5" : next.bestOf === 1 ? "short15" : "bo3");
   const isDeciderSet = next.setNumber === next.bestOf || (format === "bo3" && next.setNumber === 3) || (format === "bo5" && next.setNumber === 5);
   next.isDecider = isDeciderSet;
-  const target = isDeciderSet || format === "short15" ? 15 : 25;
+  const target = next.targetPoints ?? (isDeciderSet || format === "short15" ? 15 : 25);
   const own = team === "A" ? next.scoreA : next.scoreB;
   const rival = team === "A" ? next.scoreB : next.scoreA;
-  const setFinished = own >= target && own - rival >= 2;
+  const setFinished = next.goldenPoint === true ? own >= target : own >= target && own - rival >= 2;
   let matchFinished = false;
   let message = `Punto ${team} — ${next.scoreA}-${next.scoreB}`;
 
-  if (next.scoreA === 24 && next.scoreB === 24 && target === 25) {
-    message = `🔥 DEUCE — WIN BY 2 — ${next.scoreA}-${next.scoreB}`;
-  } else if (isDeciderSet && next.scoreA === 14 && next.scoreB === 14 && target === 15) {
+  const atDeuce = next.goldenPoint !== true && next.scoreA === target - 1 && next.scoreB === target - 1;
+  if (atDeuce) {
     message = `🔥 DEUCE — WIN BY 2 — ${next.scoreA}-${next.scoreB}`;
   } else if (setFinished && team === "A") {
     if (own >= target - 1) message = own - rival >= 1 ? `🏆 MATCH POINT — ${team}` : `⚡ SET POINT — ${team}`;
@@ -447,7 +451,70 @@ export function awardIndoorPoint(state: ScoreboardState, team: Side): PointResul
   return { state: next, rotated: sideOut, setFinished, matchFinished, sideSwitchDue, message };
 }
 
+/**
+ * Toggles the on-screen left/right court sides so the scoreboard mirrors the
+ * physical court in front of the user. Part of the undo history like a point.
+ */
+export function swapCourt(state: ScoreboardState): ScoreboardState {
+  const next = structuredClone(state);
+  next.isCourtSwapped = !(next.isCourtSwapped ?? false);
+  return next;
+}
+
+/** True when the point-8 side-switch badge should be shown (15-point sets). */
+export function point8SwitchDue(state: ScoreboardState): boolean {
+  if (state.status !== "live") return false;
+  const target = state.targetPoints ?? 15;
+  if (target !== 15) return false;
+  return Math.max(state.scoreA, state.scoreB) >= 8;
+}
+
 /* ---------------------------------------------------------------- module 5 */
+
+export interface KingOfCourtState {
+  teams: string[];
+  courtA: string;
+  courtB: string;
+  queue: string[];
+  wins: Record<string, number>;
+  streakTeam: string | null;
+  streak: number;
+}
+
+/** Rey de la Cancha: 3-5 rotating teams; the winner stays on court. */
+export function newKingOfCourt(teams: string[]): KingOfCourtState {
+  const clean = teams.map((name) => name.trim()).filter((name) => name.length > 0);
+  if (clean.length < 3 || clean.length > 5) throw new Error("king_of_court needs 3 to 5 teams");
+  return {
+    teams: clean,
+    courtA: clean[0] as string,
+    courtB: clean[1] as string,
+    queue: clean.slice(2),
+    wins: {},
+    streakTeam: null,
+    streak: 0,
+  };
+}
+
+/** Winner stays on court, loser joins the back of the queue, next challenger enters at 0-0. */
+export function kingAwardWin(state: KingOfCourtState, winnerOnCourt: "A" | "B"): KingOfCourtState {
+  const next = structuredClone(state);
+  const winner = winnerOnCourt === "A" ? next.courtA : next.courtB;
+  const loser = winnerOnCourt === "A" ? next.courtB : next.courtA;
+  next.wins[winner] = (next.wins[winner] ?? 0) + 1;
+  if (next.streakTeam === winner) {
+    next.streak += 1;
+  } else {
+    next.streakTeam = winner;
+    next.streak = 1;
+  }
+  next.queue = [...next.queue, loser];
+  const challenger = next.queue.shift();
+  if (challenger === undefined) throw new Error("empty king queue");
+  if (winnerOnCourt === "A") next.courtB = challenger;
+  else next.courtA = challenger;
+  return next;
+}
 
 export interface MatchResult {
   home: string;

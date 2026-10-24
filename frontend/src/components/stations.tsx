@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import jsQR from "jsqr";
 
 import { playWhistle } from "@/lib/court-audio";
+import { playBuzzer, playScorePop, playSetWinFanfare } from "@/lib/sound-effects";
 import { triggerCourtHaptics } from "@/lib/court-ux";
 import { clearClonedScoreboard, createQrFrames, emptyIngest, ingestQrFrame, readClonedScoreboard, renderQrSvg, storeClonedScoreboard, type IngestResult, type QrFrame } from "@/lib/qr-transfer";
 import { localizeReactTree } from "@/lib/engine-l10n";
@@ -40,17 +41,21 @@ import {
   importCapsule,
   inspectEquipment,
   jumpLoad,
+  kingAwardWin,
   newBeach,
+  newKingOfCourt,
   newScoreboard,
   newScoreboardHistory,
   overlayFromScoreboard,
   parsePlay,
+  point8SwitchDue,
   refereeReport,
   redoScoreboard,
   scoutingReport,
   snakeDraft,
   splitCosts,
   standings,
+  swapCourt,
   tempoWindow,
   trackSubstitutions,
   undoScoreboard,
@@ -123,6 +128,7 @@ import {
   deleteTeam,
   newTeam,
   teamFromRosterSheet,
+  type KingOfCourtState,
 } from "@/lib/local-engines";
 import {
   PICKUP_SAMPLE,
@@ -532,6 +538,12 @@ function pressurePoint(state: ScoreboardState): boolean {
 
 export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [matchFormat, setMatchFormat] = useState<"bo3" | "bo5" | "short15">("bo3");
+  const [preset, setPreset] = useState<"picadito" | "king" | "oficial">("oficial");
+  const [picaditoTarget, setPicaditoTarget] = useState<11 | 15 | 21 | 25>(15);
+  const [goldenPoint, setGoldenPoint] = useState(false);
+  const [kingInput, setKingInput] = useState("");
+  const [king, setKing] = useState<KingOfCourtState | null>(null);
+  const [flashSwap, setFlashSwap] = useState(false);
   const [teams, setTeams] = useState<TeamRoster[]>([]);
   const [teamAId, setTeamAId] = useState<string | null>(null);
   const [teamBId, setTeamBId] = useState<string | null>(null);
@@ -587,6 +599,20 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const point = (team: "A" | "B"): void => {
     try {
       const result = awardIndoorPoint(state, team);
+      if (result.matchFinished || result.setFinished) playSetWinFanfare();
+      else playScorePop();
+      if (result.matchFinished && preset === "king" && king) {
+        const nextKing = kingAwardWin(king, result.state.winner ?? "A");
+        setKing(nextKing);
+        const winnerName = result.state.winner === "A" ? result.state.teamA : result.state.teamB;
+        const challenger = nextKing.courtA === winnerName ? nextKing.courtB : nextKing.courtA;
+        setHistory(newScoreboardHistory(newScoreboard(nextKing.courtA, nextKing.courtB, 1, { matchFormat: "short15", targetPoints: 15, goldenPoint: false })));
+        setMessage(
+          t(locale, `👑 ${winnerName} queda en cancha (racha ${nextKing.streak}) — entra ${challenger}.`, `👑 ${winnerName} stays on court (streak ${nextKing.streak}) — ${challenger} enters.`, `👑 ${winnerName} fica na quadra (sequência ${nextKing.streak}) — ${challenger} entra.`),
+        );
+        triggerCourtHaptics([50, 40, 50]);
+        return;
+      }
       setHistory(commitScoreboard(history, result.state));
       setMessage(
         `${result.message}${result.rotated ? t(locale, " · rotación", " · rotation", " · rotação") : ""}${
@@ -597,6 +623,43 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Error");
     }
+  };
+
+  const startPicadito = (target: 11 | 15 | 21 | 25 = picaditoTarget, golden: boolean = goldenPoint): void => {
+    setPreset("picadito");
+    setPicaditoTarget(target);
+    setGoldenPoint(golden);
+    setMatchFormat("short15");
+    setKing(null);
+    setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 1, { matchFormat: "short15", targetPoints: target, goldenPoint: golden })));
+    setMessage(
+      t(locale, `⚡ Picadito a ${target} pts ${golden ? "· punto de oro" : "· ventaja de 2"}.`, `⚡ Pickup to ${target} pts ${golden ? "· golden point" : "· win by 2"}.`, `⚡ Rachinha a ${target} pts ${golden ? "· ponto de ouro" : "· vantagem de 2"}.`),
+    );
+    triggerCourtHaptics(25);
+  };
+
+  const startKing = (): void => {
+    const names = kingInput.split(/[,;\n]/).map((name) => name.trim()).filter((name) => name.length > 0);
+    try {
+      const fresh = newKingOfCourt(names);
+      setPreset("king");
+      setKing(fresh);
+      setMatchFormat("short15");
+      setHistory(newScoreboardHistory(newScoreboard(fresh.courtA, fresh.courtB, 1, { matchFormat: "short15", targetPoints: 15, goldenPoint: false })));
+      setMessage(t(locale, `👑 ${fresh.teams.length} equipos en cola. ¡A jugar!`, `👑 ${fresh.teams.length} teams in the queue. Play!`, `👑 ${fresh.teams.length} times na fila. Vamos!`));
+      triggerCourtHaptics([30, 25, 30]);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Error");
+    }
+  };
+
+  const swapSides = (): void => {
+    setHistory((previous) => commitScoreboard(previous, swapCourt(previous.present)));
+    playWhistle("double");
+    triggerCourtHaptics([40, 30, 40]);
+    setFlashSwap(true);
+    window.setTimeout(() => setFlashSwap(false), 450);
+    setMessage(t(locale, "🔄 Cancha cambiada — columnas invertidas.", "🔄 Sides swapped — columns inverted.", "🔄 Quadra trocada — colunas invertidas."));
   };
 
   const undo = (): void => {
@@ -654,7 +717,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         playWhistle("short");
       } else if (key === "b") {
         event.preventDefault();
-        playWhistle("long");
+        playBuzzer();
       } else if (key === "c") {
         event.preventDefault();
         const next = !document.documentElement.classList.contains("high-contrast");
@@ -666,6 +729,15 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [locale]);
+
+  const swapped = state.isCourtSwapped === true;
+  const left = swapped
+    ? { name: state.teamB, score: state.scoreB, sets: state.setsB, serving: state.serving === "B" }
+    : { name: state.teamA, score: state.scoreA, sets: state.setsA, serving: state.serving === "A" };
+  const right = swapped
+    ? { name: state.teamA, score: state.scoreA, sets: state.setsA, serving: state.serving === "A" }
+    : { name: state.teamB, score: state.scoreB, sets: state.setsB, serving: state.serving === "B" };
+  const showPoint8 = point8SwitchDue(state);
 
   return (
     <StationShell
@@ -679,10 +751,66 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       }}
     >
       <div className="mb-2 flex flex-wrap gap-1">
-        <button type="button" onClick={() => { setMatchFormat("bo3"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 3, { matchFormat: "bo3" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo3" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 3 (25/15)", "Best of 3 (25/15)", "Melhor de 3 (25/15)")}</button>
-        <button type="button" onClick={() => { setMatchFormat("bo5"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 5, { matchFormat: "bo5" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo5" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 5 (25/15)", "Best of 5 (25/15)", "Melhor de 5 (25/15)")}</button>
-        <button type="button" onClick={() => { setMatchFormat("short15"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 1, { matchFormat: "short15" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "short15" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Set corto 15", "Short Set 15", "Set curto 15")}</button>
+        <button type="button" onClick={() => startPicadito()} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "picadito" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>⚡ {t(locale, "Picadito", "Pickup", "Rachinha")}</button>
+        <button type="button" onClick={() => setPreset("king")} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "king" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>👑 {t(locale, "Ganador en cancha", "Winner stays", "Vencedor fica")}</button>
+        <button type="button" onClick={() => { setPreset("oficial"); setKing(null); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "oficial" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>🏆 {t(locale, "Oficial", "Official", "Oficial")}</button>
       </div>
+      {preset === "picadito" ? (
+        <div className="vos-item-card mb-2 space-y-2">
+          <div className="flex flex-wrap gap-1">
+            {([11, 15, 21, 25] as const).map((target) => (
+              <button
+                key={target}
+                type="button"
+                onClick={() => startPicadito(target)}
+                className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${picaditoTarget === target && matchFormat === "short15" ? "border-volt bg-volt/15 text-volt" : "border-white/10 text-white/50"}`}
+              >
+                {target} {t(locale, "pts", "pts", "pts")}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              onClick={() => startPicadito(picaditoTarget, false)}
+              className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${!goldenPoint ? "border-volt text-volt" : "border-white/10 text-white/50"}`}
+            >
+              {t(locale, "Diferencia de 2 (14-14 / 24-24)", "Win by 2 (14-14 / 24-24)", "Vantagem de 2 (14-14 / 24-24)")}
+            </button>
+            <button
+              type="button"
+              onClick={() => startPicadito(picaditoTarget, true)}
+              className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${goldenPoint ? "border-volt text-volt" : "border-white/10 text-white/50"}`}
+            >
+              {t(locale, "Punto de oro (muere en el target)", "Golden point (dies at target)", "Ponto de ouro (morre no alvo)")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {preset === "king" ? (
+        <div className="vos-item-card mb-2 space-y-1">
+          <input
+            value={kingInput}
+            onChange={(event) => setKingInput(event.target.value)}
+            placeholder={t(locale, "Tiburones, Lobos, Titanes, Vinchas… (3-5 equipos)", "Sharks, Wolves, Titans, Vinchas… (3-5 teams)", "Tubarões, Lobos, Titanes, Vinchas… (3-5 times)")}
+            className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px]"
+          />
+          <button type="button" className={`${BTN} w-full`} onClick={startKing}>
+            ▶ {t(locale, "Arrancar Rey de la Cancha (3-5 equipos)", "Start King of the Court (3-5 teams)", "Começar Rei da Quadra (3-5 times)")}
+          </button>
+          {king ? (
+            <p className="text-[9px] text-volt">
+              🔥 {t(locale, "Racha", "Streak", "Sequência")}: {king.streakTeam ?? "—"} ×{king.streak} · {t(locale, "cola", "queue", "fila")}: {king.queue.join(", ") || "—"}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {preset === "oficial" ? (
+        <div className="mb-2 flex flex-wrap gap-1">
+          <button type="button" onClick={() => { setMatchFormat("bo3"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 3, { matchFormat: "bo3" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo3" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 3 (25/15)", "Best of 3 (25/15)", "Melhor de 3 (25/15)")}</button>
+          <button type="button" onClick={() => { setMatchFormat("bo5"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 5, { matchFormat: "bo5" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo5" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 5 (25/15)", "Best of 5 (25/15)", "Melhor de 5 (25/15)")}</button>
+        </div>
+      ) : null}
       <div className="mb-2 grid grid-cols-2 gap-1">
         <select
           aria-label={t(locale, "Equipo local", "Home team", "Time da casa")}
@@ -760,32 +888,42 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       >
         🔒 {t(locale, "Modo Partido (botones de volumen)", "Match mode (volume keys)", "Modo Partida (botões de volume)")}
       </button>
-      <div className="rounded-xl border border-white/10 bg-obsidian/80 p-3">
+      <div className={`rounded-xl border border-white/10 bg-obsidian/80 p-3 ${flashSwap ? "vos-flash" : ""}`}>
         <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/50">
           <span>Set {state.setNumber} / {state.bestOf} {state.matchFormat === "short15" ? "(15)" : state.setNumber === state.bestOf || state.isDecider ? "(15 TB)" : "(25)"}</span>
           <span>{state.status === "finished" ? "FINAL" : `${state.streak} ${t(locale, "en racha", "run", "em sequência")}`}</span>
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2 text-center">
-          <div className={`rounded-lg py-2 ${state.serving === "A" ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
-            <p className="truncate text-xs font-bold">{state.teamA}</p>
-            <p data-testid="score-a" className="text-4xl font-black tabular-nums">{state.scoreA}</p>
-            <p className="text-[10px] text-volt">Sets {state.setsA}</p>
+          <div className={`rounded-lg py-2 ${left.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
+            <p className="truncate text-xs font-bold">{left.name}</p>
+            <p data-testid={swapped ? "score-b" : "score-a"} className="text-4xl font-black tabular-nums">{left.score}</p>
+            <p className="text-[10px] text-volt">Sets {left.sets}</p>
           </div>
-          <div className={`rounded-lg py-2 ${state.serving === "B" ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
-            <p className="truncate text-xs font-bold">{state.teamB}</p>
-            <p data-testid="score-b" className="text-4xl font-black tabular-nums">{state.scoreB}</p>
-            <p className="text-[10px] text-volt">Sets {state.setsB}</p>
+          <div className={`rounded-lg py-2 ${right.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
+            <p className="truncate text-xs font-bold">{right.name}</p>
+            <p data-testid={swapped ? "score-a" : "score-b"} className="text-4xl font-black tabular-nums">{right.score}</p>
+            <p className="text-[10px] text-volt">Sets {right.sets}</p>
           </div>
         </div>
+        <div className="mt-2 flex flex-col items-center gap-1">
+          <button type="button" className={BTN} onClick={swapSides}>
+            🔄 {t(locale, "Cambio de Cancha", "Swap Sides", "Troca de Lado")}
+          </button>
+          {showPoint8 ? (
+            <button type="button" onClick={swapSides} className="rounded-full bg-volt/15 px-2 py-0.5 text-[9px] font-bold text-volt">
+              💡 {t(locale, "Punto 8: ¿Cambiar de cancha?", "Point 8: swap sides?", "Ponto 8: trocar de lado?")}
+            </button>
+          ) : null}
+        </div>
         <div className="mt-2 flex justify-center gap-2">
-          <button type="button" className={BTN_PRIMARY} onClick={() => point("A")}>+ {state.teamA} [A]</button>
-          <button type="button" className={BTN_PRIMARY} onClick={() => point("B")}>+ {state.teamB} [L]</button>
+          <button type="button" className={BTN_PRIMARY} onClick={() => point(swapped ? "B" : "A")}>+ {left.name} [A]</button>
+          <button type="button" className={BTN_PRIMARY} onClick={() => point(swapped ? "A" : "B")}>+ {right.name} [L]</button>
         </div>
         <div className="mt-2 flex flex-wrap justify-center gap-1">
           <button type="button" className={BTN} onClick={undo} disabled={history.past.length === 0}>[Z] {t(locale, "Deshacer", "Undo", "Desfazer")} ({history.past.length})</button>
           <button type="button" className={BTN} onClick={redo} disabled={history.future.length === 0}>[Y] {t(locale, "Rehacer", "Redo", "Refazer")}</button>
           <button type="button" className={BTN} onClick={() => playWhistle("short")}>[W] {t(locale, "Silbato", "Whistle", "Apito")}</button>
-          <button type="button" className={BTN} onClick={() => playWhistle("long")}>[B] {t(locale, "Buzzer", "Buzzer", "Buzzer")}</button>
+          <button type="button" className={BTN} onClick={() => playBuzzer()}>[B] {t(locale, "Buzzer", "Buzzer", "Buzzer")}</button>
           <button type="button" className={BTN} onClick={() => {
             const next = !document.documentElement.classList.contains("high-contrast");
             document.documentElement.classList.toggle("high-contrast", next);
