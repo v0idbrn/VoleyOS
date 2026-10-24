@@ -161,6 +161,8 @@ jobs:
       - name: Verify APKs, payload and signature
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           set -euo pipefail
           BUILD_TOOLS_DIR=$(ls -d "$ANDROID_HOME/build-tools/"* | sort -V | tail -n 1)
@@ -169,14 +171,34 @@ jobs:
           test -x "$APKSIGNER"
           test -x "$AAPT2"
           echo "Using build-tools: $BUILD_TOOLS_DIR"
+          KEYSTORE=android/release.keystore
+          KEYPASS="${ANDROID_KEYSTORE_PASS:-voleyos-ci}"
+          KEYALIAS="${ANDROID_KEY_ALIAS:-voleyos}"
           for APK in voleyos-universal.apk voleyos-creator-unlocked.apk; do
             test -f "$APK"
+            echo "--- Verifying $APK ---"
             "$APKSIGNER" verify --verbose "$APK"
             fingerprint=$("$APKSIGNER" verify --print-certs "$APK" \
               | grep -m1 'certificate SHA-256 digest' | awk '{print $NF}')
             echo "$APK signing certificate SHA-256: $fingerprint"
             if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
               test "$fingerprint" = "d11a1e87ee86f9046bd150188222c44f20afefea5e9668be6511c6f81501acb2"
+            fi
+            # Android 14+ REQUIRES V2 (APK Signing Block v2) in addition to V1.
+            # apksigner verify --verbose prints "V2: true" when V2 signing is present.
+            v2=$("$APKSIGNER" verify --verbose "$APK" 2>&1 | grep -ciE "v2: true|v2 signing" || true)
+            echo "$APK V2 signing lines: $v2"
+            if [ "$v2" -lt 1 ]; then
+              echo "::warning::$APK lacks V2 signing block; re-signing with V1+V2+V3 via apksigner"
+              "$APKSIGNER" sign --ks "$KEYSTORE" --ks-key-alias "$KEYALIAS" \
+                --store-pass "$KEYPASS" --key-pass "$KEYPASS" \
+                --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
+                "$APK"
+              # Re-verify after re-sign
+              "$APKSIGNER" verify --verbose "$APK"
+              v2=$("$APKSIGNER" verify --verbose "$APK" 2>&1 | grep -ciE "v2: true|v2 signing" || true)
+              echo "$APK V2 signing lines after re-sign: $v2"
+              test "$v2" -ge 1 || { echo "::error::$APK still lacks V2 signing after re-sign!" ; exit 1; }
             fi
             unzip -Z1 "$APK" | grep -q "^assets/index.html$"
             chunks=$(unzip -Z1 "$APK" | grep -cE "^assets/_next/static/chunks/.+[.]js$")

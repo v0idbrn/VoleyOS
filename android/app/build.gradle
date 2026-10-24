@@ -10,8 +10,8 @@ android {
         applicationId "org.voleyos.global"
         minSdk 24
         targetSdk 34
-        versionCode 902
-        versionName "9.0.2"
+        versionCode 903
+        versionName "9.0.3"
     }
 
     // Android's asset merger ignores directories whose name starts with an underscore
@@ -34,10 +34,14 @@ android {
             storePassword System.getenv("VOLEYOS_KEYSTORE_PASSWORD") ?: "voleyos-ci"
             keyAlias System.getenv("VOLEYOS_KEY_ALIAS") ?: "voleyos"
             keyPassword System.getenv("VOLEYOS_KEY_PASSWORD") ?: "voleyos-ci"
-            // V1 (JAR) + V2 (APK Signing Block) are both mandatory on Android 14+.
+            // V1 (JAR) + V2 (APK Signing Block) + V3 are mandatory on Android 14+.
+            // Without a V2/V3 block, PackageInstaller on Android 14 rejects the APK
+            // with "Parse error" / "App not installed".
             v1SigningEnabled true
             v2SigningEnabled true
+            v3SigningEnabled true
         }
+    }
     }
 
     buildTypes {
