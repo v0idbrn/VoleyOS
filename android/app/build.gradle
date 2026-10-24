@@ -74,7 +74,7 @@ tasks.register("verifyWebAssets") {
     }
 }
 afterEvaluate {
-    tasks.named("preBuild").dependsOn(tasks.named("verifyWebAssets"))
+    tasks.named("preBuild").configure { dependsOn(tasks.named("verifyWebAssets")) }
 }
 
 // Pure Android SDK shell: zero androidx / Kotlin dependencies, so AAR metadata and
