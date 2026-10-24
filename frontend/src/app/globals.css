@@ -101,6 +101,32 @@ textarea,
   background: #161922;
 }
 
+/* Utility background/text classes used across the app shell and stations. */
+.bg-panel {
+  background-color: var(--vos-panel);
+}
+.bg-obsidian {
+  background-color: var(--vos-bg);
+}
+.bg-volt {
+  background-color: #EAB308;
+}
+.text-volt {
+  color: #EAB308;
+}
+.bg-crimson {
+  background-color: #E11D48;
+}
+.text-crimson {
+  color: #E11D48;
+}
+.bg-emerald {
+  background-color: #10B981;
+}
+.text-emerald {
+  color: #10B981;
+}
+
 .snap-row {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
