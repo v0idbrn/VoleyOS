@@ -1,0 +1,4 @@
+Catálogo expandido a 60 módulos offline: planilla FIVB, telestrador de video, animador de jugadas, mapa de calor, nutrición de torneo, prehab de lesiones, comandante de tie-break, arquitecto de llaves, deck de sponsors, cara a cara y reflejo periférico.
+Plantillas multi-equipo con 20 jugadores, capitanes, líberos y pegado masivo.
+Motor automático de sets FIVB: mejor de 3/5, deuce 24-24 con ventaja de 2, tie-break a 15 con cambio de cancha y deshacer entre sets.
+Pantalla gigante de gimnasio, ícono adaptativo, bloqueo de rotación respetado y copiar/pegar nativo en inputs.

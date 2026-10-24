@@ -41,7 +41,7 @@ describe("local-engines v8 (modules 54-60)", () => {
     const golden = commandTiebreak({ scoreA: 14, scoreB: 14, serving: "A", goldenPoint: true });
     expect(golden.phase).toBe("golden_point");
     expect(golden.recommendation).toContain("Punto de oro");
-    expect(() => commandTiebreak({ scoreA: 0, scoreB: 0, serving: "A", bestOf: 4 })).toThrow("best_of");
+    expect(() => commandTiebreak({ scoreA: 0, scoreB: 0, serving: "A", bestOf: 4 as unknown as 3 })).toThrow("best_of");
   });
 
   it("builds a seeded bracket with byes and later rounds", () => {

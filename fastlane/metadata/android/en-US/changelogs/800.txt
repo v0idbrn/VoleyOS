@@ -1,0 +1,4 @@
+Catalog expanded to 60 offline modules: FIVB scoresheet, video telestrator, playbook animator, shot heatmap, tournament nutrition, injury prehab, tiebreak commander, bracket architect, sponsor deck, head-to-head and peripheral reflex.
+Multi-team rosters with 20 players, captains, liberos and bulk paste.
+Automatic FIVB set engine: Best of 3/5, 24-24 deuce win-by-2, 15-point tie-break with court switch, undo across sets.
+Giant gym scoreboard screen, adaptive icon, orientation lock respect and native copy/paste in inputs.

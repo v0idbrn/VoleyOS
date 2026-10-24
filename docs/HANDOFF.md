@@ -197,14 +197,59 @@
 - Gates: 370 backend tests, 62 frontend tests (12 files), ruff/mypy/tsc clean,
   215 static pages and 32/32 live E2E.
 
-## Current state
-- 36 Decimal engines + TS mirrors, FastAPI API with security shield, HMAC
-  paywall and SQLite WAL live rooms, trilingual Command Center, 215 static
-  pages, PWA/F-Droid metadata, Docker/Render/CI and 32/32 live E2E.
-- Android APK is built and signed in GitHub Actions; local builds need a JDK.
-- Known limits: no user auth, no live checkout provider, Cloud export UI not
-  wired to the job API, Docker images unbuilt locally, live rooms poll every 5 s.
-  Static export only includes the `local` live-room demo; arbitrary room IDs
-  require the cloud server build.
+## Sprint 37 - engines 37-48 (v6 catalogue)
+- New Decimal engines: `ball_aerodynamics` (drag/lift matrix and float-serve
+  crisis), `rally_clipper` (highlight cuts + EDL), `recruiting_dossier`,
+  `system_transition`, `deception_reader`, `inclusive_adaptive`, `elo_ranking`,
+  `team_treasury`, `house_rules`, `arena_dj`, `court_slang`, `qr_sync`.
+- Dispatcher, demos, catalog and health expanded to 48 engines; six profiles at
+  eight modules each. TS mirrors for all twelve engines.
 
-Next: wire checkout + API export UI, then account auth and WebSocket live rooms.
+## Sprint 38 - gym screen v1
+- `gym_screen.py` engine + API runner, TS mirror and hub card.
+
+## Sprint 39 - engines 49-60 (v8 catalogue)
+- New Decimal engines: `fivb_escoresheet` (A4 acta with sanctions),
+  `video_telestrator` (frame stepping, jump height by flight time),
+  `playbook_animator` (3-phase SVG play), `shot_heatmap` (9-zone targets),
+  `tournament_nutrition` (carbs/fluid/sodium per match), `injury_prehab`
+  (knee/shoulder risk), `tiebreak_commander` (golden point decisions at 14-14),
+  `bracket_architect` (seeded brackets), `sponsor_deck` (CPM valuation) and
+  `head_to_head` (streak + set dominance).
+- Dispatcher, demos, catalog and health expanded to 60 engines; every profile
+  maps to exactly ten modules. Versions bumped to 8.0.0.
+- 60 TS mirrors with strict test coverage (`local-engines-v6.test.ts`,
+  `local-engines-v8.test.ts`); 0 `: any` audited via grep gate.
+
+## Sprint 40 - playbook, heatmap and copy refresh
+- `stations.tsx` wired for all sprint-39 engines with engine preview payloads;
+  module metadata for 51-60 added to `modules.ts`.
+
+## Sprint 41 - Java/Kotlin/Android bridge v2
+- `GymScreenActivity.kt` (Kotlin/Compose-free, WebView full-screen).
+- `MainActivity.java`: `VosleyOSBridge` with `openGymScreen(String payloadJson)`
+  launching `GymScreenActivity`, native Copy/Paste long-press listener and
+  volume-key scoring relay.
+- Dead files removed (`GymScreenHelper.kt`, `activity_gym_screen.xml`).
+- `screenOrientation="user"` everywhere so the phone rotation lock is honored.
+- Adaptive icon wired in manifest (`ic_launcher.xml` with foreground/background).
+
+## Sprint 42 - READMEs version 8
+- Trilingual README (`README.md`, `README.es.md`, `README.pt.md`) rewritten for
+  v8.0.0 with badges, why-it-exists, tab guide and the corrected 60-module
+  encyclopedia (verified against `modules.ts`).
+- Legacy `README.en.md` duplicate removed.
+
+## Current state
+- 60 Decimal engines + TS mirrors, FastAPI API with security shield, HMAC
+  paywall and SQLite WAL live rooms, trilingual hub with 60 stations, static
+  export build, PWA/F-Droid metadata, Docker/Render/CI and Android APK CI.
+- Android shell: agp 8.5.2 / jdk17, JNI-free JS bridge, gym screen activity,
+  adaptive icon, volumes-based scoring and native copy/paste.
+- Known limits: no user auth, no live checkout provider, no WebSocket live
+  rooms (polling fallback), Docker images unbuilt locally, live rooms poll
+  every 5 s. Static export only includes the `local` live-room demo; arbitrary
+  room IDs require the cloud server build.
+
+Next: v8.0.0 release build, tag, GitHub Release, private creator APK and
+artifact cleanup. Then optionally account auth and WebSocket live rooms.
