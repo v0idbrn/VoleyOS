@@ -1,0 +1,7 @@
+Versi�n v9.0.0 "EDICI�N TITAN".
+- Cat�logo expandido a 60 m�dulos sin conexi�n: planilla FIVB, telestrador de video, animador de jugadas, mapa de calor, nutrici�n de torneo, prehab de lesiones, comandante de tie-break, arquitecto de llaves, deck de sponsors, cara a cara y reflejo perif�rico.
+- Plantillas multi-equipo con 20 jugadores, capitanes, l�beros y pegado masivo.
+- Motor autom�tico de sets FIVB: mejor de 3/5, deuce 24-24 con ventaja de 2, tie-break a 15 con cambio de cancha y deshacer entre sets.
+- Pantalla gigante de gimnasio, �cono adaptativo, bloqueo de rotaci�n respetado y copiar/pegar nativo en inputs.
+- Licencia VOS-PRO vinculada al dispositivo (huella ANDROID_ID), precios en ARS/USD/EUR/BRL, alias de Mercado Pago y checkout de Ko-fi.
+- Consola keygen de creador y recibo por WhatsApp con ID del dispositivo y plan.
