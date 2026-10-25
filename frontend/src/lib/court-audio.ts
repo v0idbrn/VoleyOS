@@ -45,7 +45,7 @@ export function playArenaCue(cue: ArenaCue, volume = 0.5): boolean {
   if (!courtAudioEnabled) return false;
   const audio = audioContext();
   if (!audio) return false;
-  void audio.resume();
+  void audio.resume().catch(() => undefined);
   const plan = ARENA_CUE_PLANS[cue];
   let cursor = audio.currentTime;
   plan.frequencies.forEach((frequency, index) => {
@@ -74,18 +74,24 @@ let context: AudioContext | null = null;
 function audioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
   if (context) return context;
-  const AudioCtor =
-    window.AudioContext ?? (window as AudioWindow).webkitAudioContext;
-  if (!AudioCtor) return null;
-  context = new AudioCtor();
-  return context;
+  try {
+    const AudioCtor =
+      window.AudioContext ?? (window as AudioWindow).webkitAudioContext;
+    if (!AudioCtor) return null;
+    context = new AudioCtor();
+    return context;
+  } catch {
+    // Restricted WebViews can throw on construction: audio must never take
+    // the scoreboard down.
+    return null;
+  }
 }
 
 export function playWhistle(kind: WhistleKind = "short", volume = 0.7): boolean {
   if (!courtAudioEnabled) return false;
   const audio = audioContext();
   if (!audio) return false;
-  void audio.resume();
+  void audio.resume().catch(() => undefined);
   const start = audio.currentTime;
   let cursor = start;
   for (const step of WHISTLE_PLANS[kind]) {

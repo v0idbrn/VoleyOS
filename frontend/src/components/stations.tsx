@@ -544,8 +544,11 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   }, [state]);
 
   useEffect(() => {
-    const bridge = (window as Window & { VoleyOSBridge?: { setHardwareScoreMode: (enabled: boolean) => void } }).VoleyOSBridge;
-    bridge?.setHardwareScoreMode(hardwareMode);
+    const bridge = (window as Window & { VoleyOSBridge?: { setHardwareScoreMode?: (enabled: boolean) => void } }).VoleyOSBridge;
+    // The Android bridge object exists on device but older MainActivity builds
+    // do not expose this method: an unguarded call throws a TypeError in the
+    // effect on mount and takes the whole app down ("client-side error").
+    bridge?.setHardwareScoreMode?.(hardwareMode);
     if (!hardwareMode) return;
     const onHardwareKey = (event: Event): void => {
       const detail = event instanceof CustomEvent ? String(event.detail) : "";

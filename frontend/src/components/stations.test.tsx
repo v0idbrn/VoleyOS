@@ -58,6 +58,25 @@ describe("match mode", () => {
     window.dispatchEvent(new CustomEvent("voleyos:hardware-key", { detail: "VOLUME_UP" }));
     expect(screen.getByTestId("score-a").textContent).toBe("0");
   });
+
+  it("survives an Android bridge that does not expose setHardwareScoreMode", () => {
+    // Regression: on device the bridge OBJECT exists but older MainActivity
+    // builds lack the method; the unguarded call threw a TypeError on mount
+    // and produced Next's "client-side error" dead screen inside the APK.
+    const bridge = {};
+    (window as Window & { VoleyOSBridge?: unknown }).VoleyOSBridge = bridge;
+    expect(() => renderScoreboard()).not.toThrow();
+    delete (window as Window & { VoleyOSBridge?: unknown }).VoleyOSBridge;
+  });
+
+  it("forwards hardware mode to the bridge when the method exists", async () => {
+    const setHardwareScoreMode = vi.fn();
+    (window as Window & { VoleyOSBridge?: unknown }).VoleyOSBridge = { setHardwareScoreMode };
+    renderScoreboard();
+    fireEvent.click(screen.getByRole("button", { name: /Modo Partido/ }));
+    await waitFor(() => expect(setHardwareScoreMode).toHaveBeenCalledWith(true));
+    delete (window as Window & { VoleyOSBridge?: unknown }).VoleyOSBridge;
+  });
 });
 
 describe("scouting voice", () => {

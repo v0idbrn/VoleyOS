@@ -50,14 +50,20 @@ let context: AudioContext | null = null;
 function audioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
   if (context) return context;
-  const AudioCtor = window.AudioContext ?? (window as AudioWindow).webkitAudioContext;
-  if (!AudioCtor) return null;
-  context = new AudioCtor();
-  return context;
+  try {
+    const AudioCtor = window.AudioContext ?? (window as AudioWindow).webkitAudioContext;
+    if (!AudioCtor) return null;
+    context = new AudioCtor();
+    return context;
+  } catch {
+    // Restricted WebViews can throw on construction: audio must never take
+    // the scoreboard down.
+    return null;
+  }
 }
 
 function resume(audio: AudioContext): void {
-  void audio.resume();
+  void audio.resume().catch(() => undefined);
 }
 
 /** Dual detuned oscillators + 48 Hz FM pea modulation + 2800 Hz high-pass + breath attack. */
