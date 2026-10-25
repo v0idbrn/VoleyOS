@@ -1,58 +1,76 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { t } from "@/lib/i18n";
-import { MODULE_BY_SLUG } from "@/lib/modules";
 import type { Locale } from "@/lib/local-engines";
-import { triggerCourtHaptics } from "@/lib/court-ux";
+import { getModuleGuide } from "@/lib/module-guides";
 
-export function ModuleGuideBanner({ slug, locale, defaultOpen = false }: { slug: string; locale: Locale; defaultOpen?: boolean }) {
+interface ModuleGuideBannerProps {
+  slug: string;
+  locale: Locale;
+  defaultOpen?: boolean;
+}
+
+/**
+ * Collapsible 🎯 why / 👣 3 steps / 📖 glossary card rendered at the top of
+ * every module and main tab, in ES/EN/PT.
+ */
+export function ModuleGuideBanner({ slug, locale, defaultOpen = false }: ModuleGuideBannerProps) {
   const [open, setOpen] = useState(defaultOpen);
-  const meta = MODULE_BY_SLUG.get(slug);
-
-  useEffect(() => {
-    setOpen(defaultOpen);
-  }, [defaultOpen]);
-
-  const name = meta?.name?.[locale] ?? slug;
-  const tagline = meta?.tagline?.[locale] ?? "";
-  const why = t(
-    locale,
-    "¿Para qué sirve y cómo se usa?",
-    "What is this and how do I use it?",
-    "Para que serve e como usar?",
-  );
-  const close = t(locale, "Cerrar guía", "Close guide", "Fechar guia");
+  const guide = getModuleGuide(slug, locale);
 
   return (
-    <button
-      type="button"
-      onClick={() => {
-        setOpen((value) => !value);
-        triggerCourtHaptics(15);
-      }}
-      className={`tap w-full rounded-xl border border-white/10 ${open ? "bg-emerald/10 border-emerald/40" : "bg-panel border-white/10"} px-3 py-2 text-left`}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 text-[11px] font-bold text-white">
-          <span aria-hidden>💡</span>
-          {why}
+    <section className="vos-item-card mb-3" data-testid="module-guide">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <span className="text-[11px] font-black uppercase tracking-wider text-volt">
+          🧭 {t(locale, "Cómo usar este módulo", "How to use this module", "Como usar este módulo")}
         </span>
-        <span className={`text-[10px] font-bold ${open ? "text-emerald" : "text-white/40"}`}>
-          {open ? close : "▾"}
+        <span aria-hidden className="text-white/50">
+          {open ? "▲" : "▼"}
         </span>
-      </div>
-      {open && (
-        <div className="mt-2 text-[11px] leading-relaxed text-white/60">
-          {t(
-            locale,
-            `Usa "${name}" para analizar jugadas, anotar puntos y gestionar tu cancha en un solo toque. ${tagline}. Sin internet, sin cuenta y sin telemetría.`,
-            `Use "${name}" to analyze plays, score points and manage your court in one tap. ${tagline}. Offline, no account, no telemetry.`,
-            `Use "${name}" para analisar jogadas, anotar pontos e gerenciar sua quadra em um toque. ${tagline}. Sem internet, sem conta e sem telemetria.`,
-          )}
+      </button>
+      {open ? (
+        <div className="mt-3 space-y-3 text-[12px] leading-relaxed text-white/75">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-crimson">
+              🎯 {t(locale, "¿Para qué sirve?", "Why it matters on court", "Para que serve na quadra?")}
+            </p>
+            <p className="mt-1">{guide.why}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-crimson">
+              👣 {t(locale, "Cómo se usa en 3 pasos", "How to use it in 3 steps", "Como usar em 3 passos")}
+            </p>
+            <ol className="mt-1 space-y-1">
+              {guide.steps.map((step, index) => (
+                <li key={step} className="flex gap-2">
+                  <span aria-hidden>{["1️⃣", "2️⃣", "3️⃣"][index]}</span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-crimson">
+              📖 {t(locale, "Glosario rápido", "Quick glossary", "Glossário rápido")}
+            </p>
+            <dl className="mt-1 space-y-1">
+              {guide.glossary.map(([term, definition]) => (
+                <div key={term} className="flex gap-2">
+                  <dt className="font-bold text-white">{term}:</dt>
+                  <dd>{definition}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </div>
-      )}
-    </button>
+      ) : null}
+    </section>
   );
 }

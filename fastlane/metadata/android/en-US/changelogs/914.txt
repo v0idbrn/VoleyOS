@@ -1,0 +1,8 @@
+Release v9.0.14 "TITAN EDITION - FULL v9 FEATURES".
+- Restores everything the v9.0.9-v9.0.11 UI rollback removed.
+- Home: 5 guided modes (Novice / Advanced / Referee / Coach / Tournaments) with collapsible drawers over the 60 modules and a browse/search view for all tools.
+- Cancha: editable rosters (starters, libero, bench, bulk paste), Picadito 11/15/21/25 with golden point, Rey de la Cancha, Oficial Bo3/Bo5 with 24-24 deuce, undo across sets and the swap-sides button with the point-8 prompt.
+- Studio WebAudio: Fox 40 whistle (short/long/double), FIVB horn, score pop and set-win fanfare, all generated offline.
+- Video telestrator, 3-phase playbook animator and shot heatmap are interactive again.
+- Licences, donations and the creator keygen console are back in Ajustes.
+- Relative asset paths keep the WebView loading: no more missing index.html.

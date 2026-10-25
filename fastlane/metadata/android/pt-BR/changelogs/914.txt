@@ -1,0 +1,8 @@
+Versão v9.0.14 "EDIÇÃO TITAN - RECURSOS v9 COMPLETOS".
+- Restaura tudo o que o rollback de UI de v9.0.9 a v9.0.11 removeu.
+- Início: 5 modos guiados (Iniciante / Avançado / Árbitro / DT / Torneios) com gavetas recolhíveis sobre os 60 módulos e uma visualização para buscar todas as ferramentas.
+- Quadra: elencos editáveis (titulares, líbero, reservas, colar lista), Rachinha 11/15/21/25 com ponto de ouro, Rei da Quadra, Oficial Bo3/Bo5 com deuce 24-24, desfazer entre sets e o botão de troca de lado com o aviso do ponto 8.
+- Áudio de estúdio: apito Fox 40 (curto/longo/duplo), buzina FIVB, pop de ponto e fanfarra de set, tudo gerado offline.
+- Telestrador de vídeo, animador de jogadas em 3 fases e mapa de calor voltam a ser interativos.
+- Licenças, doações e o console keygen do criador voltam em Ajustes.
+- Caminhos de assets relativos: o WebView não perde mais o index.html.

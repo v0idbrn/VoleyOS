@@ -1,0 +1,8 @@
+Versión v9.0.14 "EDICIÓN TITAN - FUNCIONES v9 COMPLETAS".
+- Restaura todo lo que el rollback de UI de v9.0.9 a v9.0.11 había eliminado.
+- Inicio: 5 modos guiados (Novato / Avanzado / Árbitro / DT / Torneos) con cajones plegables sobre los 60 módulos y una vista para buscar todas las herramientas.
+- Cancha: plantillas editables (titulares, libero, suplentes, pegar lista), Picadito 11/15/21/25 con punto de oro, Rey de la Cancha, Oficial Bo3/Bo5 con deuce 24-24, deshacer entre sets y el botón de cambio de cancha con el aviso del punto 8.
+- Audio de estudio: silbato Fox 40 (corto/largo/doble), corneta FIVB, pop de punto y fanfarria de set, todo generado sin internet.
+- Telestrador de video, animador de jugadas en 3 fases y mapa de calor vuelven a ser interactivos.
+- Licencias, donaciones y la consola keygen del creador vuelven en Ajustes.
+- Rutas de assets relativas: el WebView ya no pierde el index.html.
