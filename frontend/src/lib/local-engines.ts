@@ -4810,3 +4810,63 @@ export function buildGymScreenPayload(input: GymScreenPayload): GymScreenPayload
   };
 }
 
+/* --------------------------------------------- module 50 · FIVB A4 sheet */
+
+export interface ScoresheetSetInput {
+  a: number;
+  b: number;
+}
+
+export interface ScoresheetInput {
+  matchNo?: string;
+  teamA: string;
+  teamB: string;
+  sets: ScoresheetSetInput[];
+  substitutions?: number;
+  sanctions?: number;
+}
+
+export interface ScoresheetReport {
+  setsA: number;
+  setsB: number;
+  winner: string;
+  totalPoints: number;
+  lines: string[];
+  complete: boolean;
+  message: string;
+}
+
+/** Printable FIVB scoresheet summary; mirrors backend fivb_escoresheet.py. */
+export function buildScoresheet(input: ScoresheetInput): ScoresheetReport {
+  const matchNo = input.matchNo ?? "M-001";
+  const substitutions = input.substitutions ?? 0;
+  const sanctions = input.sanctions ?? 0;
+  if (input.teamA.trim().length === 0) throw new Error("teamA required");
+  if (input.teamB.trim().length === 0) throw new Error("teamB required");
+  if (input.sets.length < 2 || input.sets.length > 5) throw new Error("sets must be 2-5");
+  if (substitutions < 0 || substitutions > 36) throw new Error("substitutions must be 0-36");
+  if (sanctions < 0 || sanctions > 10) throw new Error("sanctions must be 0-10");
+  for (const set of input.sets) {
+    if (set.a < 0 || set.a > 99 || set.b < 0 || set.b > 99) throw new Error("set scores must be 0-99");
+  }
+  const setsA = input.sets.filter((set) => set.a > set.b).length;
+  const setsB = input.sets.filter((set) => set.b > set.a).length;
+  const winner = setsA > setsB ? input.teamA : input.teamB;
+  const totalPoints = input.sets.reduce((total, set) => total + set.a + set.b, 0);
+  const complete = Math.max(setsA, setsB) >= 2 || input.sets.length === 5;
+  const lines = [
+    `FIVB ${matchNo} | ${input.teamA} vs ${input.teamB}`,
+    ...input.sets.map((set, index) => `Set ${index + 1}: ${set.a}-${set.b}`),
+    `Sets: ${setsA}-${setsB} | Cambios: ${substitutions} | Sanciones: ${sanctions}`,
+    `Ganador: ${winner}`,
+  ];
+  return {
+    setsA,
+    setsB,
+    winner,
+    totalPoints,
+    lines,
+    complete,
+    message: `Acta A4 con ${input.sets.length} sets y ${totalPoints} puntos.`,
+  };
+}

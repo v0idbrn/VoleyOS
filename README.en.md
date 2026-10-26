@@ -3,7 +3,7 @@
 [English](README.md) · [Español](README.es.md) · [Português](README.pt.md)
 
 [![Version](https://img.shields.io/badge/version-v9.0.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
-[![Modules](https://img.shields.io/badge/modules-60-FF3B5C?style=for-the-badge&color=EAB308)](#encyclopedia-of-the-60-modules)
+[![Modules](https://img.shields.io/badge/modules-61-FF3B5C?style=for-the-badge&color=EAB308)](#encyclopedia-of-the-61-modules)
 [![Offline](https://img.shields.io/badge/100%25-offline--first-FF3B5C?style=for-the-badge&color=EAB308)](#why-volleyos-exists)
 [![Android](https://img.shields.io/badge/Android%20APK-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
 [![Licence](https://img.shields.io/badge/licence-AGPL--3.0--or--later-FF3B5C?style=for-the-badge&color=EAB308)](LICENSE)
@@ -32,7 +32,7 @@ The app is a fixed 100dvh Android-feel shell. On first open, a 3-tap onboarding 
 
 ### 🏠 Inicio / Home
 
-- Filter the 60 modules by your court role (6 profiles, 10 modules each) or search by name.
+- Filter the 61 modules by your court role (6 profiles, 10 or 11 modules each) or search by name.
 - Star modules to pin them at the top: your daily station is one tap away.
 - Every card carries the number, icon and tagline so you can find "the rotation one" without knowing slugs.
 
@@ -66,9 +66,9 @@ The app is a fixed 100dvh Android-feel shell. On first open, a 3-tap onboarding 
 - Store reports in the ephemeral vault and destroy them with one tap (real delete, no trash can).
 - Native copy/paste works in every text input — paste a roster or a licence key comfortably.
 
-## Encyclopedia of the 60 modules
+## Encyclopedia of the 61 modules
 
-Six role profiles, ten modules each. Every entry says what the module is for and how you use it.
+Six role profiles, ten or eleven modules each. Every entry says what the module is for and how you use it.
 
 ### Players
 
@@ -130,6 +130,8 @@ Six role profiles, ten modules each. Every entry says what the module is for and
 | 53 | Shot Heatmap (`shot-heatmap`) | Reads opponent attack tendencies by zone. | Tap origin then landing; read hot zones, efficiency and share per zone. |
 | 57 | Bracket Architect (`bracket-architect`) | Seeds brackets without repeat pairings before the final. | Paste the team list; get the seeded round with byes and the full round list. |
 
+| 61 | Club White-Label Studio (`club-white-label`) | Gives your club its own colours instead of the generic app skin. | Enter the name plus three colours; check readable contrast and copy the CSS variables. |
+
 ### Referees
 
 | # | Module | Why it is useful | How to use it |
@@ -163,7 +165,7 @@ Six role profiles, ten modules each. Every entry says what the module is for and
 ## Architecture & security shield
 
 - **Backend:** Python 3.13+ / FastAPI / Pydantic v2, Decimal-only physics and money (zero binary floats), SQLite (WAL) for live rooms and jobs.
-- **Frontend:** Next.js App Router + TypeScript strict (zero any), Tailwind, Zod, Vitest; 60 TS mirrors of the 60 Python engines.
+- **Frontend:** Next.js App Router + TypeScript strict (zero any), Tailwind, Zod, Vitest; 61 TS mirrors of the 61 Python engines.
 - **Android:** Gradle, AGP 8.5.2, JDK 17; hardened WebView; JS bridge for volume scoring, back navigation and the gym screen; screenOrientation="user" everywhere, so the phone's own rotation lock is always respected.
 - **Security:** CSP and strict privacy headers (no-store, nosniff, no-referrer, DENY framing), 256 KiB body cap, 120 req/min/IP, XSS and formula-injection sanitisation, HMAC-SHA256 integrity seals.
 - **Dual build:** NEXT_PUBLIC_BUILD_TARGET=cloud|fdroid compiles the same code for the commercial Cloud Pro and the F-Droid free build.
@@ -207,7 +209,7 @@ build_apk.sh        # or build_apk.bat on Windows
 
 ## API surface
 
-- `GET /api/v1/health/deep` - 60-engine health and version.
+- `GET /api/v1/health/deep` - 61-engine health and version.
 - `GET /api/v1/catalog/modules` - modules, samples, profiles and pricing.
 - `POST /api/v1/modules/{slug}/run` and `/demo` - run an engine.
 - `POST /api/v1/security/verify-seal` - verify a signed match sheet.

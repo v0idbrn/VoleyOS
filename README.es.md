@@ -3,7 +3,7 @@
 [English](README.md) · **Español** · [Português](README.pt.md)
 
 [![Version](https://img.shields.io/badge/version-v9.0.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
-[![Módulos](https://img.shields.io/badge/módulos-60-FF3B5C?style=for-the-badge&color=EAB308)](#enciclopedia-de-los-60-módulos)
+[![Módulos](https://img.shields.io/badge/módulos-61-FF3B5C?style=for-the-badge&color=EAB308)](#enciclopedia-de-los-61-módulos)
 [![Offline](https://img.shields.io/badge/100%25-offline--primero-FF3B5C?style=for-the-badge&color=EAB308)](#por-qué-existe-volleyos)
 [![Android](https://img.shields.io/badge/APK%20Android-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
 [![Licencia](https://img.shields.io/badge/licencia-AGPL--3.0--o--posterior-FF3B5C?style=for-the-badge&color=EAB308)](LICENSE)
@@ -32,7 +32,7 @@ La app es un cascarón fijo `100dvh` con tacto Android. Al primer arranque, un *
 
 ### 🏠 Inicio
 
-- Filtrá los 60 módulos por tu rol (6 perfiles, 10 módulos cada uno) o buscá por nombre.
+- Filtrá los 61 módulos por tu rol (6 perfiles, 10 u 11 módulos cada uno) o buscá por nombre.
 - Marcala con estrella para fijarla arriba: tu estación diaria queda a un toque.
 - Cada tarjeta trae número, ícono y tagline para que encuentres "la de rotación" sin saber slugs.
 
@@ -66,9 +66,9 @@ La app es un cascarón fijo `100dvh` con tacto Android. Al primer arranque, un *
 - Guardá reportes en la **bóveda efímera** y destruílos con un toque (delete real, sin papelera).
 - El copiar/pegar nativo funciona en toda entrada de texto — pegá una planilla o una llave sin pelear.
 
-## Enciclopedia de los 60 módulos
+## Enciclopedia de los 61 módulos
 
-Seis perfiles de rol, diez módulos cada uno. Cada entrada: para **qué** sirve y **cómo** se usa.
+Seis perfiles de rol, diez u once módulos cada uno. Cada entrada: para **qué** sirve y **cómo** se usa.
 
 ### Jugador
 
@@ -130,6 +130,8 @@ Seis perfiles de rol, diez módulos cada uno. Cada entrada: para **qué** sirve 
 | 53 | Mapa de Calor de Remates (`shot-heatmap`) | Lee tendencias de ataque del rival por zona. | Tocá origen y destino; leés zonas calientes, eficiencia y reparto por zona. |
 | 57 | Arquitecto de Llaves (`bracket-architect`) | Siembra llaves sin cruces repetidos antes de la final. | Pegá la lista de equipos; salís con la ronda sembrada, los libres y todas las rondas. |
 
+| 61 | Estudio Marca Blanca de Club (`club-white-label`) | Tu club deja de verse genérico dentro de la app. | Cargá nombre y tres colores; revisás el contraste legible y copiás las variables CSS. |
+
 ### Árbitro & Mesa
 
 | # | Módulo | Para qué sirve | Cómo se usa |
@@ -163,7 +165,7 @@ Seis perfiles de rol, diez módulos cada uno. Cada entrada: para **qué** sirve 
 ## Arquitectura y escudo de seguridad
 
 - **Backend:** Python 3.13+ / FastAPI / Pydantic v2, física y dinero **solo en `Decimal`** (cero floats binarios), SQLite (WAL) para salas y jobs.
-- **Frontend:** Next.js App Router + TypeScript estricto (cero `: any`), Tailwind, Zod, Vitest; 60 espejos TS de los 60 motores Python.
+- **Frontend:** Next.js App Router + TypeScript estricto (cero `: any`), Tailwind, Zod, Vitest; 61 espejos TS de los 61 motores Python.
 - **Android:** Gradle, AGP 8.5.2, JDK 17; WebView endurecida; puente JS para anotar con volumen, navegación atrás y pantalla de gimnasio; `screenOrientation="user"` en todas lados, respetando siempre el bloqueo de rotación del teléfono.
 - **Seguridad:** CSP y cabeceras estrictas de privacidad (`no-store`, `nosniff`, `no-referrer`, anti-framing DENY), tope de cuerpo 256 KiB, 120 req/min/IP, saneo XSS e inyección de fórmulas, sellos de integridad HMAC-SHA256.
 - **Build dual:** `NEXT_PUBLIC_BUILD_TARGET=cloud|fdroid` compila el mismo código para el Cloud Pro comercial y la versión libre F-Droid.
@@ -207,7 +209,7 @@ build_apk.sh        # o build_apk.bat en Windows
 
 ## Superficie de la API
 
-- `GET /api/v1/health/deep` - salud y versión de los 60 motores.
+- `GET /api/v1/health/deep` - salud y versión de los 61 motores.
 - `GET /api/v1/catalog/modules` - módulos, muestras, perfiles y precios.
 - `POST /api/v1/modules/{slug}/run` y `/demo` - correr un motor.
 - `POST /api/v1/security/verify-seal` - verificar una planilla firmada.

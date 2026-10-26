@@ -70,6 +70,7 @@ MODULE_SLUGS = (
     "sponsor-deck",
     "head-to-head",
     "peripheral-reflex",
+    "club-white-label",
 )
 
 
@@ -1264,4 +1265,5 @@ DEMOS = {
     "sponsor-deck": sponsor_deck_demo,
     "head-to-head": head_to_head_demo,
     "peripheral-reflex": peripheral_reflex_demo,
+    "club-white-label": club_white_label_demo,
 }

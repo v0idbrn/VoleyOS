@@ -14,6 +14,7 @@ import { addVaultEntry, loadVault } from "@/lib/vault";
 import { downloadXlsx, openPrintableReport, type ReportSpec } from "@/lib/offline-xlsx";
 import { announceScoreTTS, requestCourtWakeLock, triggerCourtHaptics } from "@/lib/court-ux";
 import { playWhistle, setCourtAudioEnabled } from "@/lib/court-audio";
+import { setSoundEffectsEnabled } from "@/lib/sound-effects";
 import { EphemeralVaultBar } from "@/components/EphemeralVaultBar";
 import { STATIONS } from "@/components/stations";
 import { GymScreenModule } from "@/components/GymScreenModule";
@@ -282,6 +283,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
 
   useEffect(() => {
     setCourtAudioEnabled(courtAudio);
+    // The studio cues live in another module: gate both from one switch.
+    setSoundEffectsEnabled(courtAudio);
     window.localStorage.setItem(AUDIO_KEY, courtAudio ? "1" : "0");
   }, [courtAudio]);
 
@@ -429,7 +432,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const shareWhatsApp = async (slug: string): Promise<void> => {
     const meta = MODULE_BY_SLUG.get(slug);
     if (!meta) return;
-    const text = `${meta.icon} ${meta.name[locale]} — VolleyOS\n${meta.tagline[locale]}\n${t(locale, "60 módulos offline en tu cancha.", "60 offline modules on your court.", "60 módulos offline na sua quadra.")}`;
+    const text = `${meta.icon} ${meta.name[locale]} — VolleyOS\n${meta.tagline[locale]}\n${t(locale, "61 módulos offline en tu cancha.", "61 offline modules on your court.", "61 módulos offline na sua quadra.")}`;
     try {
       await navigator.clipboard.writeText(text);
       setToast(shell.copied);
@@ -911,7 +914,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 </section>
 
                 <p className="mt-6 text-center text-[9px] uppercase tracking-[0.18em] text-white/25">
-                  {t(locale, "60 motores locales · 0 telemetría · AGPL-3.0", "60 local engines · 0 telemetry · AGPL-3.0", "60 motores locais · 0 telemetria · AGPL-3.0")}
+                  {t(locale, "61 motores locales · 0 telemetría · AGPL-3.0", "61 local engines · 0 telemetry · AGPL-3.0", "61 motores locais · 0 telemetria · AGPL-3.0")}
                 </p>
               </div>
             ) : null}

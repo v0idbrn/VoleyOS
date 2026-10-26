@@ -203,7 +203,7 @@ export const GUIDED_MODES: GuidedMode[] = [
       {
         id: "t-money",
         title: { es: "Plata y sponsors", en: "Money and sponsors", pt: "Grana e patrocinadores" },
-        slugs: ["court-split", "team-treasury", "sponsor-deck", "captain-draft"],
+        slugs: ["court-split", "team-treasury", "sponsor-deck", "captain-draft", "club-white-label"],
         openByDefault: false,
       },
       {

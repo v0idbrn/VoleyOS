@@ -12,7 +12,7 @@ const g = (why: string, s1: string, s2: string, s3: string, glossary: Array<[str
   glossary,
 });
 
-/** Trilingual how-to guide for every one of the 60 modules. */
+/** Trilingual how-to guide for every one of the 61 modules. */
 export const MODULE_GUIDES: Record<string, Record<Locale, ModuleGuide>> = {
   biomechanics: {
     es: g("Convierte un mal remate en un diagnóstico mecánico.", "Cargá el ejemplo o ingresá los 5 ángulos.", "Mirá la nota 0-100 y el frame fallado.", "Seguí la corrección prioritaria del drill.", [["Remate", "Ataque al piso rival"], ["Draw", "Brazo armado tras la cabeza"]]),
@@ -313,6 +313,11 @@ export const MODULE_GUIDES: Record<string, Record<Locale, ModuleGuide>> = {
     es: g("Entrena la vista que gana picadas durondos.", "Cerrá el ojo y tocá el objetivo al verlo.", "Registrá los tiempos en ms.", "Leé promedio, dispersión y nota.", [["Reflejo", "Tiempo de reacción visual"], ["Periférico", "Visión de los bordes"]]),
     en: g("Trains the eyes that win hard digs.", "Cover one eye and tap the target when seen.", "Log the times in ms.", "Read mean, spread and rating.", [["Reflex", "Visual reaction time"], ["Peripheral", "Edge-of-vision sight"]]),
     pt: g("Treina o olho que ganha defesas duras.", "Feche um olho e toque o alvo ao ver.", "Registre os tempos em ms.", "Leia média, dispersão e nota.", [["Reflexo", "Tempo de reação visual"], ["Periférico", "Visão das bordas"]]),
+  },
+  "club-white-label": {
+    es: g("Tu club deja de verse genérico: sus colores en toda la app.", "Elegí nombre y los tres colores del club.", "Revisá el contraste legible del texto.", "Copiá las variables CSS en tu sitio.", [["Contraste", "Legibilidad del texto sobre el color"], ["Variables CSS", "Colores listos para tu web"]]),
+    en: g("Your club stops looking generic: its colours across the app.", "Enter the club name and three colours.", "Check the readable text contrast.", "Copy the CSS variables to your site.", [["Contrast", "Text legibility over the colour"], ["CSS variables", "Colours ready for your site"]]),
+    pt: g("Seu clube deixa de parecer genérico: cores próprias no app.", "Informe o nome e as três cores do clube.", "Confira o contraste legível do texto.", "Copie as variáveis CSS para o site.", [["Contraste", "Legibilidade do texto sobre a cor"], ["Variáveis CSS", "Cores prontas para o site"]]),
   },
 };
 

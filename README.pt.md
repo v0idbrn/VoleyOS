@@ -3,7 +3,7 @@
 [English](README.md) · [Español](README.es.md) · **Português**
 
 [![Version](https://img.shields.io/badge/version-v9.0.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
-[![Módulos](https://img.shields.io/badge/módulos-60-FF3B5C?style=for-the-badge&color=EAB308)](#enciclopédia-dos-60-módulos)
+[![Módulos](https://img.shields.io/badge/módulos-61-FF3B5C?style=for-the-badge&color=EAB308)](#enciclopédia-dos-61-módulos)
 [![Offline](https://img.shields.io/badge/100%25-offline--primeiro-FF3B5C?style=for-the-badge&color=EAB308)](#por-que-o-volleyos-existe)
 [![Android](https://img.shields.io/badge/APK%20Android-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
 [![Licença](https://img.shields.io/badge/licença-AGPL--3.0--ou--posterior-FF3B5C?style=for-the-badge&color=EAB308)](LICENSE)
@@ -32,7 +32,7 @@ O app é um casco fixo `100dvh` com cara de Android. Na primeira abertura, um **
 
 ### 🏠 Início
 
-- Filtre os 60 módulos pelo seu papel na quadra (6 perfis, 10 módulos cada) ou busque pelo nome.
+- Filtre os 61 módulos pelo seu papel na quadra (6 perfis, 10 ou 11 módulos cada) ou busque pelo nome.
 - Marque com estrela para fixar no topo: sua estação diária fica a um toque.
 - Cada card carrega número, ícone e tagline para achar "o do rodízio" sem saber slugs.
 
@@ -66,9 +66,9 @@ O app é um casco fixo `100dvh` com cara de Android. Na primeira abertura, um **
 - Guarde relatórios no **cofre efêmero** e destrua com um toque (delete real, sem lixeira).
 - Copiar/colar nativo funciona em toda entrada de texto — cole uma lista ou uma chave sem brigar.
 
-## Enciclopédia dos 60 módulos
+## Enciclopédia dos 61 módulos
 
-Seis perfis, dez módulos cada. Cada entrada: para **que** serve e **como** se usa.
+Seis perfis, dez ou onze módulos cada. Cada entrada: para **que** serve e **como** se usa.
 
 ### Jogador
 
@@ -130,6 +130,8 @@ Seis perfis, dez módulos cada. Cada entrada: para **que** serve e **como** se u
 | 53 | Mapa de Calor de Ataques (`shot-heatmap`) | Lê tendências de ataque do rival por zona. | Toque origem e destino; leia zonas quentes, eficiência e repartição por zona. |
 | 57 | Arquiteto de Chaves (`bracket-architect`) | Semeia chaves sem cruces repetidos antes da final. | Cole a lista de times; saia com a rodada semeada, os byes e todas as rodadas. |
 
+| 61 | Estúdio de Marca do Clube (`club-white-label`) | Seu clube deixa de parecer genérico dentro do app. | Informe nome e três cores; confira o contraste legível e copie as variáveis CSS. |
+
 ### Árbitro e Mesa
 
 | # | Módulo | Para que serve | Como usar |
@@ -163,7 +165,7 @@ Seis perfis, dez módulos cada. Cada entrada: para **que** serve e **como** se u
 ## Arquitetura e escudo de segurança
 
 - **Backend:** Python 3.13+ / FastAPI / Pydantic v2, física e dinheiro **só em `Decimal`** (zero floats binários), SQLite (WAL) para salas e jobs.
-- **Frontend:** Next.js App Router + TypeScript estrito (zero `: any`), Tailwind, Zod, Vitest; 60 espelhos TS dos 60 motores Python.
+- **Frontend:** Next.js App Router + TypeScript estrito (zero `: any`), Tailwind, Zod, Vitest; 61 espelhos TS dos 61 motores Python.
 - **Android:** Gradle, AGP 8.5.2, JDK 17; WebView endurecida; bridge JS para anotar por volume, navegação voltar e tela de ginásio; `screenOrientation="user"` por todo lado, sempre respeitando o bloqueio de rotação do celular.
 - **Segurança:** CSP e cabeçalhos rígidos de privacidade (`no-store`, `nosniff`, `no-referrer`, anti-framing DENY), teto de corpo 256 KiB, 120 req/min/IP, saneamento de XSS e injeção de fórmula, selos de integridade HMAC-SHA256.
 - **Build dual:** `NEXT_PUBLIC_BUILD_TARGET=cloud|fdroid` compila o mesmo código pro Cloud Pro comercial e a versão livre F-Droid.
@@ -207,7 +209,7 @@ build_apk.sh        # ou build_apk.bat no Windows
 
 ## Superfície da API
 
-- `GET /api/v1/health/deep` - saúde e versão dos 60 motores.
+- `GET /api/v1/health/deep` - saúde e versão dos 61 motores.
 - `GET /api/v1/catalog/modules` - módulos, amostras, perfis e preços.
 - `POST /api/v1/modules/{slug}/run` e `/demo` - rodar um motor.
 - `POST /api/v1/security/verify-seal` - verificar uma súmula assinada.

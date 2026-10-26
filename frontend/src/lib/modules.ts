@@ -730,6 +730,18 @@ export const MODULES: ModuleMeta[] = [
       pt: "Tempos de reacao, consistencia e rating de leitura de quadra.",
     },
   },
+  {
+    slug: "club-white-label",
+    number: 61,
+    icon: "🎨",
+    profiles: ["tournaments"],
+    name: { es: "Estudio Marca Blanca de Club", en: "Club White-Label Studio", pt: "Estudio de Marca do Clube" },
+    tagline: {
+      es: "Colores del club con contraste legible y variables CSS listas.",
+      en: "Club colours with readable contrast and ready-to-use CSS variables.",
+      pt: "Cores do clube com contraste legível e variáveis CSS prontas.",
+    },
+  },
 ];
 
 export const MODULE_BY_SLUG = new Map(MODULES.map((module) => [module.slug, module]));

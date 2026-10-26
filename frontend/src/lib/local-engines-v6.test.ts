@@ -8,6 +8,7 @@ import {
   buildClipPlan,
   buildQrSync,
   buildRecruitingDossier,
+  buildScoresheet,
   buildTreasury,
   calculateElo,
   readDeception,
@@ -125,4 +126,23 @@ describe("local-engines v6", () => {
     expect(report.signature).toHaveLength(12);
     expect(report.byteLength).toBeGreaterThan(10);
   });
+
+  it("prints an FIVB A4 scoresheet summary", () => {
+    const report = buildScoresheet({
+      teamA: "Tiburones",
+      teamB: "Cóndores",
+      sets: [{ a: 25, b: 21 }, { a: 23, b: 25 }, { a: 25, b: 19 }, { a: 25, b: 22 }],
+      substitutions: 6,
+      sanctions: 2,
+    });
+    expect(report.setsA).toBe(3);
+    expect(report.setsB).toBe(1);
+    expect(report.winner).toBe("Tiburones");
+    expect(report.totalPoints).toBe(185);
+    expect(report.complete).toBe(true);
+    expect(report.lines).toHaveLength(7);
+    expect(report.message).toContain("Acta A4 con 4 sets");
+    expect(() => buildScoresheet({ teamA: "A", teamB: "B", sets: [{ a: 25, b: 21 }] })).toThrow("2-5");
+  });
 });
+

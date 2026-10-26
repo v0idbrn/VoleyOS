@@ -5,10 +5,10 @@ import { LOCALES } from "./local-engines";
 import { MODULE_GUIDES, getModuleGuide } from "./module-guides";
 import { GUIDED_MODES, GUIDED_MODE_BY_ID, DIFFICULTY_BADGES } from "./guided-modes";
 
-describe("module guides: all 60 modules in ES/EN/PT", () => {
+describe("module guides: all 61 modules in ES/EN/PT", () => {
   it("has exactly one guide per module in every locale", () => {
-    expect(MODULES).toHaveLength(60);
-    expect(Object.keys(MODULE_GUIDES)).toHaveLength(60);
+    expect(MODULES).toHaveLength(61);
+    expect(Object.keys(MODULE_GUIDES)).toHaveLength(61);
     for (const module of MODULES) {
       for (const locale of LOCALES) {
         const guide = MODULE_GUIDES[module.slug]?.[locale];

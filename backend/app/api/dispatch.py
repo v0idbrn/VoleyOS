@@ -614,6 +614,14 @@ MODULES: tuple[ModuleInfo, ...] = (
         profiles=["court"],
         description="Tiempos de reaccion, consistencia y rating.",
     ),
+    ModuleInfo(
+        slug="club-white-label",
+        name="Estudio Marca Blanca de Club",
+        name_en="Club White-Label Studio",
+        profile="tournaments",
+        profiles=["tournaments"],
+        description="Colores del club, contraste legible y variables CSS.",
+    ),
 )
 
 
@@ -1091,6 +1099,7 @@ RUNNERS = {
     "sponsor-deck": _run_sponsor,
     "head-to-head": _run_head_to_head,
     "peripheral-reflex": _run_reflex,
+    "club-white-label": _run_white_label,
 }
 
 
