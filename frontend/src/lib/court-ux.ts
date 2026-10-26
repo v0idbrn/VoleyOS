@@ -1,3 +1,51 @@
+import type { ScoreboardState } from "@/lib/local-engines";
+
+/** Window event carrying the latest live scoreboard snapshot (sticky bar sync). */
+export const LIVE_SCORE_EVENT = "voleyos:live-score";
+
+const LIVE_SCORE_KEY = "volleyos.liveScoreboard";
+
+/** Persists the live scoreboard and broadcasts it to the app shell. */
+export function persistLiveScoreboard(state: ScoreboardState): void {
+  try {
+    window.localStorage.setItem(LIVE_SCORE_KEY, JSON.stringify(state));
+  } catch {
+    /* storage unavailable */
+  }
+  window.dispatchEvent(new CustomEvent(LIVE_SCORE_EVENT, { detail: state }));
+}
+
+/** Restores the last live scoreboard across tab changes (null when absent/corrupt). */
+export function readLiveScoreboard(): ScoreboardState | null {
+  try {
+    const raw = window.localStorage.getItem(LIVE_SCORE_KEY);
+    if (!raw) return null;
+    const value: unknown = JSON.parse(raw);
+    if (typeof value !== "object" || value === null) return null;
+    const candidate = value as Partial<ScoreboardState>;
+    if (
+      typeof candidate.teamA !== "string" ||
+      typeof candidate.teamB !== "string" ||
+      typeof candidate.scoreA !== "number" ||
+      typeof candidate.scoreB !== "number" ||
+      typeof candidate.setsA !== "number" ||
+      typeof candidate.setsB !== "number" ||
+      !Array.isArray(candidate.lineupA) ||
+      !Array.isArray(candidate.lineupB)
+    ) {
+      return null;
+    }
+    return candidate as ScoreboardState;
+  } catch {
+    return null;
+  }
+}
+
+/** True while a match has at least one point or set on the board. */
+export function isMatchActive(state: ScoreboardState): boolean {
+  return state.scoreA > 0 || state.scoreB > 0 || state.setsA > 0 || state.setsB > 0;
+}
+
 export interface WakeLockSentinelLike {
   released: boolean;
   release: () => Promise<void>;

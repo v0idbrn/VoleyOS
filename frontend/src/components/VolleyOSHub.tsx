@@ -3,16 +3,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { LOCALE_NAMES, SHELL, t } from "@/lib/i18n";
-import { buildTarget, paywallEnabled, type Locale, type Profile } from "@/lib/local-engines";
+import { awardIndoorPoint, buildTarget, paywallEnabled, swapCourt, type Locale, type Profile, type ScoreboardState } from "@/lib/local-engines";
 import { clearCreatorUnlock, creatorUnlocked, matchesCreatorKey, persistCreatorToken } from "@/lib/creator-unlock";
 import { clearLicenseToken, unlockCreatorOnServer } from "@/lib/api-client";
 import { MODULES, MODULE_BY_SLUG, PROFILE_LABELS } from "@/lib/modules";
 import { DIFFICULTY_BADGES, GUIDED_MODES, GUIDED_MODE_BY_ID, type GuidedModeId } from "@/lib/guided-modes";
 import { ModuleGuideBanner } from "@/components/ModuleGuideBanner";
+import { CoachMarksOverlay } from "@/components/CoachMarksOverlay";
+import { MODULE_GUIDES } from "@/lib/module-guides";
 import { MonetizationModal } from "@/components/MonetizationModal";
 import { addVaultEntry, loadVault } from "@/lib/vault";
 import { downloadXlsx, openPrintableReport, type ReportSpec } from "@/lib/offline-xlsx";
-import { announceScoreTTS, requestCourtWakeLock, triggerCourtHaptics } from "@/lib/court-ux";
+import { LIVE_SCORE_EVENT, announceScoreTTS, isMatchActive, persistLiveScoreboard, readLiveScoreboard, requestCourtWakeLock, triggerCourtHaptics } from "@/lib/court-ux";
 import { playWhistle, setCourtAudioEnabled } from "@/lib/court-audio";
 import { setSoundEffectsEnabled } from "@/lib/sound-effects";
 import { EphemeralVaultBar } from "@/components/EphemeralVaultBar";
@@ -174,6 +176,75 @@ function ValueRow({
   );
 }
 
+/**
+ * Sticky mini scoreboard shown above every tab while a match is live in
+ * the Court tab, so the score is always one tap away (v9.2).
+ */
+export function StickyMiniScoreboard({
+  state,
+  locale,
+  onPoint,
+  onSwap,
+  onGoCourt,
+}: {
+  state: ScoreboardState;
+  locale: Locale;
+  onPoint: (team: "A" | "B") => void;
+  onSwap: () => void;
+  onGoCourt: () => void;
+}) {
+  return (
+    <div data-testid="sticky-mini-scoreboard" className="z-30 shrink-0 border-b border-volt/30 bg-panel/95 backdrop-blur">
+      <div className="mx-auto flex max-w-3xl items-center gap-1.5 px-3 py-2">
+        <span aria-hidden className="text-sm leading-none">🏐</span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[11px] font-black text-white">
+            {state.teamA} <span className="tabular-nums text-volt">{state.scoreA} - {state.scoreB}</span> {state.teamB}
+          </p>
+          <p className="truncate text-[9px] font-bold uppercase tracking-wider text-white/45">
+            {t(locale, "Sets", "Sets", "Sets")} {state.setsA} - {state.setsB} ·{" "}
+            {state.status === "finished"
+              ? t(locale, "Final", "Finished", "Final")
+              : t(locale, "En juego", "Live", "Ao vivo")}
+          </p>
+        </div>
+        <button
+          type="button"
+          aria-label={`${t(locale, "Punto", "Point", "Ponto")} +1 ${state.teamA} [A]`}
+          onClick={() => onPoint("A")}
+          className="tap rounded-lg border border-volt/50 bg-volt/15 px-2 py-1.5 text-[10px] font-black text-volt"
+        >
+          +1 A
+        </button>
+        <button
+          type="button"
+          aria-label={`${t(locale, "Punto", "Point", "Ponto")} +1 ${state.teamB} [B]`}
+          onClick={() => onPoint("B")}
+          className="tap rounded-lg border border-volt/50 bg-volt/15 px-2 py-1.5 text-[10px] font-black text-volt"
+        >
+          +1 B
+        </button>
+        <button
+          type="button"
+          aria-label={t(locale, "Cambiar de lado", "Swap sides", "Trocar de lado")}
+          onClick={onSwap}
+          className="tap rounded-lg border border-white/15 px-2 py-1.5 text-[10px] font-black text-white/70"
+        >
+          🔄 {t(locale, "Lado", "Sides", "Lado")}
+        </button>
+        <button
+          type="button"
+          aria-label={t(locale, "Ir a Cancha", "Go to Court", "Ir para Cancha")}
+          onClick={onGoCourt}
+          className="tap rounded-lg border border-crimson/60 bg-crimson/20 px-2 py-1.5 text-[10px] font-black text-white"
+        >
+          ⏱️ {t(locale, "Ir a Cancha", "Court", "Cancha")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function VolleyOSHub({ locale }: { locale: Locale }) {
   const shell = SHELL[locale];
   const [tab, setTab] = useState<Tab>("home");
@@ -206,6 +277,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [checkout, setCheckout] = useState<Plan | null>(null);
   const [monetizationOpen, setMonetizationOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [liveScore, setLiveScore] = useState<ScoreboardState | null>(null);
+  const [coachMarks, setCoachMarks] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const target = buildTarget();
   const locked = paywallEnabled() && !creator;
@@ -295,6 +368,22 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     const timer = window.setTimeout(() => setToast(null), 3200);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    const sync = (event?: Event): void => {
+      const next = event instanceof CustomEvent ? (event.detail as ScoreboardState) : readLiveScoreboard();
+      setLiveScore(next);
+    };
+    sync();
+    window.addEventListener(LIVE_SCORE_EVENT, sync as EventListener);
+    return () => window.removeEventListener(LIVE_SCORE_EVENT, sync as EventListener);
+  }, []);
+
+  useEffect(() => {
+    const openCoach = (): void => setCoachMarks(true);
+    window.addEventListener("voleyos:coach-marks", openCoach);
+    return () => window.removeEventListener("voleyos:coach-marks", openCoach);
+  }, []);
 
   const closeOverlays = useCallback((): boolean => {
     if (keyOpen) {
@@ -503,6 +592,30 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     });
   };
 
+  const livePoint = (team: "A" | "B"): void => {
+    if (!liveScore) return;
+    try {
+      persistLiveScoreboard(awardIndoorPoint(liveScore, team).state);
+      triggerCourtHaptics(30);
+    } catch {
+      /* the match is already finished */
+    }
+  };
+
+  const liveSwap = (): void => {
+    if (!liveScore) return;
+    persistLiveScoreboard(swapCourt(liveScore));
+    triggerCourtHaptics([40, 30, 40]);
+  };
+
+  const goCourtScoreboard = (): void => {
+    setCasualOpen(false);
+    setTab("court");
+    setActiveSlug(null);
+    setTabPick((current) => ({ ...current, court: "scoreboard" }));
+    triggerCourtHaptics(16);
+  };
+
   const goTab = (next: Tab): void => {
     setTab(next);
     setActiveSlug(null);
@@ -536,6 +649,9 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const groupKey = tab === "court" || tab === "board" || tab === "lab" ? tab : null;
   const groupSlugs = groupKey ? TAB_GROUP[groupKey] : [];
   const pickedSlug = groupKey ? tabPick[groupKey] ?? groupSlugs[0] ?? "" : "";
+  const onScoreboard =
+    activeMeta?.slug === "scoreboard" || (!activeMeta && !casualOpen && tab === "court" && pickedSlug === "scoreboard");
+  const stickyVisible = liveScore !== null && isMatchActive(liveScore) && !onScoreboard;
   const PickedStation = pickedSlug ? STATIONS[pickedSlug] : undefined;
   const tabTitles: Record<Tab, { title: string; sub: string }> = {
     home: { title: shell.allModules, sub: shell.fullScreenHint },
@@ -641,6 +757,14 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
             <div className="ml-auto flex items-center gap-0.5">
               <button
                 type="button"
+                aria-label={t(locale, "Guía interactiva", "Interactive guide", "Guia interativa")}
+                onClick={() => setCoachMarks(true)}
+                className="tap grid h-10 w-10 place-items-center rounded-xl text-base text-white/70"
+              >
+                🎯
+              </button>
+              <button
+                type="button"
                 aria-label={shell.whistle}
                 onClick={() => {
                   playWhistle("short");
@@ -685,6 +809,10 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
           </div>
         </header>
       )}
+
+      {stickyVisible && liveScore ? (
+        <StickyMiniScoreboard state={liveScore} locale={locale} onPoint={livePoint} onSwap={liveSwap} onGoCourt={goCourtScoreboard} />
+      ) : null}
 
       <div id="app-content" className="relative min-h-0 flex-1">
         {activeMeta ? (
@@ -757,6 +885,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
 
                 <button
                   type="button"
+                  data-testid="picadito-entry"
                   onClick={() => {
                     setCasualOpen(true);
                     triggerCourtHaptics(22);
@@ -769,7 +898,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   </span>
                 </button>
 
-                <div className="snap-row mt-3 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={t(locale, "Modos guiados", "Guided modes", "Modos guiados")}>
+                <div data-testid="guided-modes" className="snap-row mt-3 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={t(locale, "Modos guiados", "Guided modes", "Modos guiados")}>
                   {GUIDED_MODES.map((mode) => (
                     <button
                       key={mode.id}
@@ -786,7 +915,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   ))}
                 </div>
 
-                <div className="snap-row mt-1.5 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={shell.allModules}>
+                <div data-testid="profile-filters" className="snap-row mt-1.5 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={shell.allModules}>
                   <button
                     type="button"
                     role="tab"
@@ -1104,6 +1233,31 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   {t(locale, "Licencias, donaciones y keygen", "Licences, donations & keygen", "Licenças, doações e keygen")}
                 </button>
 
+                <section
+                  data-testid="coverage-card"
+                  className="mt-5 rounded-2xl border border-emerald/30 bg-emerald/10 p-4"
+                >
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald">
+                    📊 {t(locale, "Estadística de Rigor y Cobertura", "Rigor & Coverage Stat", "Estatística de Rigor e Cobertura")}
+                  </p>
+                  <p className="mt-1 text-[13px] font-black text-white">
+                    {Object.keys(MODULE_GUIDES).length}/{MODULES.length}{" "}
+                    {t(locale, "módulos con guía interactiva", "modules with an interactive guide", "módulos com guia interativa")}
+                  </p>
+                  <ul className="mt-2 space-y-0.5 text-[11px] text-white/70">
+                    <li>
+                      ✅ 100% {t(locale, "offline", "offline", "offline")} · 0%{" "}
+                      {t(locale, "telemetría", "telemetry", "telemetria")}
+                    </li>
+                    <li>
+                      🌍 {t(locale, "Cobertura trilingüe ES/EN/PT verificada", "Verified ES/EN/PT trilingual coverage", "Cobertura trilíngue ES/EN/PT verificada")}
+                    </li>
+                    <li>
+                      🧭 {t(locale, "Guías paso a paso en cada módulo", "Step-by-step guides in every module", "Guias passo a passo em cada módulo")}
+                    </li>
+                  </ul>
+                </section>
+
                 <h2 className="mt-5 px-1 pb-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.vaultSection}</h2>
                 <EphemeralVaultBar locale={locale} embedded />
 
@@ -1275,6 +1429,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
           </div>
         </div>
       ) : null}
+
+      {coachMarks ? <CoachMarksOverlay locale={locale} onClose={() => setCoachMarks(false)} /> : null}
 
       {toast ? (
         <div

@@ -6,7 +6,7 @@ import jsQR from "jsqr";
 
 import { playArenaCue, playWhistle, type ArenaCue } from "@/lib/court-audio";
 import { playBuzzer, playScorePop, playSetWinFanfare } from "@/lib/sound-effects";
-import { triggerCourtHaptics } from "@/lib/court-ux";
+import { persistLiveScoreboard, readLiveScoreboard, triggerCourtHaptics } from "@/lib/court-ux";
 import { clearClonedScoreboard, createQrFrames, emptyIngest, ingestQrFrame, readClonedScoreboard, renderQrSvg, storeClonedScoreboard, type IngestResult, type QrFrame } from "@/lib/qr-transfer";
 import { localizeReactTree } from "@/lib/engine-l10n";
 import { COPY, t } from "@/lib/i18n";
@@ -561,6 +561,8 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [history, setHistory] = useState(() => {
     const saved = readClonedScoreboard();
     if (saved) return newScoreboardHistory(saved);
+    const live = readLiveScoreboard();
+    if (live) return newScoreboardHistory(live);
     return newScoreboardHistory(newScoreboard("Tiburones", "Cóndores", 3, { matchFormat: "bo3" }));
   });
   const [message, setMessage] = useState(t(locale, "Elegí un equipo para sumar.", "Pick a team to score.", "Escolha um time para pontuar."));
@@ -573,6 +575,10 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const state = history.present;
   const [serveCap, setServeCap] = useState<ServeCapLimit>(0);
   const [serveCapBanner, setServeCapBanner] = useState<string | null>(null);
+  const [undoPill, setUndoPill] = useState(false);
+  const [burst, setBurst] = useState<"set" | "match" | null>(null);
+  const undoTimerRef = useRef<number | null>(null);
+  const burstTimerRef = useRef<number | null>(null);
   const serveStreakRef = useRef(0);
   const prevPointRef = useRef<{ total: number; serving: ScoreboardState["serving"] } | null>(null);
 
@@ -603,6 +609,25 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       serveStreakRef.current = next;
     }
   }, [state, preset, serveCap, locale]);
+
+  const flashUndoPill = (): void => {
+    setUndoPill(true);
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = window.setTimeout(() => setUndoPill(false), 5000);
+  };
+
+  const flashBurst = (kind: "set" | "match"): void => {
+    setBurst(kind);
+    if (burstTimerRef.current) window.clearTimeout(burstTimerRef.current);
+    burstTimerRef.current = window.setTimeout(() => setBurst(null), 1800);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+      if (burstTimerRef.current) window.clearTimeout(burstTimerRef.current);
+    };
+  }, []);
 
   const applyRoster = (team: TeamRoster, side: "A" | "B"): void => {
     if (side === "A") setTeamAId(team.id);
@@ -653,6 +678,9 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         return;
       }
       setHistory(commitScoreboard(history, result.state));
+      flashUndoPill();
+      if (result.matchFinished) flashBurst("match");
+      else if (result.setFinished) flashBurst("set");
       setMessage(
         `${result.message}${result.rotated ? t(locale, " · rotación", " · rotation", " · rotação") : ""}${
           result.sideSwitchDue ? t(locale, " · cambio de lado", " · switch sides", " · troca de lado") : ""
@@ -708,7 +736,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   };
 
   useEffect(() => {
-    window.localStorage.setItem("volleyos.liveScoreboard", JSON.stringify(state));
+    persistLiveScoreboard(state);
     clearClonedScoreboard();
   }, [state]);
 
@@ -1023,6 +1051,41 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       ) : null}
       </div>
       <BenchRotator locale={locale} />
+      {undoPill ? (
+        <button
+          type="button"
+          data-testid="undo-pill"
+          onClick={() => {
+            undo();
+            setUndoPill(false);
+          }}
+          className="fixed bottom-24 left-1/2 z-40 -translate-x-1/2 rounded-full border border-obsidian bg-volt px-4 py-2.5 text-[12px] font-black text-obsidian shadow-lg"
+        >
+          ↶ {t(locale, "Deshacer último punto", "Undo last point", "Desfazer último ponto")}
+        </button>
+      ) : null}
+      {burst ? (
+        <div data-testid="set-burst" aria-hidden className="pointer-events-none fixed inset-0 z-40 overflow-hidden">
+          {Array.from({ length: 18 }, (_, index) => (
+            <span
+              key={index}
+              className="vos-confetti-piece"
+              style={{
+                left: `${(index * 100) / 18}%`,
+                background: ["#FACC15", "#E11D48", "#10B981", "#FFFFFF", "#8B5CF6"][index % 5],
+                animationDelay: `${(index % 6) * 0.08}s`,
+              }}
+            />
+          ))}
+          <div className="absolute inset-0 grid place-items-center vos-flash">
+            <p className="rounded-2xl bg-volt px-5 py-3 text-lg font-black text-obsidian shadow-2xl">
+              {burst === "match"
+                ? `🏆 ${t(locale, "¡Partido cerrado!", "Match closed!", "Partida encerrada!")}`
+                : `🎉 ${t(locale, "¡Set ganado!", "Set won!", "Set ganho!")}`}
+            </p>
+          </div>
+        </div>
+      ) : null}
     </StationShell>
   );
 }

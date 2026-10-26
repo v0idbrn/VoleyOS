@@ -276,3 +276,24 @@ html.solar :focus-visible {
 .hidden-by-default {
   display: none;
 }
+
+/* v9.2: set-win confetti burst overlay */
+.vos-confetti-piece {
+  position: absolute;
+  top: -12vh;
+  width: 10px;
+  height: 16px;
+  border-radius: 2px;
+  animation: vos-confetti-fall 1.7s ease-in forwards;
+}
+
+@keyframes vos-confetti-fall {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, 118vh, 0) rotate(560deg);
+    opacity: 0;
+  }
+}

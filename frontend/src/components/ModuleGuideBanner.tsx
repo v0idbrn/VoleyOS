@@ -35,6 +35,19 @@ export function ModuleGuideBanner({ slug, locale, defaultOpen = false }: ModuleG
           {open ? "▲" : "▼"}
         </span>
       </button>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          data-testid="coach-trigger"
+          onClick={() => window.dispatchEvent(new CustomEvent("voleyos:coach-marks"))}
+          className="tap rounded-lg border border-volt/40 bg-volt/10 px-2 py-1 text-[10px] font-black text-volt"
+        >
+          🎯 {t(locale, "Probar Guía Interactiva", "Try Interactive Guide", "Testar Guia Interativa")}
+        </button>
+        <span className="text-[9px] text-white/35">
+          {t(locale, "3 pasos visuales", "3 visual steps", "3 passos visuais")}
+        </span>
+      </div>
       {open ? (
         <div className="mt-3 space-y-3 text-[12px] leading-relaxed text-white/75">
           <div>
