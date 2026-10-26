@@ -1,0 +1,453 @@
+"use client";
+
+import { useState } from "react";
+
+import { triggerCourtHaptics } from "@/lib/court-ux";
+import { t } from "@/lib/i18n";
+import type { Locale } from "@/lib/local-engines";
+import {
+  GEAR_FLAGS,
+  GEAR_LABELS,
+  addPlayer,
+  benchFairness,
+  benchSwapMessage,
+  buildOrganizer,
+  capacityLabel,
+  dropPlayer,
+  formatMatchSheet,
+  formatMissingBanner,
+  missingCount,
+  newBenchTeam,
+  rotateWithBench,
+  toggleGear,
+  togglePaid,
+  type BenchEntry,
+  type BenchTeamState,
+  type OrganizerRoster,
+} from "@/lib/casual-engines";
+
+const BTN =
+  "rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white transition hover:border-volt hover:text-volt focus-visible:outline focus-visible:outline-2 focus-visible:outline-volt";
+const BTN_PRIMARY =
+  "rounded-lg bg-crimson px-3 py-2 text-xs font-black uppercase tracking-wider text-white transition hover:bg-imperial focus-visible:outline focus-visible:outline-2 focus-visible:outline-volt";
+const INPUT =
+  "w-full rounded-lg border border-white/15 bg-obsidian px-3 py-2 text-sm text-white outline-none focus:border-volt";
+const LABEL = "text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50";
+const CHIP_ON = "rounded-lg border border-volt bg-volt/15 px-2 py-1 text-[9px] font-bold text-volt";
+const CHIP_OFF = "rounded-lg border border-white/10 px-2 py-1 text-[9px] font-bold text-white/50";
+
+/**
+ * 🔄 Rotador Automático de 7 a 10 jugadores con el Banco: rotates the six
+ * court zones on every side-out and swaps the next bench player in at the
+ * chosen entry spot, tracking fair play-time per person.
+ */
+export function BenchRotator({ locale }: { locale: Locale }) {
+  const [namesText, setNamesText] = useState("");
+  const [entry, setEntry] = useState<BenchEntry>("serve");
+  const [team, setTeam] = useState<BenchTeamState | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [banner, setBanner] = useState<string | null>(null);
+
+  const pickEntry = (next: BenchEntry): void => {
+    setEntry(next);
+    setTeam((current) => (current ? { ...current, entry: next } : current));
+  };
+
+  const load = (): void => {
+    const names = namesText
+      .split(/[\n,;]+/)
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0);
+    try {
+      setTeam(newBenchTeam(names, entry));
+      setError(null);
+      setBanner(null);
+      triggerCourtHaptics(20);
+    } catch {
+      setTeam(null);
+      setError(
+        t(
+          locale,
+          "Cargá entre 7 y 10 jugadores únicos.",
+          "Load 7 to 10 unique players.",
+          "Carregue de 7 a 10 jogadores únicos.",
+        ),
+      );
+    }
+  };
+
+  const rotate = (): void => {
+    if (!team) return;
+    const next = rotateWithBench(team);
+    setTeam(next);
+    if (next.lastSwap) setBanner(benchSwapMessage(next.lastSwap, locale));
+    triggerCourtHaptics([30, 25, 30]);
+  };
+
+  const entryButtons = (
+    <div className="flex flex-wrap gap-1" role="group" aria-label={t(locale, "Punto de entrada", "Entry spot", "Ponto de entrada")}>
+      <button
+        type="button"
+        aria-pressed={entry === "serve"}
+        onClick={() => pickEntry("serve")}
+        className={entry === "serve" ? CHIP_ON : CHIP_OFF}
+      >
+        {t(locale, "Entra al Saque (Posición I)", "Enters at Serve (Position I)", "Entra no Saque (Posição I)")}
+      </button>
+      <button
+        type="button"
+        aria-pressed={entry === "back"}
+        onClick={() => pickEntry("back")}
+        className={entry === "back" ? CHIP_ON : CHIP_OFF}
+      >
+        {t(locale, "Entra al Fondo (Posición VI)", "Enters at the Back (Position VI)", "Entra no Fundo (Posição VI)")}
+      </button>
+    </div>
+  );
+
+  return (
+    <section className="vos-item-card space-y-2">
+      <p className={LABEL}>🪇 {t(locale, "Rotador con banco (7-10)", "Bench rotator (7-10)", "Rodízio com banco (7-10)")}</p>
+      {team === null ? (
+        <>
+          <textarea
+            value={namesText}
+            onChange={(event) => setNamesText(event.target.value)}
+            rows={3}
+            placeholder={"Ana\nBruno\nCarla\nDamián\nEugenia\nFlavio\nGaby\nHéctor"}
+            aria-label={t(locale, "Jugadores del equipo", "Team players", "Jogadores do time")}
+            className={`${INPUT} font-mono text-xs`}
+          />
+          {entryButtons}
+          <button type="button" className={`${BTN_PRIMARY} w-full`} onClick={load}>
+            ▶ {t(locale, "Cargar equipo", "Load squad", "Carregar time")}
+          </button>
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-6 gap-1 text-center text-[10px]">
+            {team.court.map((name, index) => (
+              <div
+                key={`bench-zone-${index + 1}`}
+                className={`rounded ${index === 0 ? "bg-volt/20 text-volt" : "bg-white/5"}`}
+              >
+                <p className="text-white/40">Z{index + 1}</p>
+                <p className="truncate font-bold">{name}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-white/55">
+            🪑 {t(locale, "Banca", "Bench", "Banco")}: {team.bench.join(", ") || "—"}
+          </p>
+          {banner ? (
+            <p role="status" className="rounded-lg bg-emerald/15 px-2 py-1 text-[10px] font-semibold text-emerald">
+              {banner}
+            </p>
+          ) : null}
+          {entryButtons}
+          <div className="flex flex-wrap gap-1">
+            <button type="button" className={BTN} onClick={rotate}>
+              🔄 {t(locale, "Rotar con el Banco", "Rotate with the Bench", "Rodar com o Banco")}
+            </button>
+            <button
+              type="button"
+              className={BTN}
+              onClick={() => {
+                setTeam(null);
+                setBanner(null);
+                setNamesText("");
+              }}
+            >
+              ✕ {t(locale, "Vaciar", "Clear", "Limpar")}
+            </button>
+          </div>
+          <ul className="space-y-0.5">
+            {benchFairness(team).map((row) => (
+              <li key={`fair-${row.name}`} className="flex justify-between rounded bg-white/5 px-2 py-0.5 text-[10px]">
+                <span className="text-white/70">{row.name}</span>
+                <span className="font-bold text-white/50">
+                  {row.rotations} {t(locale, "rotaciones", "rotations", "rodízios")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {error ? (
+        <p role="alert" className="text-[10px] font-semibold text-crimson">
+          {error}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * 📋 Armador de Lista de WhatsApp: bulk paste, smart parsing, waitlist
+ * promotion on "se bajó", payment/gear checklist and 1-tap WhatsApp copy.
+ */
+export function WhatsAppMatchOrganizer({ locale }: { locale: Locale }) {
+  const [paste, setPaste] = useState("");
+  const [capacity, setCapacity] = useState(12);
+  const [venue, setVenue] = useState(t(locale, "Cancha Municipal", "Municipal Court", "Quadra Municipal"));
+  const [time, setTime] = useState("21:00");
+  const [roster, setRoster] = useState<OrganizerRoster | null>(null);
+  const [manual, setManual] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
+
+  const build = (): void => {
+    const next = buildOrganizer(paste, capacity, venue, time);
+    setRoster(next);
+    setToast(
+      t(
+        locale,
+        `✅ ${next.confirmed.length} confirmados · ⏳ ${next.waitlist.length} en espera`,
+        `✅ ${next.confirmed.length} confirmed · ⏳ ${next.waitlist.length} waiting`,
+        `✅ ${next.confirmed.length} confirmados · ⏳ ${next.waitlist.length} na fila`,
+      ),
+    );
+    triggerCourtHaptics(20);
+  };
+
+  const applyCapacity = (cap: number): void => {
+    setCapacity(cap);
+    setRoster((current) => {
+      if (!current) return null;
+      const all = [...current.confirmed, ...current.waitlist];
+      return { ...current, capacity: cap, confirmed: all.slice(0, cap), waitlist: all.slice(cap) };
+    });
+  };
+
+  const addManual = (): void => {
+    const base = roster ?? buildOrganizer([], capacity, venue, time);
+    const before = base.confirmed.length + base.waitlist.length;
+    const next = addPlayer(base, manual);
+    setRoster(next);
+    if (next.confirmed.length + next.waitlist.length === before) {
+      setToast(t(locale, "Ese nombre ya estaba en la lista.", "That name was already on the list.", "Esse nome já estava na lista."));
+    } else {
+      setManual("");
+      setToast(
+        next.waitlist.length > 0 && !next.confirmed.some((player) => player.name === manual.trim())
+          ? t(locale, "⬆️ La lista está llena: entró en espera.", "⬆️ Roster full: joined the waitlist.", "⬆️ Lista cheia: entrou na fila.")
+          : t(locale, "✅ Jugador agregado.", "✅ Player added.", "✅ Jogador adicionado."),
+      );
+    }
+  };
+
+  const drop = (id: string): void => {
+    if (!roster) return;
+    const { roster: next, promoted } = dropPlayer(roster, id);
+    setRoster(next);
+    triggerCourtHaptics([25, 30]);
+    setToast(
+      promoted
+        ? t(
+            locale,
+            `⬆️ Subió ${promoted.name} a la lista titular`,
+            `⬆️ ${promoted.name} moved up to the main roster`,
+            `⬆️ ${promoted.name} subiu pra lista titular`,
+          )
+        : t(locale, "⚠️ Se bajó de la lista.", "⚠️ Dropped off the roster.", "⚠️ Saiu da lista."),
+    );
+  };
+
+  const copy = async (text: string, ok: string): Promise<void> => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setToast(ok);
+      triggerCourtHaptics(15);
+    } catch {
+      setToast(
+        t(locale, "El navegador bloqueó el copiado.", "The browser blocked copying.", "O navegador bloqueou a cópia."),
+      );
+    }
+  };
+
+  return (
+    <section className="vos-section-card vos-stack">
+      <p className={LABEL}>📋 {t(locale, "Armador de Lista de WhatsApp", "WhatsApp Roster Builder", "Montador de Lista do WhatsApp")}</p>
+      <label className="block text-xs">
+        <span className={LABEL}>{t(locale, "Pegá la lista del grupo", "Paste the group list", "Cole a lista do grupo")}</span>
+        <textarea
+          value={paste}
+          onChange={(event) => setPaste(event.target.value)}
+          rows={3}
+          placeholder={"1. Tano\n2. Luci\n3. Marcos"}
+          className={`${INPUT} mt-1 font-mono text-xs`}
+        />
+      </label>
+      <div className="flex flex-wrap gap-1">
+        {[8, 10, 12, 14, 16, 18].map((cap) => (
+          <button
+            key={cap}
+            type="button"
+            aria-pressed={capacity === cap}
+            onClick={() => applyCapacity(cap)}
+            className={capacity === cap ? CHIP_ON : CHIP_OFF}
+          >
+            {cap}
+          </button>
+        ))}
+        <span className="self-center text-[10px] font-bold text-white/55">{capacityLabel(capacity, locale)}</span>
+      </div>
+      <div className="grid grid-cols-[1fr_5rem] gap-1">
+        <label className="text-xs">
+          <span className={LABEL}>{t(locale, "Cancha / Sede", "Court / Venue", "Quadra / Local")}</span>
+          <input value={venue} onChange={(event) => setVenue(event.target.value)} className={`${INPUT} mt-1 text-xs`} />
+        </label>
+        <label className="text-xs">
+          <span className={LABEL}>{t(locale, "Hora", "Time", "Hora")}</span>
+          <input value={time} onChange={(event) => setTime(event.target.value)} className={`${INPUT} mt-1 text-xs`} />
+        </label>
+      </div>
+      <button type="button" className={BTN_PRIMARY} onClick={build}>
+        📋 {t(locale, "Armá la lista", "Build the roster", "Monte a lista")}
+      </button>
+      <div className="flex gap-1">
+        <input
+          value={manual}
+          onChange={(event) => setManual(event.target.value)}
+          placeholder={t(locale, "Agregar a mano…", "Add manually…", "Adicionar à mão…")}
+          aria-label={t(locale, "Agregar jugador manualmente", "Add player manually", "Adicionar jogador manualmente")}
+          className={`${INPUT} text-xs`}
+        />
+        <button type="button" className={BTN} onClick={addManual}>
+          +
+        </button>
+      </div>
+
+      {roster ? (
+        <>
+          <p className="text-[11px] font-bold text-white/70">
+            ✅ {t(locale, "Confirmados", "Confirmed", "Confirmados")} {roster.confirmed.length}/{roster.capacity}
+          </p>
+          <ul className="space-y-1">
+            {roster.confirmed.map((player, index) => (
+              <li key={player.id} className="space-y-1 rounded-lg bg-white/5 px-2 py-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate text-[11px] font-bold text-white/90">
+                    {index + 1}. {player.name}
+                  </span>
+                  <button
+                    type="button"
+                    className={`${player.paid ? CHIP_ON : CHIP_OFF} shrink-0`}
+                    aria-pressed={player.paid}
+                    onClick={() => setRoster(togglePaid(roster, player.id))}
+                  >
+                    💸 {t(locale, "Seña/Pagó", "Deposit/Paid", "Sinal/Pagou")}
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {GEAR_FLAGS.map((flag) => (
+                    <button
+                      key={flag}
+                      type="button"
+                      aria-pressed={player.gear.includes(flag)}
+                      onClick={() => setRoster(toggleGear(roster, player.id, flag))}
+                      className={player.gear.includes(flag) ? CHIP_ON : CHIP_OFF}
+                    >
+                      {GEAR_LABELS[flag][locale]}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => drop(player.id)}
+                    className="rounded-lg border border-crimson/50 px-2 py-1 text-[9px] font-bold text-crimson"
+                  >
+                    😱 {t(locale, "¡Se bajó!", "Dropped out!", "Caiu!")}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {roster.waitlist.length > 0 ? (
+            <>
+              <p className="text-[11px] font-bold text-white/55">
+                ⏳ {t(locale, "Lista de Espera / Suplentes", "Waitlist / Substitutes", "Lista de Espera / Suplentes")}
+              </p>
+              <ul className="space-y-0.5">
+                {roster.waitlist.map((player, index) => (
+                  <li key={player.id} className="truncate px-1 text-[10px] text-white/50">
+                    {index + 1}. {player.name}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="text-[10px] font-semibold text-emerald">
+              {t(locale, "✅ Cancha llena.", "✅ Full court.", "✅ Quadra cheia.")}
+            </p>
+          )}
+          <button
+            type="button"
+            className={BTN}
+            onClick={() => void copy(formatMatchSheet(roster, locale), t(locale, "📲 Lista copiada.", "📲 Roster copied.", "📲 Lista copiada."))}
+          >
+            📲 {t(locale, "Copiar Lista Actualizada para WhatsApp", "Copy Updated Roster for WhatsApp", "Copiar Lista Atualizada pro WhatsApp")}
+          </button>
+          <button
+            type="button"
+            className={BTN_PRIMARY}
+            disabled={missingCount(roster) === 0}
+            onClick={() =>
+              void copy(
+                formatMissingBanner(roster, locale),
+                t(locale, "🚨 Cartel copiado.", "🚨 Sign copied.", "🚨 Cartaz copiado."),
+              )
+            }
+          >
+            🚨 {t(locale, 'Copiar Cartel "¡NOS FALTA 1 HOY!"', 'Copy "WE\'RE 1 SHORT TODAY" Sign', 'Copiar Cartaz "FALTA 1 PRA HOJE!"')}
+          </button>
+        </>
+      ) : null}
+
+      {toast ? (
+        <p role="status" className="rounded-lg bg-emerald/15 px-2 py-1 text-[10px] font-semibold text-emerald">
+          {toast}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+type SuiteSection = "lista" | "banco";
+
+const SECTIONS: Array<{ id: SuiteSection; label: Record<Locale, string> }> = [
+  { id: "lista", label: { es: "📋 Lista de WhatsApp", en: "📋 WhatsApp Roster", pt: "📋 Lista do WhatsApp" } },
+  { id: "banco", label: { es: "🪇 Rotador con Banco", en: "🪇 Bench Rotator", pt: "🪇 Rodízio com Banco" } },
+];
+
+/** 🍻 Picadito & Amigos suite: pre-match organisation and bench rotation. */
+export function CasualPlayerSuite({ locale }: { locale: Locale }) {
+  const [section, setSection] = useState<SuiteSection>("lista");
+  return (
+    <div className="space-y-3">
+      <div
+        role="tablist"
+        aria-label={t(locale, "Picadito & Amigos", "Pickup & Friends", "Picadito & Amigos")}
+        className="flex flex-wrap gap-1.5"
+      >
+        {SECTIONS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={section === item.id}
+            onClick={() => {
+              setSection(item.id);
+              triggerCourtHaptics(16);
+            }}
+            className={`rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+              section === item.id ? "border-crimson bg-crimson text-white" : "border-white/10 text-white/60"
+            }`}
+          >
+            {item.label[locale]}
+          </button>
+        ))}
+      </div>
+      {section === "lista" ? <WhatsAppMatchOrganizer locale={locale} /> : <BenchRotator locale={locale} />}
+    </div>
+  );
+}

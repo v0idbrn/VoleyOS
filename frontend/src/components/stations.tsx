@@ -4,12 +4,14 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 
 import jsQR from "jsqr";
 
-import { playWhistle } from "@/lib/court-audio";
+import { playArenaCue, playWhistle, type ArenaCue } from "@/lib/court-audio";
 import { playBuzzer, playScorePop, playSetWinFanfare } from "@/lib/sound-effects";
 import { triggerCourtHaptics } from "@/lib/court-ux";
 import { clearClonedScoreboard, createQrFrames, emptyIngest, ingestQrFrame, readClonedScoreboard, renderQrSvg, storeClonedScoreboard, type IngestResult, type QrFrame } from "@/lib/qr-transfer";
 import { localizeReactTree } from "@/lib/engine-l10n";
 import { COPY, t } from "@/lib/i18n";
+import { BenchRotator } from "@/components/CasualPlayerSuite";
+import { nextServeStreak, serveCapHit, serveCapMessage, type ServeCapLimit } from "@/lib/casual-engines";
 import {
   FAN_QUESTIONS,
   REFEREE_GESTURES,
@@ -80,8 +82,10 @@ import {
   buildShotHeatmap,
   buildQrSync,
   buildRecruitingDossier,
+  buildScoresheet,
   buildSponsorDeck,
   buildTreasury,
+  buildWhiteLabel,
   calculateElo,
   commandTiebreak,
   assessPrehab,
@@ -567,10 +571,38 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [rosterSheet, setRosterSheet] = useState("");
   const [rosterError, setRosterError] = useState<string | null>(null);
   const state = history.present;
+  const [serveCap, setServeCap] = useState<ServeCapLimit>(0);
+  const [serveCapBanner, setServeCapBanner] = useState<string | null>(null);
+  const serveStreakRef = useRef(0);
+  const prevPointRef = useRef<{ total: number; serving: ScoreboardState["serving"] } | null>(null);
 
   useEffect(() => {
     setTeams(loadTeams());
   }, []);
+
+  // Friendly recreational serve cap: counts consecutive points scored by
+  // the team on serve across every scoring path (taps, keys, volume).
+  useEffect(() => {
+    const total = state.scoreA + state.scoreB;
+    const previous = prevPointRef.current;
+    prevPointRef.current = { total, serving: state.serving };
+    if (!previous) return;
+    if (total < previous.total) {
+      serveStreakRef.current = 0;
+      setServeCapBanner(null);
+      return;
+    }
+    if (total !== previous.total + 1 || preset !== "picadito" || serveCap === 0) return;
+    const scoredOnServe = state.serving === previous.serving;
+    const next = nextServeStreak(serveStreakRef.current, scoredOnServe);
+    if (serveCapHit(next, serveCap)) {
+      serveStreakRef.current = 0;
+      setServeCapBanner(serveCapMessage(serveCap, locale));
+      triggerCourtHaptics([30, 45, 30]);
+    } else {
+      serveStreakRef.current = next;
+    }
+  }, [state, preset, serveCap, locale]);
 
   const applyRoster = (team: TeamRoster, side: "A" | "B"): void => {
     if (side === "A") setTeamAId(team.id);
@@ -795,6 +827,31 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
               {t(locale, "Punto de oro (muere en el target)", "Golden point (dies at target)", "Ponto de ouro (morre no alvo)")}
             </button>
           </div>
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-[9px] font-bold text-white/45">🎯 {t(locale, "Límite de Saques Seguidos", "Consecutive Serve Cap", "Limite de Saques Seguidos")}</span>
+            {([0, 3, 5] as const).map((cap) => (
+              <button
+                key={cap}
+                type="button"
+                aria-pressed={serveCap === cap}
+                onClick={() => {
+                  setServeCap(cap);
+                  setServeCapBanner(null);
+                  triggerCourtHaptics(16);
+                }}
+                className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${serveCap === cap ? "border-volt bg-volt/15 text-volt" : "border-white/10 text-white/50"}`}
+              >
+                {cap === 0
+                  ? t(locale, "Sin límite", "No limit", "Sem limite")
+                  : t(locale, `${cap} Saques`, `${cap} Serves`, `${cap} Saques`)}
+              </button>
+            ))}
+          </div>
+          {serveCapBanner ? (
+            <p role="status" className="rounded-lg bg-emerald/15 px-2 py-1 text-center text-[10px] font-semibold text-emerald">
+              {serveCapBanner}
+            </p>
+          ) : null}
         </div>
       ) : null}
       {preset === "king" ? (
@@ -965,6 +1022,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         </div>
       ) : null}
       </div>
+      <BenchRotator locale={locale} />
     </StationShell>
   );
 }
@@ -3113,6 +3171,7 @@ export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
         "arena-dj": () => buildArenaCue({ event: "MONSTER_BLOCK" }) as unknown as Record<string, unknown>,
         "court-slang": () => translateSlang({ term: "pipe", origin: "AR" }) as unknown as Record<string, unknown>,
         "qr-sync": () => buildQrSync({ kind: "match", payload: { home: "Tiburones", score_a: 24 }, matrixSize: 21 }) as unknown as Promise<Record<string, unknown>>,
+        "fivb-escoresheet": () => buildScoresheet({ teamA: "Tiburones", teamB: "Cóndores", sets: [{ a: 25, b: 21 }, { a: 23, b: 25 }, { a: 25, b: 19 }, { a: 25, b: 22 }], substitutions: 6, sanctions: 2 }) as unknown as Record<string, unknown>,
         "tournament-nutrition": () => planMatchNutrition({ weightKg: 78, matches: 2, minutesPerMatch: 90, tempC: 31, sweatRateLh: 1.1 }) as unknown as Record<string, unknown>,
         "injury-prehab": () => assessPrehab({ weeklyJumps: 420, weeklySpikes: 260, sleepHours: 6.5, kneePain: 3, shoulderPain: 0, priorInjury: true }) as unknown as Record<string, unknown>,
         "tiebreak-commander": () => commandTiebreak({ scoreA: 13, scoreB: 12, serving: "A", bestOf: 3, goldenPoint: true }) as unknown as Record<string, unknown>,
@@ -3120,6 +3179,7 @@ export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
         "sponsor-deck": () => buildSponsorDeck({ impressions: 24000, reach: 8000, cpm: 12, engagementPct: 6, currency: "USD" }) as unknown as Record<string, unknown>,
         "head-to-head": () => buildHeadToHead({ teamA: "Tiburones", teamB: "Lobos", matches: [{ setsA: 3, setsB: 1 }, { setsA: 2, setsB: 3 }, { setsA: 3, setsB: 0 }] }) as unknown as Record<string, unknown>,
         "peripheral-reflex": () => scoreReflex({ timesMs: [210, 195, 240, 205, 220] }) as unknown as Record<string, unknown>,
+        "club-white-label": () => buildWhiteLabel({ club: "Tiburones Voley", primary: "#0f766e", secondary: "#111827", accent: "#f59e0b" }) as unknown as Record<string, unknown>,
       };
       const preview = previews[meta.slug];
       if (!preview) return;
@@ -3131,6 +3191,15 @@ export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
   }, [meta.slug]);
   return (
     <StationShell meta={meta} locale={locale} rows={2} onSave={onSave} onExample={() => setReport(null)}>
+      {report && meta.slug === "arena-dj" ? (
+        <button
+          type="button"
+          className={BTN}
+          onClick={() => playArenaCue(String(report.event ?? "MONSTER_BLOCK") as ArenaCue)}
+        >
+          ▶ {t(locale, "Sonar cue", "Play cue", "Tocar cue")}
+        </button>
+      ) : null}
       {report ? (
         <div className="grid gap-1 text-[11px]">
           {Object.entries(report).filter(([key]) => key !== "svg" && key !== "rallies" && key !== "selected").map(([key, value]) => (
