@@ -17,7 +17,8 @@ import { announceScoreTTS, persistLiveScoreboard, readLiveScoreboard, triggerCou
 import { clearClonedScoreboard, createQrFrames, emptyIngest, ingestQrFrame, readClonedScoreboard, renderQrSvg, storeClonedScoreboard, type IngestResult, type QrFrame } from "@/lib/qr-transfer";
 import { localizeReactTree } from "@/lib/engine-l10n";
 import { COPY, t } from "@/lib/i18n";
-import { BenchRotator } from "@/components/CasualPlayerSuite";
+import { BenchRotator, FlowWizard } from "@/components/CasualPlayerSuite";
+import { saveSeasonMatch, seasonMatchFromState } from "@/lib/season-vault";
 import { nextServeStreak, serveCapHit, serveCapMessage, type ServeCapLimit } from "@/lib/casual-engines";
 import {
   FAN_QUESTIONS,
@@ -738,9 +739,14 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       flashUndoPill();
       if (result.matchFinished) flashBurst("match");
       else if (result.setFinished) flashBurst("set");
+      if (result.matchFinished) saveSeasonMatch(seasonMatchFromState(result.state, preset));
       setMessage(
         `${result.message}${result.rotated ? t(locale, " · rotación", " · rotation", " · rotação") : ""}${
           result.sideSwitchDue ? t(locale, " · cambio de lado", " · switch sides", " · troca de lado") : ""
+        }${
+          result.matchFinished
+            ? t(locale, " · guardado en Mi Temporada", " · saved in My Season", " · salvo em Minha Temporada")
+            : ""
         }`,
       );
       triggerCourtHaptics(pressurePoint(result.state) ? [80, 50, 80, 50, 140] : 30);
@@ -1102,6 +1108,31 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           }}>[C] {t(locale, "Contraste", "Contrast", "Contraste")}</button>
         </div>
       </div>
+      <button
+        type="button"
+        data-testid="save-season"
+        disabled={state.status !== "finished" && state.setsA + state.setsB === 0}
+        onClick={() => {
+          saveSeasonMatch(seasonMatchFromState(state, preset));
+          setMessage(
+            t(
+              locale,
+              "💾 Partido guardado en 🏆 Mi Temporada.",
+              "💾 Match saved to 🏆 My Season.",
+              "💾 Partida salva em 🏆 Minha Temporada.",
+            ),
+          );
+          triggerCourtHaptics(25);
+        }}
+        className={`${BTN} mt-2 w-full disabled:opacity-40`}
+      >
+        💾 {t(locale, "Guardar Partido en Mi Temporada", "Save Match to My Season", "Salvar Partida na Minha Temporada")}
+      </button>
+      {state.status === "finished" ? (
+        <div className="mt-2">
+          <FlowWizard locale={locale} current={3} />
+        </div>
+      ) : null}
       <p className="mt-2 text-[11px] text-white/60">{message}</p>
       <div className="mt-2 grid grid-cols-6 gap-1 text-center text-[10px]">
         {state.lineupA.map((player, index) => (
@@ -1477,7 +1508,13 @@ function acwrDays(lastWeek: number): DailyJumps[] {
 }
 
 export function AcwrStation({ meta, locale, onSave }: StationProps) {
-  const [load, setLoad] = useState(185);
+  const [load, setLoad] = useState(() => {
+    const stored = Number(window.localStorage.getItem("volleyos.acwrLoad") ?? "185");
+    return Number.isFinite(stored) && stored > 0 ? stored : 185;
+  });
+  useEffect(() => {
+    window.localStorage.setItem("volleyos.acwrLoad", String(load));
+  }, [load]);
   const days = useMemo(() => acwrDays(load), [load]);
   const report = useMemo(() => jumpLoad(days), [days]);
   const tone = report.color === "emerald" ? "text-emerald" : report.color === "amber" ? "text-volt" : "text-crimson";

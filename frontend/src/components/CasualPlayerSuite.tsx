@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { triggerCourtHaptics } from "@/lib/court-ux";
 import { playCoinClink, playJudgeGavel, playWarmupTick, playWhistle } from "@/lib/sound-effects";
@@ -41,6 +41,17 @@ import {
   type JudgeVerdict,
   type OrganizerRoster,
 } from "@/lib/casual-engines";
+import { openPrintableReport, type ReportSpec } from "@/lib/offline-xlsx";
+import {
+  loadFlowRoster,
+  loadSeason,
+  saveFlowRoster,
+  seasonStats,
+  seasonSummaryText,
+  seasonToCsv,
+  trendPath,
+  type SeasonMatch,
+} from "@/lib/season-vault";
 
 const BTN =
   "rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white transition hover:border-volt hover:text-volt focus-visible:outline focus-visible:outline-2 focus-visible:outline-volt";
@@ -888,7 +899,235 @@ function PrizePanel({ locale, roster }: SuitePanelProps) {
   );
 }
 
-type SuiteSection = "lista" | "banco" | "juez" | "senas" | "calor" | "vaquita" | "premios";
+/** 🧭 Chained 5-step Picadito / weekend-tournament workflow bar. */
+export const FLOW_STEPS = [
+  { step: 1, icon: "1️⃣", label: { es: "Lista WhatsApp", en: "WhatsApp Roster", pt: "Lista WhatsApp" } },
+  { step: 2, icon: "2️⃣", label: { es: "Armar Equipos / Cancha", en: "Build Teams / Court", pt: "Montar Times / Quadra" } },
+  { step: 3, icon: "3️⃣", label: { es: "Jugar / Arbitrar", en: "Play / Officiate", pt: "Jogar / Arbitrar" } },
+  { step: 4, icon: "4️⃣", label: { es: "Premios MVP", en: "MVP Prizes", pt: "Prêmios MVP" } },
+  { step: 5, icon: "5️⃣", label: { es: "La Vaquita", en: "The Pot", pt: "A Vaquinha" } },
+] as const;
+
+/**
+ * One-tap chain across the five Picadito steps. The roster saved in step 1
+ * (and the match written by ⏱️ Cancha) is handed over through localStorage,
+ * so every later step opens with the players, teams and score already there.
+ */
+export function FlowWizard({
+  locale,
+  current,
+  onSelect,
+}: {
+  locale: Locale;
+  current: number;
+  onSelect?: (step: number) => void;
+}) {
+  const pick = (step: number): void => {
+    triggerCourtHaptics(16);
+    if (onSelect) {
+      onSelect(step);
+      return;
+    }
+    if (step === 3) {
+      window.dispatchEvent(new CustomEvent("voleyos:open-scoreboard"));
+      return;
+    }
+    const target = step === 1 ? "lista" : step === 2 ? "banco" : step === 4 ? "premios" : "vaquita";
+    window.dispatchEvent(new CustomEvent("voleyos:open-suite", { detail: target }));
+  };
+  return (
+    <nav
+      data-testid="flow-wizard"
+      aria-label={t(locale, "Flujo Picadito", "Pickup flow", "Fluxo Picadito")}
+      className="flex gap-1 overflow-x-auto no-scrollbar rounded-2xl border border-volt/25 bg-volt/5 px-2 py-1.5"
+    >
+      {FLOW_STEPS.map((item) => (
+        <button
+          key={item.step}
+          type="button"
+          data-testid={`flow-step-${item.step}`}
+          aria-current={current === item.step ? "step" : undefined}
+          onClick={() => pick(item.step)}
+          className={`shrink-0 rounded-lg px-2 py-1 text-[9px] font-black leading-tight ${
+            current === item.step ? "bg-volt text-obsidian" : "border border-white/10 text-white/60"
+          }`}
+        >
+          {item.icon} {item.label[locale]}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+/** 🏆 Mi Temporada: local match history, streaks, rivalries and trend. */
+function SeasonPanel({ locale }: { locale: Locale }) {
+  const [history, setHistory] = useState<SeasonMatch[]>(() => loadSeason());
+  const [notice, setNotice] = useState<string | null>(null);
+  const stats = useMemo(() => seasonStats(history), [history]);
+
+  const copySummary = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(seasonSummaryText(history, locale));
+      setNotice(t(locale, "📲 Resumen copiado.", "📋 Summary copied.", "📋 Resumo copiado."));
+    } catch {
+      setNotice(
+        t(locale, "El navegador bloqueó el copiado.", "The browser blocked copying.", "O navegador bloqueou a cópia."),
+      );
+    }
+  };
+
+  const exportCsv = (): void => {
+    const csv = seasonToCsv(history);
+    try {
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "voleyos-temporada.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+      setNotice(t(locale, "📄 CSV generado.", "📄 CSV generated.", "📄 CSV gerado."));
+    } catch {
+      void navigator.clipboard.writeText(csv).then(() =>
+        setNotice(t(locale, "📄 CSV copiado.", "📄 CSV copied.", "📄 CSV copiado.")),
+      );
+    }
+  };
+
+  const printReport = (): void => {
+    const spec: ReportSpec = {
+      title: t(locale, "Mi Temporada", "My Season", "Minha Temporada"),
+      module: "season",
+      locale,
+      generatedAt: new Date().toISOString(),
+      sheets: [
+        {
+          name: t(locale, "Partidos", "Matches", "Jogos"),
+          headers: [
+            t(locale, "Fecha", "Date", "Data"),
+            t(locale, "Partido", "Match", "Jogo"),
+            t(locale, "Ganador", "Winner", "Vencedor"),
+            t(locale, "Sets", "Sets", "Sets"),
+          ],
+          rows: history.map((match) => [
+            match.date,
+            `${match.teamA} ${match.setsA}-${match.setsB} ${match.teamB}`,
+            match.winner === "A" ? match.teamA : match.teamB,
+            match.setScores.map((set) => `${set.a}-${set.b}`).join(" / "),
+          ]),
+        },
+      ],
+    };
+    void openPrintableReport(spec).then((opened) =>
+      setNotice(
+        opened
+          ? t(locale, "🖨 Reporte listo para imprimir.", "🖨 Report ready to print.", "🖨 Relatório pronto para imprimir.")
+          : t(locale, "Permití ventanas emergentes para imprimir.", "Allow pop-ups to print.", "Permita pop-ups para imprimir."),
+      ),
+    );
+  };
+
+  if (history.length === 0) {
+    return (
+      <section className="vos-section-card vos-stack">
+        <p className={LABEL}>🏆 {t(locale, "Mi Temporada", "My Season", "Minha Temporada")}</p>
+        <div className="rounded-lg border border-dashed border-white/15 px-3 py-4 text-center">
+          <p className="text-[11px] text-white/55">
+            {t(
+              locale,
+              "Todavía no guardaste partidos: cerrá uno en ⏱️ Cancha o tocá 💾 Guardar Partido.",
+              "No matches yet: finish one in ⏱️ Court or tap 💾 Save Match.",
+              "Ainda sem partidos: feche um na ⏱️ Cancha ou toque 💾 Salvar Partida.",
+            )}
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="vos-section-card vos-stack" data-testid="season-vault">
+      <p className={LABEL}>🏆 {t(locale, "Mi Temporada", "My Season", "Minha Temporada")}</p>
+      <div className="grid grid-cols-3 gap-1 text-center">
+        <div className="rounded-lg bg-white/5 px-1 py-2">
+          <p className="text-lg font-black text-volt">{stats.matches}</p>
+          <p className="text-[9px] uppercase text-white/45">{t(locale, "Partidos", "Matches", "Jogos")}</p>
+        </div>
+        <div className="rounded-lg bg-white/5 px-1 py-2">
+          <p className="text-lg font-black text-volt">{stats.setsPlayed}</p>
+          <p className="text-[9px] uppercase text-white/45">{t(locale, "Sets", "Sets", "Sets")}</p>
+        </div>
+        <div className="rounded-lg bg-white/5 px-1 py-2">
+          <p className="text-lg font-black text-volt">{stats.bestStreak.streak > 0 ? `🔥${stats.bestStreak.streak}` : "—"}</p>
+          <p className="truncate text-[9px] uppercase text-white/45">{stats.bestStreak.team}</p>
+        </div>
+      </div>
+
+      <div>
+        <p className={LABEL}>{t(locale, "Récord por equipo", "Record by team", "Recorde por time")}</p>
+        <ul className="mt-1 space-y-0.5">
+          {stats.winRates.slice(0, 5).map((row) => (
+            <li key={`rate-${row.team}`} className="flex items-center justify-between gap-2 rounded bg-white/5 px-2 py-1 text-[10px]">
+              <span className="min-w-0 truncate font-bold text-white/75">{row.team}</span>
+              <span className="shrink-0 tabular-nums text-white/55">
+                {row.wins}-{row.played - row.wins} · {Math.round(row.rate * 100)}%
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <p className={LABEL}>{t(locale, "Tendencia de victorias", "Win trend", "Tendência de vitórias")}</p>
+        <svg viewBox="0 0 240 60" className="mt-1 h-16 w-full rounded-lg bg-obsidian/70" role="img"
+          aria-label={t(locale, "Tendencia de victorias", "Win trend", "Tendência de vitórias")}>
+          <polyline
+            data-testid="season-trend"
+            points={trendPath(stats.trend.points)}
+            fill="none"
+            stroke="#FACC15"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <p className="text-[9px] text-white/45">{stats.trend.team} · {t(locale, "víctorias acumuladas", "cumulative wins", "vitórias acumuladas")}</p>
+      </div>
+
+      <div>
+        <p className={LABEL}>{t(locale, "Clásicos del head-to-head", "Head-to-head classics", "Clássicos do confronto direto")}</p>
+        <ul className="mt-1 space-y-0.5">
+          {stats.rivalries.slice(0, 5).map((rivalry) => (
+            <li key={`h2h-${rivalry.teamA}-${rivalry.teamB}`} className="flex items-center justify-between gap-2 rounded bg-white/5 px-2 py-1 text-[10px]">
+              <span className="min-w-0 truncate font-bold text-white/75">
+                {rivalry.teamA} <span className="text-volt">{rivalry.winsA}</span> - <span className="text-volt">{rivalry.winsB}</span> {rivalry.teamB}
+              </span>
+              <span className="shrink-0 text-white/40">×{rivalry.total}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="flex flex-wrap gap-1">
+        <button type="button" className={BTN} data-testid="season-whatsapp" onClick={() => void copySummary()}>
+          📲 {t(locale, "WhatsApp", "WhatsApp", "WhatsApp")}
+        </button>
+        <button type="button" className={BTN} data-testid="season-csv" onClick={exportCsv}>
+          📄 CSV
+        </button>
+        <button type="button" className={BTN} data-testid="season-print" onClick={printReport}>
+          🖨 {t(locale, "PDF", "PDF", "PDF")}
+        </button>
+      </div>
+      {notice ? (
+        <p role="status" className="rounded-lg bg-emerald/15 px-2 py-1 text-[10px] font-semibold text-emerald">
+          {notice}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+export type SuiteSection = "lista" | "banco" | "juez" | "senas" | "calor" | "vaquita" | "premios" | "temporada";
 
 const SECTIONS: Array<{ id: SuiteSection; label: Record<Locale, string> }> = [
   { id: "lista", label: { es: "📋 Lista de WhatsApp", en: "📋 WhatsApp Roster", pt: "📋 Lista do WhatsApp" } },
@@ -898,6 +1137,7 @@ const SECTIONS: Array<{ id: SuiteSection; label: Record<Locale, string> }> = [
   { id: "calor", label: { es: "🔥 Calentamiento 4′", en: "🔥 4′ Warmup", pt: "🔥 Aquecimento 4′" } },
   { id: "vaquita", label: { es: "💰 La Vaquita 2.0", en: "💰 The Pot 2.0", pt: "💰 A Vaquinha 2.0" } },
   { id: "premios", label: { es: "🏆 Premios", en: "🏆 Prizes", pt: "🏆 Prêmios" } },
+  { id: "temporada", label: { es: "🏆 Mi Temporada", en: "🏆 My Season", pt: "🏆 Minha Temporada" } },
 ];
 
 const PANELS: Record<SuiteSection, (props: SuitePanelProps) => React.ReactElement> = {
@@ -908,15 +1148,43 @@ const PANELS: Record<SuiteSection, (props: SuitePanelProps) => React.ReactElemen
   calor: WarmupExpress,
   vaquita: VaquitaPanel,
   premios: PrizePanel,
+  temporada: SeasonPanel,
 };
 
 /** 🍻 Picadito & Amigos suite: pre-match organisation and bench rotation. */
-export function CasualPlayerSuite({ locale }: { locale: Locale }) {
-  const [section, setSection] = useState<SuiteSection>("lista");
-  const [roster, setRoster] = useState<OrganizerRoster | null>(null);
+const SECTION_STEP: Record<SuiteSection, number> = {
+  lista: 1,
+  banco: 2,
+  juez: 3,
+  senas: 0,
+  calor: 0,
+  vaquita: 5,
+  premios: 4,
+  temporada: 0,
+};
+
+export function CasualPlayerSuite({ locale, initialSection }: { locale: Locale; initialSection?: SuiteSection }) {
+  const [section, setSection] = useState<SuiteSection>(initialSection ?? "lista");
+  // The roster survives tab changes so step 1 hands its players to every
+  // later step of the chained Picadito workflow.
+  const [roster, setRoster] = useState<OrganizerRoster | null>(() => loadFlowRoster());
   const Panel = PANELS[section];
+  const persistRoster = (next: OrganizerRoster | null): void => {
+    setRoster(next);
+    saveFlowRoster(next);
+  };
+  const selectStep = (step: number): void => {
+    if (step === 3) {
+      window.dispatchEvent(new CustomEvent("voleyos:open-scoreboard"));
+      return;
+    }
+    const target = step === 1 ? "lista" : step === 2 ? "banco" : step === 4 ? "premios" : "vaquita";
+    setSection(target);
+    triggerCourtHaptics(16);
+  };
   return (
     <div className="space-y-3">
+      <FlowWizard locale={locale} current={SECTION_STEP[section]} onSelect={selectStep} />
       <div
         role="tablist"
         aria-label={t(locale, "Picadito & Amigos", "Pickup & Friends", "Picadito & Amigos")}
@@ -940,7 +1208,7 @@ export function CasualPlayerSuite({ locale }: { locale: Locale }) {
           </button>
         ))}
       </div>
-      <Panel locale={locale} roster={roster} onRosterChange={setRoster} goToSection={setSection} />
+      <Panel locale={locale} roster={roster} onRosterChange={persistRoster} goToSection={setSection} />
     </div>
   );
 }

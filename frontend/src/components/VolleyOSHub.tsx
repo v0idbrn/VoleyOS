@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { LOCALE_NAMES, SHELL, t } from "@/lib/i18n";
-import { awardIndoorPoint, buildTarget, paywallEnabled, swapCourt, type Locale, type Profile, type ScoreboardState } from "@/lib/local-engines";
+import { awardIndoorPoint, buildTarget, jumpLoad, paywallEnabled, swapCourt, type Locale, type Profile, type ScoreboardState } from "@/lib/local-engines";
 import { clearCreatorUnlock, creatorUnlocked, matchesCreatorKey, persistCreatorToken } from "@/lib/creator-unlock";
 import { clearLicenseToken, unlockCreatorOnServer } from "@/lib/api-client";
 import { MODULES, MODULE_BY_SLUG, PROFILE_LABELS } from "@/lib/modules";
@@ -20,7 +20,9 @@ import { loadCrowdAmbience, saveCrowdAmbience, setSoundEffectsEnabled } from "@/
 import { EphemeralVaultBar } from "@/components/EphemeralVaultBar";
 import { STATIONS } from "@/components/stations";
 import { GymScreenModule } from "@/components/GymScreenModule";
-import { CasualPlayerSuite } from "@/components/CasualPlayerSuite";
+import { CasualPlayerSuite, type SuiteSection } from "@/components/CasualPlayerSuite";
+import { loadFlowRoster } from "@/lib/season-vault";
+import { acwrSample } from "@/lib/samples";
 
 const FILTERS: Array<Profile | "all"> = ["all", "players", "coaches", "court", "referees", "fans", "tournaments"];
 const LOCALES: Locale[] = ["es", "en", "pt"];
@@ -280,6 +282,9 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [liveScore, setLiveScore] = useState<ScoreboardState | null>(null);
   const [coachMarks, setCoachMarks] = useState(false);
   const [crowdVolume, setCrowdVolume] = useState(0.7);
+  const [suiteSection, setSuiteSection] = useState<SuiteSection | null>(null);
+  const [suiteNonce, setSuiteNonce] = useState(0);
+  const [reminder, setReminder] = useState<{ time: string; venue: string; acwr: string } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const target = buildTarget();
   const locked = paywallEnabled() && !creator;
@@ -386,6 +391,44 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     window.addEventListener("voleyos:coach-marks", openCoach);
     return () => window.removeEventListener("voleyos:coach-marks", openCoach);
   }, []);
+
+  // Chained Picadito flow: any step can pull the suite (or the scoreboard)
+  // forward, carrying the roster and the live match saved in localStorage.
+  useEffect(() => {
+    const openSuite = (event: Event): void => {
+      const detail = event instanceof CustomEvent ? event.detail : null;
+      setSuiteSection(typeof detail === "string" ? (detail as SuiteSection) : null);
+      setSuiteNonce((value) => value + 1);
+      setActiveSlug(null);
+      setCasualOpen(true);
+    };
+    const openScoreboard = (): void => {
+      setCasualOpen(false);
+      setTab("court");
+      setActiveSlug(null);
+      setTabPick((current) => ({ ...current, court: "scoreboard" }));
+      triggerCourtHaptics(16);
+    };
+    window.addEventListener("voleyos:open-suite", openSuite);
+    window.addEventListener("voleyos:open-scoreboard", openScoreboard);
+    return () => {
+      window.removeEventListener("voleyos:open-suite", openSuite);
+      window.removeEventListener("voleyos:open-scoreboard", openScoreboard);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (tab !== "home") return;
+    const roster = loadFlowRoster();
+    if (!roster || roster.time === "—" || roster.time.length === 0) {
+      setReminder(null);
+      return;
+    }
+    const stored = Number(window.localStorage.getItem("volleyos.acwrLoad") ?? "185");
+    const weekly = Number.isFinite(stored) && stored > 0 ? stored : 185;
+    const report = jumpLoad(acwrSample().map((day, index) => (index >= 21 ? { ...day, jumps: weekly } : day)));
+    setReminder({ time: roster.time, venue: roster.venue, acwr: `${report.ratio.toFixed(2)} · ${report.zone}` });
+  }, [tab]);
 
   const closeOverlays = useCallback((): boolean => {
     if (keyOpen) {
@@ -864,13 +907,26 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
         ) : casualOpen ? (
           <div className="h-full overflow-y-auto no-scrollbar px-3 pb-28 pt-3">
             <div className="mx-auto w-full max-w-2xl space-y-3">
-              <CasualPlayerSuite locale={locale} />
+              <CasualPlayerSuite key={suiteNonce} locale={locale} initialSection={suiteSection ?? undefined} />
             </div>
           </div>
         ) : (
           <div className="h-full overflow-y-auto no-scrollbar">
             {tab === "home" ? (
               <div className="mx-auto max-w-3xl px-3 pb-28 pt-3">
+                {reminder ? (
+                  <section data-testid="next-match-banner" className="mb-3 rounded-2xl border border-volt/30 bg-volt/10 px-3 py-2">
+                    <p className="text-[11px] font-black text-volt">
+                      ⏰ {t(locale, "Próximo partido agendado", "Next match scheduled", "Próximo jogo agendado")}:{" "}
+                      {t(locale, "Hoy", "Today", "Hoje")} {reminder.time} hs
+                    </p>
+                    <p className="truncate text-[10px] text-white/60">📍 {reminder.venue}</p>
+                    <p className="text-[10px] text-white/55">
+                      ✅ {t(locale, "Checklist", "Checklist", "Checklist")}: {t(locale, "Pelota", "Ball", "Bola")} ✓ ·{" "}
+                      {t(locale, "Entrada en calor 4′", "4′ warmup", "Aquecimento 4′")} ✓ · ACWR {reminder.acwr}
+                    </p>
+                  </section>
+                ) : null}
                 <label className="relative block">
                   <span className="sr-only">{shell.search}</span>
                   <span aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-white/35">⌕</span>
