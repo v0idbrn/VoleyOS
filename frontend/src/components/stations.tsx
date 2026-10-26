@@ -19,6 +19,7 @@ import { localizeReactTree } from "@/lib/engine-l10n";
 import { COPY, t } from "@/lib/i18n";
 import { BenchRotator, FlowWizard } from "@/components/CasualPlayerSuite";
 import { saveSeasonMatch, seasonMatchFromState } from "@/lib/season-vault";
+import { syncWidgetSnapshot } from "@/lib/widget-bridge";
 import { nextServeStreak, serveCapHit, serveCapMessage, type ServeCapLimit } from "@/lib/casual-engines";
 import {
   FAN_QUESTIONS,
@@ -803,6 +804,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   useEffect(() => {
     persistLiveScoreboard(state);
     clearClonedScoreboard();
+    syncWidgetSnapshot();
   }, [state]);
 
   useEffect(() => {

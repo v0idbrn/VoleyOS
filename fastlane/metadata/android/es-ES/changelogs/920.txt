@@ -1,0 +1,5 @@
+- Widget nativo: marcador en vivo, próximo partido y 1 toque a Marcador/Picadito.
+- Mi Temporada: récords, rachas, clásicos, tendencia y exportes WhatsApp/CSV/impresión.
+- Marcador flotante, guía interactiva de 3 pasos y confeti con deshacer de 5 segundos.
+- Suite de sonidos completa (cues de picadito, público, ticks) y anunciador sin manos.
+- Flujo encadenado de Picadito, aviso de partido, apoyo honesto y actualizador interno.

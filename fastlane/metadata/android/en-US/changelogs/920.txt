@@ -1,0 +1,5 @@
+- Native Android widget: live score, next match and 1-tap Marcador/Picadito, plus launcher shortcuts.
+- Mi Temporada: win rates, streaks, rivalries, trend chart and WhatsApp/CSV/print exports.
+- Sticky mini-scoreboard, 3-step interactive guide and set-win confetti with 5s undo.
+- Full audio suite (picadito cues, stadium crowd, warmup ticks) and a hands-free voice announcer.
+- Chained Picadito flow, match reminder, honest support flow and in-app update check.

@@ -417,11 +417,28 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
       setTabPick((current) => ({ ...current, court: "scoreboard" }));
       triggerCourtHaptics(16);
     };
+    const nativeNav = (event: Event): void => {
+      const target = event instanceof CustomEvent ? String(event.detail) : "";
+      if (target === "cancha") {
+        setCasualOpen(false);
+        setTab("court");
+        setActiveSlug(null);
+        setTabPick((current) => ({ ...current, court: "scoreboard" }));
+      } else {
+        setSuiteSection(target === "season" ? "temporada" : "lista");
+        setSuiteNonce((value) => value + 1);
+        setActiveSlug(null);
+        setCasualOpen(true);
+      }
+      triggerCourtHaptics(16);
+    };
     window.addEventListener("voleyos:open-suite", openSuite);
     window.addEventListener("voleyos:open-scoreboard", openScoreboard);
+    window.addEventListener("vos-native-nav", nativeNav);
     return () => {
       window.removeEventListener("voleyos:open-suite", openSuite);
       window.removeEventListener("voleyos:open-scoreboard", openScoreboard);
+      window.removeEventListener("vos-native-nav", nativeNav);
     };
   }, []);
 

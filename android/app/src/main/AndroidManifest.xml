@@ -27,7 +27,24 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Long-press launcher shortcuts: 1-tap Marcador and Picadito. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- Home screen widget: pure SDK provider, explicitly exported for Android 14. -->
+        <receiver
+            android:name=".VoleyOSWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/voleyos_widget_info" />
+        </receiver>
 
     </application>
 </manifest>

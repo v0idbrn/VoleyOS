@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static long-press shortcuts on the launcher icon. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="cancha"
+        android:shortcutLongLabel="@string/shortcut_cancha_long"
+        android:shortcutShortLabel="@string/shortcut_cancha">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="voleyos://tab/cancha"
+            android:targetClass="org.voleyos.global.MainActivity"
+            android:targetPackage="org.voleyos.global">
+            <extra
+                android:name="vos_target_tab"
+                android:value="cancha" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="picadito"
+        android:shortcutLongLabel="@string/shortcut_picadito_long"
+        android:shortcutShortLabel="@string/shortcut_picadito">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="voleyos://tab/picadito"
+            android:targetClass="org.voleyos.global.MainActivity"
+            android:targetPackage="org.voleyos.global">
+            <extra
+                android:name="vos_target_tab"
+                android:value="picadito" />
+        </intent>
+    </shortcut>
+</shortcuts>

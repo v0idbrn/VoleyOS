@@ -2,7 +2,7 @@
 
 [English](README.md) · [Español](README.es.md) · **Português**
 
-[![Version](https://img.shields.io/badge/version-v9.0.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v9.2.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Módulos](https://img.shields.io/badge/módulos-61-FF3B5C?style=for-the-badge&color=EAB308)](#enciclopédia-dos-61-módulos)
 [![Offline](https://img.shields.io/badge/100%25-offline--primeiro-FF3B5C?style=for-the-badge&color=EAB308)](#por-que-o-volleyos-existe)
 [![Android](https://img.shields.io/badge/APK%20Android-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -13,6 +13,23 @@
 [![Download APK](https://img.shields.io/badge/APK-voleyos--universal.apk-FF3B5C?style=for-the-badge&logo=android)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
 
 APK universal assinado, construído pelo GitHub Actions a cada tag `v*`. Android 7.0+ (minSdk 24), trilíngue, offline primeiro, sem contas e sem telemetria. Pronto para F-Droid.
+
+## 🆕 Novidades do v9.2.0
+
+- **Widget nativo do Android na tela inicial** (SDK puro, zero androidx): placar ao vivo, próximo jogo e botões de 1 toque para ⏱️ Marcador e 🍻 Picadito, mais atalhos de toque longo.
+- **🏆 Minha Temporada**: cada partida fechada fica salva com recordes, 🔥 sequências, clássicos do confronto direto, gráfico de tendência SVG e exportes WhatsApp / CSV / impressão.
+- **Marcador flotante** que te segue por todas as abas com `+1 A`, `+1 B`, troca de lado e salto de 1 toque para a quadra.
+- **Guia interativo com coach marks**: as guias dos módulos viraram um tour visual de 3 passos.
+- **Suíte de sons completa + anunciante de voz**: cues de picadito (saque, recuperação, kill, limite), torcida atrás do fanfare, ticks 3-2-1 do aquecimento, moeda da Vaquinha, martelo do Juiz e anunciante de placar sem mãos em ES / EN / PT.
+- **Apoio honesto**: folha de apoio uma vez por semana, códigos `VOS-CHIP` com selo dourado 👑 Patrocinador, Muro da Comunidade e verificador de versões do GitHub em um toque.
+
+## ❤️ Apoie o VolleyOS
+
+Grátis, 100% offline, sem contas, sem telemetria e sem anúncios — bancado pela comunidade.
+
+- ☕ Ko-fi: https://ko-fi.com/unfrgvnn
+- 💵 Alias Mercado Pago: `unfrgvnn.dead`
+- 👑 Troque um código `VOS-CHIP` pelo selo dourado de patrocinador; os apoiadores aparecem nestes READMEs a cada release.
 
 ## Por que o VolleyOS existe
 

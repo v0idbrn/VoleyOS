@@ -2,7 +2,7 @@
 
 [English](README.md) · [Español](README.es.md) · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v9.0.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v9.2.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Modules](https://img.shields.io/badge/modules-61-FF3B5C?style=for-the-badge&color=EAB308)](#encyclopedia-of-the-61-modules)
 [![Offline](https://img.shields.io/badge/100%25-offline--first-FF3B5C?style=for-the-badge&color=EAB308)](#why-volleyos-exists)
 [![Android](https://img.shields.io/badge/Android%20APK-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -13,6 +13,23 @@
 [![Download APK](https://img.shields.io/badge/APK-voleyos--universal.apk-FF3B5C?style=for-the-badge&logo=android)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
 
 Signed universal APK built by GitHub Actions on every `v*` tag. Android 7.0+ (minSdk 24), trilingual, offline-first, no accounts and no telemetry. F-Droid ready.
+
+## 🆕 What's new in v9.2.0
+
+- **Native Android home-screen widget** (pure SDK, zero androidx): live score line, next scheduled match and 1-tap buttons straight into ⏱️ Marcador and 🍻 Picadito, plus long-press launcher shortcuts.
+- **🏆 Mi Temporada**: every finished match is stored locally with win rates, 🔥 streaks, head-to-head rivalries, an SVG win-trend chart and WhatsApp / CSV / printable exports.
+- **Sticky mini-scoreboard** that follows you across every tab with `+1 A`, `+1 B`, swap sides and a 1-tap jump back to the court.
+- **Interactive coach-marks wizard**: the module guides became a 3-step visual spotlight tour, one tap from every card.
+- **Full court audio suite + voice announcer**: picadito cues (ace / side-out / kill / serve-cap), a stadium crowd layer behind the set fanfare, 3-2-1 warmup ticks, the Vaquita coin clink, the Judge's gavel and a hands-free score announcer in ES / EN / PT.
+- **Honest support flow**: a once-a-week support sheet, `VOS-CHIP` supporter codes with a golden 👑 Patrocinador badge, a Wall of Supporters and a tap-only GitHub update checker.
+
+## ❤️ Support VolleyOS
+
+Gratis, 100% offline, sin cuentas, sin telemetría y sin anuncios — bancado por la comunidad.
+
+- ☕ Ko-fi: https://ko-fi.com/unfrgvnn
+- 💵 Mercado Pago alias: `unfrgvnn.dead`
+- 👑 Redeem a `VOS-CHIP` code from the Creator Keygen Console for the golden supporter badge; supporters are credited in these READMEs with every release.
 
 ## Why VolleyOS exists
 

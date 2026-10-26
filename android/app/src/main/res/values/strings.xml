@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">VoleyOS</string>
+    <string name="widget_label">VoleyOS Marcador &amp; Turno</string>
+    <string name="shortcut_cancha">⏱️ Marcador</string>
+    <string name="shortcut_cancha_long">Abrir el marcador en 1 tap</string>
+    <string name="shortcut_picadito">🍻 Picadito</string>
+    <string name="shortcut_picadito_long">Abrir Picadito &amp; Temporada</string>
     <color name="obsidian">#070709</color>
     <string name="color_obsidian">Obsidian Night</string>
     <string name="color_amber">Amber Volt</string>

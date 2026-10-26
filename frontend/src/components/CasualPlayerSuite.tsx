@@ -53,6 +53,7 @@ import {
   type SeasonMatch,
 } from "@/lib/season-vault";
 import { supporterChipActive } from "@/lib/support";
+import { syncWidgetSnapshot } from "@/lib/widget-bridge";
 
 const BTN =
   "rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white transition hover:border-volt hover:text-volt focus-visible:outline focus-visible:outline-2 focus-visible:outline-volt";
@@ -1175,6 +1176,7 @@ export function CasualPlayerSuite({ locale, initialSection }: { locale: Locale; 
   const persistRoster = (next: OrganizerRoster | null): void => {
     setRoster(next);
     saveFlowRoster(next);
+    syncWidgetSnapshot();
   };
   const selectStep = (step: number): void => {
     if (step === 3) {
