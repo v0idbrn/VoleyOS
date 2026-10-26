@@ -11,7 +11,10 @@ import { DIFFICULTY_BADGES, GUIDED_MODES, GUIDED_MODE_BY_ID, type GuidedModeId }
 import { ModuleGuideBanner } from "@/components/ModuleGuideBanner";
 import { CoachMarksOverlay } from "@/components/CoachMarksOverlay";
 import { MODULE_GUIDES } from "@/lib/module-guides";
-import { MonetizationModal } from "@/components/MonetizationModal";
+import { CreatorKeygenPanel, MonetizationModal } from "@/components/MonetizationModal";
+import { SupportSheet } from "@/components/SupportSheet";
+import { canAskSupport, persistSupporterChip, supporterChipActive } from "@/lib/support";
+import { APP_VERSION, checkForUpdate, type UpdateCheck } from "@/lib/update-check";
 import { addVaultEntry, loadVault } from "@/lib/vault";
 import { downloadXlsx, openPrintableReport, type ReportSpec } from "@/lib/offline-xlsx";
 import { LIVE_SCORE_EVENT, announceScoreTTS, isMatchActive, persistLiveScoreboard, readLiveScoreboard, requestCourtWakeLock, triggerCourtHaptics } from "@/lib/court-ux";
@@ -285,6 +288,10 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [suiteSection, setSuiteSection] = useState<SuiteSection | null>(null);
   const [suiteNonce, setSuiteNonce] = useState(0);
   const [reminder, setReminder] = useState<{ time: string; venue: string; acwr: string } | null>(null);
+  const [supporter, setSupporter] = useState(false);
+  const [supportMoment, setSupportMoment] = useState<"match" | "export" | null>(null);
+  const [updateState, setUpdateState] = useState<UpdateCheck | null>(null);
+  const [checking, setChecking] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const target = buildTarget();
   const locked = paywallEnabled() && !creator;
@@ -348,6 +355,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     setVoice(window.localStorage.getItem(VOICE_KEY) === "1");
     setCourtAudio(window.localStorage.getItem(AUDIO_KEY) !== "0");
     setCrowdVolume(loadCrowdAmbience());
+    setSupporter(supporterChipActive());
     setPinned((current) => (current.length > 0 ? current : readStringList(PIN_KEY)));
     setRecent(readStringList(RECENT_KEY));
     const done = window.localStorage.getItem(ONBOARDING_KEY) === "1";
@@ -430,6 +438,18 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     setReminder({ time: roster.time, venue: roster.venue, acwr: `${report.ratio.toFixed(2)} · ${report.zone}` });
   }, [tab]);
 
+  // Layer 1 of the donation funnel: a support sheet at emotional moments,
+  // gated by the persistent 7-day cooldown.
+  useEffect(() => {
+    const onRequest = (event: Event): void => {
+      if (!canAskSupport()) return;
+      const moment = event instanceof CustomEvent && event.detail === "export" ? "export" : "match";
+      setSupportMoment(moment);
+    };
+    window.addEventListener("voleyos:support-moment", onRequest);
+    return () => window.removeEventListener("voleyos:support-moment", onRequest);
+  }, []);
+
   const closeOverlays = useCallback((): boolean => {
     if (keyOpen) {
       setKeyOpen(false);
@@ -501,6 +521,20 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   };
 
   const submitCreatorKey = async (): Promise<void> => {
+    if (keyValue.trim().toUpperCase().startsWith("VOS-CHIP")) {
+      const ok = await persistSupporterChip(keyValue);
+      if (ok) {
+        setSupporter(true);
+        setKeyOpen(false);
+        setKeyValue("");
+        setKeyError(false);
+        setToast(t(locale, "👑 Eres Patrocinador Oficial", "👑 You are an Official Supporter", "👑 Você é Patrocinador Oficial"));
+        triggerCourtHaptics([40, 30, 60]);
+      } else {
+        setKeyError(true);
+      }
+      return;
+    }
     if (await matchesCreatorKey(keyValue)) {
       const key = keyValue.trim();
       persistCreatorToken(key);
@@ -620,6 +654,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const exportExcel = (slug: string): void => {
     const report = buildReport(slug);
     if (!report) return;
+    if ((slug === "fivb-escoresheet" || slug === "match-poster") && canAskSupport()) setSupportMoment("export");
     downloadXlsx(report);
     setToast(t(locale, "XLSX generado offline.", "XLSX generated offline.", "XLSX gerado offline."));
     triggerCourtHaptics(30);
@@ -628,6 +663,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const exportPdf = (slug: string): void => {
     const report = buildReport(slug);
     if (!report) return;
+    if ((slug === "fivb-escoresheet" || slug === "match-poster") && canAskSupport()) setSupportMoment("export");
     void openPrintableReport(report).then((opened) => {
       setToast(
         opened
@@ -799,6 +835,14 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
             >
               {creator ? `👑 ${shell.pro}` : `⚡ ${shell.local}`}
             </span>
+            {supporter ? (
+              <span
+                data-testid="supporter-badge"
+                className="max-w-[120px] truncate rounded-full border border-volt/60 bg-volt/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-volt"
+              >
+                👑 {t(locale, "Patrocinador Oficial", "Official Supporter", "Patrocinador Oficial")}
+              </span>
+            ) : null}
             <div className="ml-auto flex items-center gap-0.5">
               <button
                 type="button"
@@ -1306,6 +1350,71 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   {t(locale, "Licencias, donaciones y keygen", "Licences, donations & keygen", "Licenças, doações e keygen")}
                 </button>
 
+                {creator ? <CreatorKeygenPanel locale={locale} /> : null}
+
+                <button
+                  type="button"
+                  data-testid="update-check"
+                  disabled={checking}
+                  onClick={() => {
+                    setChecking(true);
+                    setUpdateState(null);
+                    void checkForUpdate(APP_VERSION).then((result) => {
+                      setUpdateState(result);
+                      setChecking(false);
+                    });
+                  }}
+                  className="tap w-full rounded-xl border border-white/10 bg-panel px-4 py-3 text-left text-[13px] font-semibold text-white disabled:opacity-50"
+                >
+                  🔄{" "}
+                  {checking
+                    ? t(locale, "Consultando GitHub…", "Checking GitHub…", "Consultando GitHub…")
+                    : t(
+                        locale,
+                        "Verificar si hay una versión nueva en GitHub",
+                        "Check for a new version on GitHub",
+                        "Verificar se há uma versão nova no GitHub",
+                      )}
+                </button>
+                {updateState ? (
+                  <p
+                    data-testid="update-result"
+                    className={`rounded-xl border px-3 py-2 text-[11px] font-semibold ${
+                      updateState.status === "update"
+                        ? "border-emerald/40 bg-emerald/10 text-emerald"
+                        : "border-white/15 bg-panel text-white/60"
+                    }`}
+                  >
+                    {updateState.status === "update" ? (
+                      <>
+                        {t(
+                          locale,
+                          `⬆️ Nueva versión disponible: ${updateState.version}`,
+                          `⬆️ New version available: ${updateState.version}`,
+                          `⬆️ Nova versão disponível: ${updateState.version}`,
+                        )}{" "}
+                        <a href={updateState.url} target="_blank" rel="noreferrer" className="font-black underline">
+                          ⬇️ {t(locale, "Descargar APK", "Download APK", "Baixar APK")}
+                        </a>
+                      </>
+                    ) : updateState.status === "up-to-date" ? (
+                      t(
+                        locale,
+                        `✅ Estás en la última versión (${APP_VERSION}).`,
+                        `✅ You are on the latest version (${APP_VERSION}).`,
+                        `✅ Você está na última versão (${APP_VERSION}).`,
+                      )
+                    ) : (
+                      t(
+                        locale,
+                        `⚠️ No se pudo consultar (${updateState.message}).`,
+                        `⚠️ Check failed (${updateState.message}).`,
+                        `⚠️ Falha na consulta (${updateState.message}).`,
+                      )
+                    )}
+                  </p>
+                ) : null}
+
                 <section
                   data-testid="coverage-card"
                   className="mt-5 rounded-2xl border border-emerald/30 bg-emerald/10 p-4"
@@ -1504,6 +1613,10 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
       ) : null}
 
       {coachMarks ? <CoachMarksOverlay locale={locale} onClose={() => setCoachMarks(false)} /> : null}
+
+      {supportMoment ? (
+        <SupportSheet locale={locale} moment={supportMoment} onClose={() => setSupportMoment(null)} />
+      ) : null}
 
       {toast ? (
         <div

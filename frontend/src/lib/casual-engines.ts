@@ -831,6 +831,8 @@ export interface PrizePosterInput {
   mvp?: string;
   date: string;
   venue?: string;
+  /** Golden 👑 Patrocinador badge stamped by a redeemed VOS-CHIP. */
+  supporter?: boolean;
 }
 
 function escapeXml(value: string): string {
@@ -887,6 +889,11 @@ export function buildPrizePoster(input: PrizePosterInput): string {
     `<text x="360" y="72" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="30" fill="#FF3B5C">${esc(title)}</text>`,
     `<line x1="180" y1="96" x2="540" y2="96" stroke="#2A2A33" stroke-width="2"/>`,
     ...blocks,
+    ...(input.supporter
+      ? [
+          `<text x="360" y="484" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="14" letter-spacing="3" fill="#FACC15">👑 PATROCINADOR OFICIAL</text>`,
+        ]
+      : []),
     `<text x="360" y="514" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#6B6B78">${esc(footer)}</text>`,
     `</svg>`,
   ].join("");

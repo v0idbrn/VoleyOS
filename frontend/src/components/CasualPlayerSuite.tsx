@@ -52,6 +52,7 @@ import {
   trendPath,
   type SeasonMatch,
 } from "@/lib/season-vault";
+import { supporterChipActive } from "@/lib/support";
 
 const BTN =
   "rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white transition hover:border-volt hover:text-volt focus-visible:outline focus-visible:outline-2 focus-visible:outline-volt";
@@ -821,11 +822,13 @@ function PrizePanel({ locale, roster }: SuitePanelProps) {
         mvp: mvp.trim() || undefined,
         date: date.trim(),
         venue: roster?.venue,
+        supporter: supporterChipActive(),
       }),
     );
     setError(null);
     setNotice(null);
     triggerCourtHaptics(25);
+    window.dispatchEvent(new CustomEvent("voleyos:support-moment", { detail: "export" }));
   };
 
   const copy = async (): Promise<void> => {

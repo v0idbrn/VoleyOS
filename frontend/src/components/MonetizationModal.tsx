@@ -21,6 +21,7 @@ import {
   type LicenseTier,
 } from "@/lib/creator-unlock";
 import type { Locale } from "@/lib/local-engines";
+import { persistSupporterChip, signSupporterChip, supporterChipActive } from "@/lib/support";
 
 function t(locale: Locale, es: string, en: string, pt: string): string {
   return locale === "es" ? es : locale === "en" ? en : pt;
@@ -46,6 +47,7 @@ export function MonetizationModal({ locale, onClose, onActivated }: Monetization
   const [code, setCode] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [supporter, setSupporter] = useState(() => supporterChipActive());
   const deviceId = getDeviceInstallId();
   const price = priceFor(tier, duration, currency);
 
@@ -61,6 +63,16 @@ export function MonetizationModal({ locale, onClose, onActivated }: Monetization
 
   const activate = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
+    if (code.trim().toUpperCase().startsWith("VOS-CHIP")) {
+      const ok = await persistSupporterChip(code);
+      setSupporter(ok || supporterChipActive());
+      setStatus(
+        ok
+          ? t(locale, "👑 Patrocinador Oficial activo", "👑 Official Supporter active", "👑 Patrocinador Oficial ativo")
+          : t(locale, "❌ Chip inválido", "❌ Invalid chip", "❌ Chip inválido"),
+      );
+      return;
+    }
     const check = await verifyCustomerLicense(code, { deviceId });
     if (!check.ok) {
       setStatus(
@@ -208,6 +220,42 @@ export function MonetizationModal({ locale, onClose, onActivated }: Monetization
             {status ? <p className="text-center text-[11px] font-bold text-white/70">{status}</p> : null}
           </form>
 
+          <div data-testid="supporter-wall" className="rounded-xl border border-volt/30 bg-obsidian/60 p-3">
+            <p className={LEGEND}>
+              🏅 {t(locale, "Muro de la Comunidad & Patrocinadores", "Community & Supporters Wall", "Muro da Comunidade & Patrocinadores")}
+            </p>
+            {supporter ? (
+              <p className="mt-1 rounded-lg border border-volt/40 bg-volt/10 px-2 py-1 text-[10px] font-black text-volt">
+                👑 {t(
+                  locale,
+                  "PATROCINADOR OFICIAL — este dispositivo",
+                  "OFFICIAL SUPPORTER — this device",
+                  "PATROCINADOR OFICIAL — este dispositivo",
+                )}
+              </p>
+            ) : (
+              <p className="mt-1 text-[10px] leading-relaxed text-white/55">
+                {t(
+                  locale,
+                  "Tu nombre puede aparecer acá y en el README con cada release: bancá la cancha por Ko-fi o Alias MP.",
+                  "Your name can appear here and in the README with every release: back the court via Ko-fi or MP Alias.",
+                  "Seu nome pode aparecer aqui e no README a cada release: apoie a quadra via Ko-fi ou Alias MP.",
+                )}
+              </p>
+            )}
+            <ul className="mt-2 space-y-0.5 text-[10px] text-white/50">
+              <li>☕ Ko-fi · MP {MP_ALIAS}</li>
+              <li>
+                {t(
+                  locale,
+                  "Aportes reconocidos en los README (es/en/pt) con cada release.",
+                  "Support credited in the READMEs (es/en/pt) with every release.",
+                  "Apoios reconhecidos nos READMEs (es/en/pt) a cada release.",
+                )}
+              </li>
+            </ul>
+          </div>
+
           <p className="text-[9px] leading-relaxed text-white/35">
             {t(
               locale,
@@ -235,6 +283,7 @@ export function CreatorKeygenPanel({ locale }: KeygenPanelProps) {
   const [issued, setIssued] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [chip, setChip] = useState<string | null>(null);
 
   const generate = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
@@ -258,6 +307,20 @@ export function CreatorKeygenPanel({ locale }: KeygenPanelProps) {
       return;
     }
     setIssued(code);
+  };
+
+  const generateChip = async (): Promise<void> => {
+    const generated = await signSupporterChip(holder.trim() || `chip-${Date.now()}`);
+    setChip(generated);
+  };
+
+  const copyChip = async (): Promise<void> => {
+    if (!chip) return;
+    try {
+      await navigator.clipboard.writeText(chip);
+    } catch {
+      /* clipboard blocked: the chip stays visible for manual copy */
+    }
   };
 
   const copy = async (): Promise<void> => {
@@ -307,6 +370,24 @@ export function CreatorKeygenPanel({ locale }: KeygenPanelProps) {
       <button type="submit" className={`${BTN} bg-volt text-obsidian`}>
         ⚡ {t(locale, "Generar código VOS-PRO", "Generate VOS-PRO code", "Gerar código VOS-PRO")}
       </button>
+      <button
+        type="button"
+        data-testid="chip-generate"
+        onClick={() => void generateChip()}
+        className={`${BTN} border border-volt/50 bg-volt/10 text-volt`}
+      >
+        👑 {t(locale, "Generar chip de Patrocinador", "Generate Supporter chip", "Gerar chip de Patrocinador")}
+      </button>
+      {chip ? (
+        <div className="grid gap-1">
+          <p className="rounded-lg border border-white/10 bg-obsidian p-2 font-mono text-[10px] break-all text-emerald" data-testid="chip-code">
+            {chip}
+          </p>
+          <button type="button" onClick={() => void copyChip()} className={`${BTN} border border-white/15 bg-white/5`}>
+            📋 {t(locale, "Copiar chip", "Copy chip", "Copiar chip")}
+          </button>
+        </div>
+      ) : null}
       {issued ? (
         <div className="grid gap-2">
           <p className="rounded-lg border border-white/10 bg-obsidian p-2 font-mono text-[10px] break-all text-emerald">{issued}</p>

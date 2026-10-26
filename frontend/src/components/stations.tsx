@@ -740,6 +740,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       if (result.matchFinished) flashBurst("match");
       else if (result.setFinished) flashBurst("set");
       if (result.matchFinished) saveSeasonMatch(seasonMatchFromState(result.state, preset));
+      if (result.matchFinished) window.dispatchEvent(new CustomEvent("voleyos:support-moment", { detail: "match" }));
       setMessage(
         `${result.message}${result.rotated ? t(locale, " · rotación", " · rotation", " · rotação") : ""}${
           result.sideSwitchDue ? t(locale, " · cambio de lado", " · switch sides", " · troca de lado") : ""
