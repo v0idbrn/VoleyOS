@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { triggerCourtHaptics } from "@/lib/court-ux";
 import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/local-engines";
 import {
+  COURT_CRIES,
   GEAR_FLAGS,
   GEAR_LABELS,
+  JUDGE_DISPUTES,
+  WARMUP_PHASES,
+  WARMUP_TOTAL_SECONDS,
   addPlayer,
   benchFairness,
   benchSwapMessage,
@@ -16,13 +20,19 @@ import {
   dropPlayer,
   formatMatchSheet,
   formatMissingBanner,
+  judgeVerdict,
   missingCount,
   newBenchTeam,
   rotateWithBench,
   toggleGear,
   togglePaid,
+  translateCry,
+  warmupClock,
+  warmupPhaseAt,
   type BenchEntry,
   type BenchTeamState,
+  type JudgeDispute,
+  type JudgeVerdict,
   type OrganizerRoster,
 } from "@/lib/casual-engines";
 
@@ -412,16 +422,212 @@ export function WhatsAppMatchOrganizer({ locale }: { locale: Locale }) {
   );
 }
 
-type SuiteSection = "lista" | "banco";
+/** ⚖️ El Juez del Picadito: captains agree on the observable, the app rules. */
+function JudgePanel({ locale }: { locale: Locale }) {
+  const [dispute, setDispute] = useState<JudgeDispute>("foot");
+  const [accused, setAccused] = useState<"A" | "B">("A");
+  const [verdict, setVerdict] = useState<JudgeVerdict | null>(null);
+  const spec = JUDGE_DISPUTES[dispute];
+
+  const rule = (fact: boolean): void => {
+    setVerdict(judgeVerdict(dispute, fact, accused, locale));
+    triggerCourtHaptics(fact ? [30, 45, 30] : 22);
+  };
+
+  return (
+    <section className="vos-section-card vos-stack">
+      <p className={LABEL}>⚖️ {t(locale, "El Juez del Picadito", "The Pickup Judge", "O Juiz da Rachinha")}</p>
+      <div className="flex flex-wrap gap-1">
+        {(Object.keys(JUDGE_DISPUTES) as JudgeDispute[]).map((id) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={dispute === id}
+            onClick={() => {
+              setDispute(id);
+              setVerdict(null);
+              triggerCourtHaptics(14);
+            }}
+            className={dispute === id ? CHIP_ON : CHIP_OFF}
+          >
+            {JUDGE_DISPUTES[id].icon} {JUDGE_DISPUTES[id].call[locale]}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs leading-relaxed text-white/75">❓ {spec.question[locale]}</p>
+      <div className="flex flex-wrap gap-1">
+        <button type="button" aria-pressed={accused === "A"} onClick={() => setAccused("A")} className={accused === "A" ? CHIP_ON : CHIP_OFF}>
+          {t(locale, "Acusado: Equipo A", "Accused: Team A", "Acusado: Time A")}
+        </button>
+        <button type="button" aria-pressed={accused === "B"} onClick={() => setAccused("B")} className={accused === "B" ? CHIP_ON : CHIP_OFF}>
+          {t(locale, "Acusado: Equipo B", "Accused: Team B", "Acusado: Time B")}
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-1">
+        <button type="button" className={BTN} onClick={() => rule(true)}>
+          ✅ {t(locale, "Sí, pasó", "Yes, it happened", "Sim, aconteceu")}
+        </button>
+        <button type="button" className={BTN} onClick={() => rule(false)}>
+          ❌ {t(locale, "No pasó", "No, it didn't", "Não aconteceu")}
+        </button>
+      </div>
+      {verdict ? (
+        <p role="status" className="rounded-lg bg-emerald/15 px-2 py-1.5 text-[11px] font-semibold text-emerald">
+          {verdict.text}
+        </p>
+      ) : null}
+      <p className="text-[10px] leading-relaxed text-white/45">📜 {spec.rule[locale]}</p>
+    </section>
+  );
+}
+
+/** 📣 Traductor de Señas y Gritos: accent-insensitive three-way shout lookup. */
+function CryTranslator({ locale }: { locale: Locale }) {
+  const [query, setQuery] = useState("");
+  const results = translateCry(query);
+  return (
+    <section className="vos-section-card vos-stack">
+      <p className={LABEL}>📣 {t(locale, "Traductor de Señas y Gritos", "Signals & Shouts Translator", "Tradutor de Sinais e Gritos")}</p>
+      <input
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder={t(locale, "Buscar grito: mía, out, rotación…", "Search a shout: mine, out, rotate…", "Buscar grito: minha, fora, rodízio…")}
+        aria-label={t(locale, "Buscar grito o señal", "Search shout or signal", "Buscar grito ou sinal")}
+        className={INPUT}
+      />
+      <ul className="space-y-1">
+        {results.map((cry) => (
+          <li key={cry.id} className="rounded-lg bg-white/5 px-2 py-1.5">
+            <p className="text-[11px] font-black text-white/90">
+              {cry.es} <span className="text-white/40">→</span> <span className="text-volt">{cry.en}</span>{" "}
+              <span className="text-white/40">·</span> <span className="text-emerald">{cry.pt}</span>
+            </p>
+            <p className="text-[10px] text-white/50">💬 {cry.when[locale]}</p>
+          </li>
+        ))}
+        {results.length === 0 ? (
+          <li className="text-[11px] text-white/45">
+            {t(locale, "Sin resultados: probá con otra palabra.", "No results: try another word.", "Sem resultados: tente outra palavra.")}
+          </li>
+        ) : null}
+      </ul>
+      <p className="text-[10px] text-white/40">
+        {results.length} {t(locale, "gritos encontrados", "shouts found", "gritos encontrados")}
+      </p>
+    </section>
+  );
+}
+
+/** 🔥 Entrada en Calor Express: a strict 4-minute phased countdown. */
+function WarmupExpress({ locale }: { locale: Locale }) {
+  const [elapsed, setElapsed] = useState(0);
+  const [running, setRunning] = useState(false);
+  const finished = elapsed >= WARMUP_TOTAL_SECONDS;
+  const phase = warmupPhaseAt(elapsed);
+  const phaseIndex = WARMUP_PHASES.indexOf(phase);
+  const prevIndexRef = useRef(phaseIndex);
+
+  useEffect(() => {
+    if (!running) return;
+    const id = window.setInterval(() => {
+      setElapsed((value) => Math.min(WARMUP_TOTAL_SECONDS, value + 1));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [running]);
+
+  useEffect(() => {
+    if (elapsed >= WARMUP_TOTAL_SECONDS) {
+      setRunning(false);
+      triggerCourtHaptics([40, 30, 60, 30, 60]);
+    }
+  }, [elapsed]);
+
+  useEffect(() => {
+    if (prevIndexRef.current !== phaseIndex) {
+      prevIndexRef.current = phaseIndex;
+      triggerCourtHaptics(24);
+    }
+  }, [phaseIndex]);
+
+  const next = phaseIndex < WARMUP_PHASES.length - 1 ? WARMUP_PHASES[phaseIndex + 1] : undefined;
+
+  return (
+    <section className="vos-section-card vos-stack">
+      <p className={LABEL}>🔥 {t(locale, "Entrada en Calor Express (4 min)", "Express Warmup (4 min)", "Aquecimento Express (4 min)")}</p>
+      <div className="rounded-xl border border-white/10 bg-obsidian px-3 py-3 text-center">
+        <p className="text-4xl font-black tabular-nums text-volt">{warmupClock(elapsed)}</p>
+        <p className="text-[10px] uppercase tracking-widest text-white/45">
+          {t(locale, "restante", "left", "restante")} {warmupClock(WARMUP_TOTAL_SECONDS - elapsed)}
+        </p>
+        <p className="mt-2 text-xs font-bold text-white/85">
+          {phase.icon} {phase[locale]}
+        </p>
+        <p className="text-[10px] text-white/45">
+          {next ? `⏭ ${warmupClock(next.start)} · ${next[locale]}` : t(locale, "🏁 Último tramo", "🏁 Final stretch", "🏁 Trecho final")}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-1">
+        <button type="button" className={BTN_PRIMARY} disabled={finished} onClick={() => setRunning((value) => !value)}>
+          {running ? `⏸ ${t(locale, "Pausa", "Pause", "Pausa")}` : `▶ ${t(locale, "Empezar", "Start", "Começar")}`}
+        </button>
+        <button
+          type="button"
+          className={BTN}
+          onClick={() => {
+            setRunning(false);
+            setElapsed(0);
+          }}
+        >
+          ↺ {t(locale, "Reiniciar", "Reset", "Reiniciar")}
+        </button>
+      </div>
+      <ol className="space-y-1">
+        {WARMUP_PHASES.map((item, index) => (
+          <li
+            key={`warmup-${item.start}`}
+            className={`rounded-lg px-2 py-1 text-[10px] ${index === phaseIndex ? "bg-volt/15 text-volt" : "bg-white/5 text-white/55"}`}
+          >
+            <span className="font-black">{item.icon} {warmupClock(item.start)}</span> {item[locale]}
+            {index === phaseIndex ? <span className="font-bold"> ← {t(locale, "acá", "now", "agora")}</span> : null}
+          </li>
+        ))}
+      </ol>
+      {finished ? (
+        <p role="status" className="rounded-lg bg-emerald/15 px-2 py-1 text-center text-[11px] font-semibold text-emerald">
+          {t(
+            locale,
+            "🏁 Calentamiento completo: jugá el primer rally con cuidado.",
+            "🏁 Warmup complete: take the first rally easy.",
+            "🏁 Aquecimento completo: leve o primeiro rally com cuidado.",
+          )}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+type SuiteSection = "lista" | "banco" | "juez" | "senas" | "calor";
 
 const SECTIONS: Array<{ id: SuiteSection; label: Record<Locale, string> }> = [
   { id: "lista", label: { es: "📋 Lista de WhatsApp", en: "📋 WhatsApp Roster", pt: "📋 Lista do WhatsApp" } },
   { id: "banco", label: { es: "🪇 Rotador con Banco", en: "🪇 Bench Rotator", pt: "🪇 Rodízio com Banco" } },
+  { id: "juez", label: { es: "⚖️ El Juez", en: "⚖️ The Judge", pt: "⚖️ O Juiz" } },
+  { id: "senas", label: { es: "📣 Señas & Gritos", en: "📣 Shouts & Calls", pt: "📣 Sinais & Gritos" } },
+  { id: "calor", label: { es: "🔥 Calentamiento 4′", en: "🔥 4′ Warmup", pt: "🔥 Aquecimento 4′" } },
 ];
+
+const PANELS: Record<SuiteSection, (props: { locale: Locale }) => React.ReactElement> = {
+  lista: WhatsAppMatchOrganizer,
+  banco: BenchRotator,
+  juez: JudgePanel,
+  senas: CryTranslator,
+  calor: WarmupExpress,
+};
 
 /** 🍻 Picadito & Amigos suite: pre-match organisation and bench rotation. */
 export function CasualPlayerSuite({ locale }: { locale: Locale }) {
   const [section, setSection] = useState<SuiteSection>("lista");
+  const Panel = PANELS[section];
   return (
     <div className="space-y-3">
       <div
@@ -447,7 +653,7 @@ export function CasualPlayerSuite({ locale }: { locale: Locale }) {
           </button>
         ))}
       </div>
-      {section === "lista" ? <WhatsAppMatchOrganizer locale={locale} /> : <BenchRotator locale={locale} />}
+      <Panel locale={locale} />
     </div>
   );
 }

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  COURT_CRIES,
+  JUDGE_DISPUTES,
+  WARMUP_PHASES,
+  WARMUP_TOTAL_SECONDS,
   addPlayer,
   benchFairness,
   benchSwapMessage,
@@ -9,6 +13,7 @@ import {
   dropPlayer,
   formatMatchSheet,
   formatMissingBanner,
+  judgeVerdict,
   missingCount,
   newBenchTeam,
   nextServeStreak,
@@ -18,6 +23,9 @@ import {
   serveCapMessage,
   toggleGear,
   togglePaid,
+  translateCry,
+  warmupClock,
+  warmupPhaseAt,
 } from "./casual-engines";
 
 const GROUP = ["Tano", "Luci", "Marcos", "Julieta", "Rocío", "Fede", "Nata", "Pato", "Vero", "Chino", "Sol", "Momo", "Tini", "Coco"];
@@ -166,5 +174,92 @@ describe("recreational consecutive-serve cap", () => {
     );
     expect(serveCapMessage(3, "en")).toContain("3 serves in a row!");
     expect(serveCapMessage(5, "pt")).toContain("5 saques seguidos!");
+  });
+});
+
+describe("el juez del picadito", () => {
+  it("awards the point to the accusing team when the fault is confirmed", () => {
+    const verdict = judgeVerdict("lift", true, "A", "es");
+    expect(verdict.winner).toBe("B");
+    expect(verdict.text).toContain("Falta confirmada");
+    expect(verdict.text).toContain("Punto para el equipo B");
+  });
+
+  it("keeps the point with the accused team when the call is denied", () => {
+    const verdict = judgeVerdict("net", false, "B", "en");
+    expect(verdict.winner).toBe("B");
+    expect(verdict.text).toContain("No foul");
+    expect(verdict.text).toContain("stays with team B");
+  });
+
+  it("covers five disputes with questions and rules in three languages", () => {
+    const ids = Object.keys(JUDGE_DISPUTES);
+    expect(ids).toHaveLength(5);
+    for (const dispute of ["foot", "lift", "finger", "double", "net"] as const) {
+      const spec = JUDGE_DISPUTES[dispute];
+      for (const locale of ["es", "en", "pt"] as const) {
+        expect(spec.call[locale].length).toBeGreaterThanOrEqual(3);
+        expect(spec.question[locale].length).toBeGreaterThan(3);
+        expect(spec.rule[locale]).toMatch(/^Rule:|Regla:|Regra:/);
+      }
+    }
+  });
+});
+
+describe("traductor de señas y gritos", () => {
+  it("finds shouts accent-insensitively across the three languages", () => {
+    expect(translateCry("mia").map((cry) => cry.id)).toContain("mia");
+    expect(translateCry("Mine!").map((cry) => cry.id)).toContain("mia");
+    expect(translateCry("fora").map((cry) => cry.id)).toContain("fuera");
+    expect(translateCry("")).toHaveLength(COURT_CRIES.length);
+    expect(translateCry("zzz")).toHaveLength(0);
+  });
+
+  it("ships every shout in ES/EN/PT with a usage note", () => {
+    expect(COURT_CRIES.length).toBeGreaterThanOrEqual(10);
+    for (const cry of COURT_CRIES) {
+      for (const locale of ["es", "en", "pt"] as const) {
+        expect(cry[locale].length).toBeGreaterThan(2);
+        expect(cry.when[locale].length).toBeGreaterThan(5);
+      }
+    }
+  });
+});
+
+describe("entrada en calentamiento express de 4 minutos", () => {
+  it("covers the full four minutes with contiguous phases", () => {
+    expect(WARMUP_PHASES[0]!.start).toBe(0);
+    expect(WARMUP_PHASES.at(-1)!.end).toBe(WARMUP_TOTAL_SECONDS);
+    expect(WARMUP_TOTAL_SECONDS).toBe(240);
+    for (let index = 1; index < WARMUP_PHASES.length; index += 1) {
+      expect(WARMUP_PHASES[index]!.start).toBe(WARMUP_PHASES[index - 1]!.end);
+    }
+    const sum = WARMUP_PHASES.reduce((total, phase) => total + (phase.end - phase.start), 0);
+    expect(sum).toBe(240);
+  });
+
+  it("maps elapsed seconds to the right phase and clamps at both ends", () => {
+    expect(warmupPhaseAt(0).icon).toBe("🫀");
+    expect(warmupPhaseAt(45).icon).toBe("🏃");
+    expect(warmupPhaseAt(100).icon).toBe("🦘");
+    expect(warmupPhaseAt(239).icon).toBe("🏐");
+    expect(warmupPhaseAt(240).icon).toBe("🏐");
+    expect(warmupPhaseAt(-10).start).toBe(0);
+  });
+
+  it("formats the countdown clock in seconds and minutes", () => {
+    expect(warmupClock(0)).toBe("0:00");
+    expect(warmupClock(89)).toBe("1:29");
+    expect(warmupClock(240)).toBe("4:00");
+    expect(warmupClock(999)).toBe("4:00");
+    expect(warmupClock(-5)).toBe("0:00");
+  });
+
+  it("labels every phase in three languages", () => {
+    for (const phase of WARMUP_PHASES) {
+      for (const locale of ["es", "en", "pt"] as const) {
+        expect(phase[locale].length).toBeGreaterThan(5);
+      }
+    }
   });
 });

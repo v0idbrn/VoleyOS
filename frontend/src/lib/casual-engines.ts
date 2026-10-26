@@ -361,3 +361,355 @@ export function serveCapMessage(cap: ServeCapLimit, locale: Locale): string {
     `🤝 ${cap} saques seguidos! Rotação amistosa de sacador (seu time mantém o saque)`,
   );
 }
+
+/* ------------------------------------------------------------------ *
+ * 4. El Juez del Picadito (dispute arbiter)
+ * ------------------------------------------------------------------ */
+
+export type JudgeDispute = "foot" | "lift" | "finger" | "double" | "net";
+
+export const JUDGE_DISPUTES: Record<JudgeDispute, {
+  icon: string;
+  call: Record<Locale, string>;
+  question: Record<Locale, string>;
+  rule: Record<Locale, string>;
+}> = {
+  foot: {
+    icon: "🦶",
+    call: { es: "ROQUETA (pie sobre la línea)", en: "FOOT FAULT (foot on the line)", pt: "ROQUETA (pé na linha)" },
+    question: {
+      es: "¿El sacador pisó la línea antes de golpear?",
+      en: "Did the server step on the line before contact?",
+      pt: "O sacador pisou a linha antes de bater?",
+    },
+    rule: {
+      es: "Regla: el pie no cruza la línea hasta que la pelota está en juego.",
+      en: "Rule: the foot may not cross the line until the ball is in play.",
+      pt: "Regra: o pé não cruza a linha antes de a bola entrar em jogo.",
+    },
+  },
+  lift: {
+    icon: "✋",
+    call: { es: "MANO DURA (levante)", en: "LIFT (held ball)", pt: "MANO DURA (sustentação)" },
+    question: {
+      es: "¿La pelota se quedó un instante en los brazos?",
+      en: "Did the ball rest in the arms for a moment?",
+      pt: "A bola ficou um instante nos braços?",
+    },
+    rule: {
+      es: "Regla: la recepción no puede retener ni lanzar la pelota.",
+      en: "Rule: the reception may not catch or throw the ball.",
+      pt: "Regra: a recepção não pode segurar nem lançar a bola.",
+    },
+  },
+  finger: {
+    icon: "👆",
+    call: { es: "DEDO (impulso con dedos)", en: "FINGER SET on first contact", pt: "DEDO (toque com impulso)" },
+    question: {
+      es: "¿Hubo impulso con los dedos en la primera recepción?",
+      en: "Was there a finger set on the first contact?",
+      pt: "Houve toque com dedos no primeiro recebimento?",
+    },
+    rule: {
+      es: "Regla: en la 1ª recepción los dedos no pueden empujar; solo contactar.",
+      en: "Rule: on first contact fingers may only contact, never push.",
+      pt: "Regra: no 1º recebimento os dedos só contactam, nunca empurram.",
+    },
+  },
+  double: {
+    icon: "🔄",
+    call: { es: "DOBLE TOQUE", en: "DOUBLE CONTACT", pt: "DOIS TOQUES" },
+    question: {
+      es: "¿El mismo jugador tocó dos veces seguidas?",
+      en: "Did the same player contact it twice in a row?",
+      pt: "O mesmo jogador tocou duas vezes seguidas?",
+    },
+    rule: {
+      es: "Regla: nadie toca dos veces seguidas (salvo bloqueo o 1ª recepción).",
+      en: "Rule: no player may contact twice consecutively (except block or first contact).",
+      pt: "Regra: ninguém toca duas vezes seguidas (exceto bloqueio ou 1º recebimento).",
+    },
+  },
+  net: {
+    icon: "🕸️",
+    call: { es: "RED", en: "NET TOUCH", pt: "REDE" },
+    question: {
+      es: "¿Tocó la red durante el remate o el bloqueo?",
+      en: "Did they touch the net during the attack or block?",
+      pt: "Tocou a rede no ataque ou no bloqueio?",
+    },
+    rule: {
+      es: "Regla: tocar la red en el rally es falta; el punto es del rival.",
+      en: "Rule: touching the net during the rally is a fault; the point goes to the opponent.",
+      pt: "Regra: tocar a rede no rally é falta; o ponto vai para o adversário.",
+    },
+  },
+};
+
+export interface JudgeVerdict {
+  winner: "A" | "B";
+  text: string;
+}
+
+/**
+ * The captains agree on the observable (`fact`); the accused team is the one
+ * alleged to have committed the fault. Confirmed -> point to the other team,
+ * denied -> the point stays where it was.
+ */
+export function judgeVerdict(
+  dispute: JudgeDispute,
+  fact: boolean,
+  accused: "A" | "B",
+  locale: Locale,
+): JudgeVerdict {
+  const spec = JUDGE_DISPUTES[dispute];
+  const winner: "A" | "B" = fact ? (accused === "A" ? "B" : "A") : accused;
+  const head = fact
+    ? `${spec.icon} ${t(locale, "✅ Falta confirmada", "✅ Foul confirmed", "✅ Falta confirmada")}`
+    : `${spec.icon} ${t(locale, "❌ Sin falta", "❌ No foul", "❌ Sem falta")}`;
+  const tail = fact
+    ? t(locale, `Punto para el equipo ${winner}.`, `Point to team ${winner}.`, `Ponto para o time ${winner}.`)
+    : t(
+        locale,
+        `La acusación no va: el punto se queda con el equipo ${accused}.`,
+        `The accusation drops: the point stays with team ${accused}.`,
+        `A acusação cai: o ponto fica com o time ${accused}.`,
+      );
+  return { winner, text: `${head} — ${spec.call[locale]}. ${tail}` };
+}
+
+/* ------------------------------------------------------------------ *
+ * 5. Traductor de Señas y Gritos (court cries)
+ * ------------------------------------------------------------------ */
+
+export type CryCategory = "attack" | "defense" | "receive" | "captain";
+
+export interface CourtCry {
+  id: string;
+  cat: CryCategory;
+  es: string;
+  en: string;
+  pt: string;
+  when: Record<Locale, string>;
+}
+
+export const COURT_CRIES: CourtCry[] = [
+  {
+    id: "mia",
+    cat: "attack",
+    es: "¡Mía!",
+    en: "Mine!",
+    pt: "Minha!",
+    when: {
+      es: "La pelota cae en medio y nadie la había llamado.",
+      en: "The ball drops between players and nobody called it.",
+      pt: "A bola cai no meio e ninguém chamou.",
+    },
+  },
+  {
+    id: "tuya",
+    cat: "attack",
+    es: "¡Tuya!",
+    en: "Yours!",
+    pt: "Sua!",
+    when: {
+      es: "Cedés el balón antes de chocar con tu compañera.",
+      en: "You hand the ball over before you collide.",
+      pt: "Você cede a bola antes da colisão.",
+    },
+  },
+  {
+    id: "fuera",
+    cat: "defense",
+    es: "¡Fuera!",
+    en: "Out!",
+    pt: "Fora!",
+    when: {
+      es: "El remate sale por la línea lateral.",
+      en: "The attack flies past the sideline.",
+      pt: "O ataque sai pela linha lateral.",
+    },
+  },
+  {
+    id: "dejala",
+    cat: "defense",
+    es: "¡Déjala!",
+    en: "Leave it!",
+    pt: "Deixa!",
+    when: {
+      es: "Vuela fuera: si la tocás, es tuya.",
+      en: "It is going out: touching it makes it yours.",
+      pt: "Está saindo: se tocar, é sua.",
+    },
+  },
+  {
+    id: "rodizio",
+    cat: "captain",
+    es: "¡Rotación!",
+    en: "Rotate!",
+    pt: "Rodízio!",
+    when: {
+      es: "Punto ganado: todos una posición en sentido horario.",
+      en: "Point won: everyone shifts one spot clockwise.",
+      pt: "Ponto ganado: todo mundo muda um lugar.",
+    },
+  },
+  {
+    id: "cambio",
+    cat: "captain",
+    es: "¡Cambio!",
+    en: "Switch!",
+    pt: "Troca!",
+    when: {
+      es: "Rotación confusa: reordenáis los puestos al vuelo.",
+      en: "Confused rotation: fix positions on the fly.",
+      pt: "Rodízio confuso: reordene as posições.",
+    },
+  },
+  {
+    id: "tiempo",
+    cat: "captain",
+    es: "¡Tiempo!",
+    en: "Time out!",
+    pt: "Tempo!",
+    when: {
+      es: "Pausa corta para rearmar el plan del set.",
+      en: "Short pause to reset the set plan.",
+      pt: "Pausa curta para rearmar o plano do set.",
+    },
+  },
+  {
+    id: "sacavos",
+    cat: "captain",
+    es: "¡Sacá vos!",
+    en: "You serve!",
+    pt: "Você saca!",
+    when: {
+      es: "Rotación incómoda: cedés el saque al mejor del equipo.",
+      en: "Awkward rotation: give the serve to your best server.",
+      pt: "Rotação desconfortável: passe o saque ao melhor.",
+    },
+  },
+  {
+    id: "volea",
+    cat: "attack",
+    es: "¡Volea!",
+    en: "Volley!",
+    pt: "Voleio!",
+    when: {
+      es: "Remate directo desde la red, sin recepción.",
+      en: "Direct hit at the net, no reception involved.",
+      pt: "Ataque direto na rede, sem recepção.",
+    },
+  },
+  {
+    id: "linea",
+    cat: "defense",
+    es: "¡En la línea!",
+    en: "On the line!",
+    pt: "Na linha!",
+    when: {
+      es: "Avisás que cae justo en el borde de la línea.",
+      en: "Calling it as it lands right on the edge.",
+      pt: "Chamando quando cai exatamente na borda.",
+    },
+  },
+  {
+    id: "red",
+    cat: "defense",
+    es: "¡Red!",
+    en: "Net!",
+    pt: "Rede!",
+    when: {
+      es: "Roce de red del rival: señalá al árbitro al instante.",
+      en: "Opponent net touch: show the referee right away.",
+      pt: "Toque de rede do adversário: sinalize na hora.",
+    },
+  },
+  {
+    id: "libero",
+    cat: "receive",
+    es: "¡Líbero!",
+    en: "Libero!",
+    pt: "Líbero!",
+    when: {
+      es: "Cedés la recepción a la especialista de la rotación.",
+      en: "Hand the reception to the rotation specialist.",
+      pt: "Entregue a recepção à especialista da rotação.",
+    },
+  },
+];
+
+/** Lowercase + strip accents so "mia" finds "¡Mía!" in any language. */
+function fold(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+/** Accent-insensitive lookup across ES/EN/PT shouts; empty query lists all. */
+export function translateCry(query: string): CourtCry[] {
+  const needle = fold(query.trim());
+  if (!needle) return COURT_CRIES;
+  return COURT_CRIES.filter((cry) =>
+    fold(`${cry.es} ${cry.en} ${cry.pt} ${cry.when.es} ${cry.when.en} ${cry.when.pt}`).includes(needle),
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * 6. Entrada en Calor Express de 4 Minutos
+ * ------------------------------------------------------------------ */
+
+export interface WarmupPhase {
+  start: number;
+  end: number;
+  icon: string;
+  es: string;
+  en: string;
+  pt: string;
+}
+
+export const WARMUP_TOTAL_SECONDS = 240;
+
+export const WARMUP_PHASES: WarmupPhase[] = [
+  {
+    start: 0,
+    end: 30,
+    icon: "🫀",
+    es: "Pulso y movilidad: cuello, hombros, muñecas, tobillos",
+    en: "Pulse and mobility: neck, shoulders, wrists, ankles",
+    pt: "Pulso e mobilidade: pescoço, ombros, punhos, tornozelos",
+  },
+  {
+    start: 30,
+    end: 90,
+    icon: "🏃",
+    es: "Activación: desplazamientos laterales y pasos C",
+    en: "Activation: side shuffles and C-steps",
+    pt: "Ativação: deslizes laterais e passos C",
+  },
+  {
+    start: 90,
+    end: 180,
+    icon: "🦘",
+    es: "Rebote: enfoques, saltos de ataque y de bloqueo",
+    en: "Bounce: approaches, attack and block jumps",
+    pt: "Rebote: aproximações, saltos de ataque e de bloqueio",
+  },
+  {
+    start: 180,
+    end: 240,
+    icon: "🏐",
+    es: "Colocación y remate suave al vacío",
+    en: "Setting and soft swings into the air",
+    pt: "Colocação e golpe suave no ar",
+  },
+];
+
+export function warmupPhaseAt(elapsed: number): WarmupPhase {
+  const seconds = Math.max(0, Math.min(WARMUP_TOTAL_SECONDS, Math.floor(elapsed)));
+  return WARMUP_PHASES.find((phase) => seconds < phase.end) ?? WARMUP_PHASES[WARMUP_PHASES.length - 1]!;
+}
+
+export function warmupClock(elapsed: number): string {
+  const seconds = Math.max(0, Math.min(WARMUP_TOTAL_SECONDS, Math.floor(elapsed)));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
