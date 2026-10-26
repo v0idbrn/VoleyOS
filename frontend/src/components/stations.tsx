@@ -5,8 +5,15 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import jsQR from "jsqr";
 
 import { playArenaCue, playWhistle, type ArenaCue } from "@/lib/court-audio";
-import { playBuzzer, playScorePop, playSetWinFanfare } from "@/lib/sound-effects";
-import { persistLiveScoreboard, readLiveScoreboard, triggerCourtHaptics } from "@/lib/court-ux";
+import {
+  loadCrowdAmbience,
+  playBuzzer,
+  playPicaditoCue,
+  playScorePop,
+  playSetWinFanfare,
+  saveCrowdAmbience,
+} from "@/lib/sound-effects";
+import { announceScoreTTS, persistLiveScoreboard, readLiveScoreboard, triggerCourtHaptics } from "@/lib/court-ux";
 import { clearClonedScoreboard, createQrFrames, emptyIngest, ingestQrFrame, readClonedScoreboard, renderQrSvg, storeClonedScoreboard, type IngestResult, type QrFrame } from "@/lib/qr-transfer";
 import { localizeReactTree } from "@/lib/engine-l10n";
 import { COPY, t } from "@/lib/i18n";
@@ -577,6 +584,8 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [serveCapBanner, setServeCapBanner] = useState<string | null>(null);
   const [undoPill, setUndoPill] = useState(false);
   const [burst, setBurst] = useState<"set" | "match" | null>(null);
+  const [voiceOn, setVoiceOn] = useState(() => window.localStorage.getItem("volleyos.voice") === "1");
+  const [crowdOn, setCrowdOn] = useState(() => loadCrowdAmbience() > 0.01);
   const undoTimerRef = useRef<number | null>(null);
   const burstTimerRef = useRef<number | null>(null);
   const serveStreakRef = useRef(0);
@@ -604,6 +613,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     if (serveCapHit(next, serveCap)) {
       serveStreakRef.current = 0;
       setServeCapBanner(serveCapMessage(serveCap, locale));
+      playPicaditoCue("serve_cap");
       triggerCourtHaptics([30, 45, 30]);
     } else {
       serveStreakRef.current = next;
@@ -628,6 +638,44 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       if (burstTimerRef.current) window.clearTimeout(burstTimerRef.current);
     };
   }, []);
+
+  const ttsLang = locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : "es-ES";
+
+  const announcePoint = (next: ScoreboardState): void => {
+    if (!voiceOn) return;
+    const servingName = next.serving === "A" ? next.teamA : next.teamB;
+    announceScoreTTS(
+      t(
+        locale,
+        `${next.scoreA} a ${next.scoreB}, saca ${servingName}`,
+        `${next.scoreA} all ${next.scoreB}, ${servingName} serves`,
+        `${next.scoreA} a ${next.scoreB}, saca ${servingName}`,
+      ),
+      true,
+      ttsLang,
+    );
+  };
+
+  const toggleVoiceOn = (): void => {
+    const next = !voiceOn;
+    setVoiceOn(next);
+    window.localStorage.setItem("volleyos.voice", next ? "1" : "0");
+    triggerCourtHaptics(18);
+    if (next) {
+      announceScoreTTS(
+        t(locale, "Voz del marcador activada.", "Score voice on.", "Voz do marcador ativada."),
+        true,
+        ttsLang,
+      );
+    }
+  };
+
+  const toggleCrowd = (): void => {
+    const next = !crowdOn;
+    setCrowdOn(next);
+    saveCrowdAmbience(next ? 0.7 : 0);
+    triggerCourtHaptics(16);
+  };
 
   const applyRoster = (team: TeamRoster, side: "A" | "B"): void => {
     if (side === "A") setTeamAId(team.id);
@@ -662,9 +710,18 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
 
   const point = (team: "A" | "B"): void => {
     try {
+      const wasOnServe = state.serving === team;
+      const rivalStreak = state.streak;
       const result = awardIndoorPoint(state, team);
       if (result.matchFinished || result.setFinished) playSetWinFanfare();
-      else playScorePop();
+      else {
+        playScorePop();
+        // Picadito audio grammar: ace on your own serve, side-out when you
+        // steal it, sub-bass kill when you break a rival run of 3+.
+        if (wasOnServe) playPicaditoCue("ace");
+        else if (rivalStreak >= 3) playPicaditoCue("kill");
+        else playPicaditoCue("sideout");
+      }
       if (result.matchFinished && preset === "king" && king) {
         const nextKing = kingAwardWin(king, result.state.winner ?? "A");
         setKing(nextKing);
@@ -687,6 +744,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         }`,
       );
       triggerCourtHaptics(pressurePoint(result.state) ? [80, 50, 80, 50, 140] : 30);
+      announcePoint(result.state);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Error");
     }
@@ -1015,6 +1073,24 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           <button type="button" className={BTN_PRIMARY} onClick={() => point(swapped ? "A" : "B")}>+ {right.name} [L]</button>
         </div>
         <div className="mt-2 flex flex-wrap justify-center gap-1">
+          <button
+            type="button"
+            aria-pressed={voiceOn}
+            onClick={toggleVoiceOn}
+            data-testid="voice-toggle"
+            className={voiceOn ? `${BTN} border-volt text-volt` : BTN}
+          >
+            🗣️ {t(locale, "Voz", "Voice", "Voz")}: {voiceOn ? "ON" : "OFF"}
+          </button>
+          <button
+            type="button"
+            aria-pressed={crowdOn}
+            onClick={toggleCrowd}
+            data-testid="crowd-toggle"
+            className={crowdOn ? `${BTN} border-emerald text-emerald` : BTN}
+          >
+            🔉 {t(locale, "Público", "Crowd", "Torcida")}: {crowdOn ? "ON" : "OFF"}
+          </button>
           <button type="button" className={BTN} onClick={undo} disabled={history.past.length === 0}>[Z] {t(locale, "Deshacer", "Undo", "Desfazer")} ({history.past.length})</button>
           <button type="button" className={BTN} onClick={redo} disabled={history.future.length === 0}>[Y] {t(locale, "Rehacer", "Redo", "Refazer")}</button>
           <button type="button" className={BTN} onClick={() => playWhistle("short")}>[W] {t(locale, "Silbato", "Whistle", "Apito")}</button>

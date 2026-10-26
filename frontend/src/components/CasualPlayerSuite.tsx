@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { triggerCourtHaptics } from "@/lib/court-ux";
+import { playCoinClink, playJudgeGavel, playWarmupTick, playWhistle } from "@/lib/sound-effects";
 import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/local-engines";
 import {
@@ -440,6 +441,7 @@ function JudgePanel({ locale }: { locale: Locale }) {
 
   const rule = (fact: boolean): void => {
     setVerdict(judgeVerdict(dispute, fact, accused, locale));
+    playJudgeGavel();
     triggerCourtHaptics(fact ? [30, 45, 30] : 22);
   };
 
@@ -545,8 +547,15 @@ function WarmupExpress({ locale }: { locale: Locale }) {
   }, [running]);
 
   useEffect(() => {
+    if (!running || finished) return;
+    const remaining = phase.end - elapsed;
+    if (remaining >= 1 && remaining <= 3) playWarmupTick(remaining === 1);
+  }, [elapsed, running, finished, phase]);
+
+  useEffect(() => {
     if (elapsed >= WARMUP_TOTAL_SECONDS) {
       setRunning(false);
+      playWhistle("double");
       triggerCourtHaptics([40, 30, 60, 30, 60]);
     }
   }, [elapsed]);
@@ -554,6 +563,7 @@ function WarmupExpress({ locale }: { locale: Locale }) {
   useEffect(() => {
     if (prevIndexRef.current !== phaseIndex) {
       prevIndexRef.current = phaseIndex;
+      playWhistle("short");
       triggerCourtHaptics(24);
     }
   }, [phaseIndex]);
@@ -620,6 +630,7 @@ function VaquitaPanel({ locale, roster, goToSection }: SuitePanelProps) {
   const [fee, setFee] = useState("0");
   const [pot, setPot] = useState("0");
   const [credits, setCredits] = useState<Record<GearFlag, string>>({ ball: "0", pump: "0", court: "0", water: "0" });
+  const [notice, setNotice] = useState<string | null>(null);
 
   const feeCents = parseCents(fee);
   const potCents = parseCents(pot);
@@ -636,6 +647,36 @@ function VaquitaPanel({ locale, roster, goToSection }: SuitePanelProps) {
     invalid || feeCents === null || potCents === null || players.length === 0
       ? null
       : settleVaquita(players, feeCents, potCents, creditMap, locale);
+
+  const copySettlement = async (): Promise<void> => {
+    if (!report) return;
+    const text = report.lines
+      .map((line) =>
+        line.status === "pays"
+          ? `${line.name}: ${formatCents(line.owesCents)} ${t(locale, "por entrar", "to put in", "por entrar")}`
+          : line.status === "refund"
+            ? `${line.name}: ${formatCents(line.getsBackCents)} ${t(locale, "a cobrar", "to collect", "a receber")}`
+            : `${line.name}: ✅ ${t(locale, "al día", "square", "em dia")}`,
+      )
+      .concat(report.summary)
+      .join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      playCoinClink();
+      setNotice(
+        t(
+          locale,
+          "💰 Cierre copiado para WhatsApp.",
+          "💰 Settlement copied for WhatsApp.",
+          "💰 Fechamento copiado para o WhatsApp.",
+        ),
+      );
+    } catch {
+      setNotice(
+        t(locale, "El navegador bloqueó el copiado.", "The browser blocked copying.", "O navegador bloqueou a cópia."),
+      );
+    }
+  };
 
   return (
     <section className="vos-section-card vos-stack">
@@ -723,6 +764,14 @@ function VaquitaPanel({ locale, roster, goToSection }: SuitePanelProps) {
               >
                 {report.summary}
               </p>
+              <button type="button" className={BTN} data-testid="vaquita-copy" onClick={() => void copySettlement()}>
+                📋 {t(locale, "Copiar cierre para WhatsApp", "Copy settlement for WhatsApp", "Copiar fechamento pro WhatsApp")}
+              </button>
+              {notice ? (
+                <p role="status" className="rounded-lg bg-emerald/15 px-2 py-1 text-[10px] font-semibold text-emerald">
+                  {notice}
+                </p>
+              ) : null}
             </>
           ) : null}
         </>

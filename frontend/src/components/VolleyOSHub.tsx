@@ -16,7 +16,7 @@ import { addVaultEntry, loadVault } from "@/lib/vault";
 import { downloadXlsx, openPrintableReport, type ReportSpec } from "@/lib/offline-xlsx";
 import { LIVE_SCORE_EVENT, announceScoreTTS, isMatchActive, persistLiveScoreboard, readLiveScoreboard, requestCourtWakeLock, triggerCourtHaptics } from "@/lib/court-ux";
 import { playWhistle, setCourtAudioEnabled } from "@/lib/court-audio";
-import { setSoundEffectsEnabled } from "@/lib/sound-effects";
+import { loadCrowdAmbience, saveCrowdAmbience, setSoundEffectsEnabled } from "@/lib/sound-effects";
 import { EphemeralVaultBar } from "@/components/EphemeralVaultBar";
 import { STATIONS } from "@/components/stations";
 import { GymScreenModule } from "@/components/GymScreenModule";
@@ -279,6 +279,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [toast, setToast] = useState<string | null>(null);
   const [liveScore, setLiveScore] = useState<ScoreboardState | null>(null);
   const [coachMarks, setCoachMarks] = useState(false);
+  const [crowdVolume, setCrowdVolume] = useState(0.7);
   const searchRef = useRef<HTMLInputElement>(null);
   const target = buildTarget();
   const locked = paywallEnabled() && !creator;
@@ -341,6 +342,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     setSolar(window.localStorage.getItem(THEME_KEY) === "solar");
     setVoice(window.localStorage.getItem(VOICE_KEY) === "1");
     setCourtAudio(window.localStorage.getItem(AUDIO_KEY) !== "0");
+    setCrowdVolume(loadCrowdAmbience());
     setPinned((current) => (current.length > 0 ? current : readStringList(PIN_KEY)));
     setRecent(readStringList(RECENT_KEY));
     const done = window.localStorage.getItem(ONBOARDING_KEY) === "1";
@@ -1202,6 +1204,21 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 />
                 <div className="mt-2 grid gap-2">
                   <SwitchRow label={shell.courtAudio} checked={courtAudio} onToggle={() => setCourtAudio((value) => !value)} />
+                  <label className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-panel px-4 py-3">
+                    <span className="text-[13px] font-semibold text-white">
+                      🔉 {t(locale, "Público del estadio", "Stadium crowd", "Torcida do estádio")}
+                    </span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={Math.round(crowdVolume * 100)}
+                      aria-label={t(locale, "Volumen del público", "Crowd volume", "Volume da torcida")}
+                      onChange={(event) => setCrowdVolume(saveCrowdAmbience(Number(event.target.value) / 100))}
+                      className="w-32 accent-volt"
+                    />
+                  </label>
                   <SwitchRow label={shell.voice} checked={voice} onToggle={toggleVoice} />
                   <SwitchRow
                     label={t(locale, "Pantalla despierta", "Keep screen awake", "Tela acordada")}
