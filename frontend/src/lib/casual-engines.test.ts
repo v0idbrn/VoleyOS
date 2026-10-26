@@ -9,23 +9,29 @@ import {
   benchFairness,
   benchSwapMessage,
   buildOrganizer,
+  buildPrizePoster,
   capacityLabel,
   dropPlayer,
+  formatCents,
   formatMatchSheet,
   formatMissingBanner,
   judgeVerdict,
   missingCount,
   newBenchTeam,
   nextServeStreak,
+  parseCents,
   parseWhatsAppList,
   rotateWithBench,
   serveCapHit,
   serveCapMessage,
+  settleVaquita,
   toggleGear,
   togglePaid,
   translateCry,
   warmupClock,
   warmupPhaseAt,
+  type GearFlag,
+  type OrganizerPlayer,
 } from "./casual-engines";
 
 const GROUP = ["Tano", "Luci", "Marcos", "Julieta", "Rocío", "Fede", "Nata", "Pato", "Vero", "Chino", "Sol", "Momo", "Tini", "Coco"];
@@ -261,5 +267,116 @@ describe("entrada en calentamiento express de 4 minutos", () => {
         expect(phase[locale].length).toBeGreaterThan(5);
       }
     }
+  });
+});
+
+describe("la vaquita 2.0 compensada", () => {
+  const player = (id: string, paid: boolean, gear: GearFlag[] = []): OrganizerPlayer => ({
+    id,
+    name: id.toUpperCase(),
+    paid,
+    gear,
+  });
+
+  it("parses amounts to integer cents without float math", () => {
+    expect(parseCents("1000")).toBe(100000);
+    expect(parseCents("1000.50")).toBe(100050);
+    expect(parseCents("1000,5")).toBe(100050);
+    expect(parseCents("0.05")).toBe(5);
+    expect(parseCents("")).toBeNull();
+    expect(parseCents("abc")).toBeNull();
+    expect(parseCents("-5")).toBeNull();
+    expect(parseCents("1.000")).toBeNull();
+    expect(parseCents("12.345")).toBeNull();
+  });
+
+  it("formats cents with exact grouping and sign", () => {
+    expect(formatCents(0)).toBe("$0.00");
+    expect(formatCents(5)).toBe("$0.05");
+    expect(formatCents(12345)).toBe("$123.45");
+    expect(formatCents(100000)).toBe("$1,000.00");
+    expect(formatCents(-250)).toBe("-$2.50");
+  });
+
+  it("settles entry fees against gear credits with paid flags", () => {
+    const players = [player("a", true, ["ball"]), player("b", true), player("c", false, ["court"])];
+    const report = settleVaquita(players, 10000, 20000, { ball: 5000, court: 3000 }, "es");
+    const [a, b, c] = report.lines;
+    expect(a).toMatchObject({ creditCents: 5000, netCents: 5000, alreadyPaidCents: 5000, owesCents: 0, status: "settled" });
+    expect(b).toMatchObject({ netCents: 10000, alreadyPaidCents: 10000, status: "settled" });
+    expect(c).toMatchObject({ creditCents: 3000, owesCents: 7000, status: "pays" });
+    expect(report.incomingCents).toBe(7000);
+    expect(report.payoutCents).toBe(0);
+    expect(report.shortfallCents).toBe(0);
+    expect(report.summary).toContain("todo cubierto");
+  });
+
+  it("flags a pot that cannot cover the compensations", () => {
+    const report = settleVaquita([player("a", false, ["ball"])], 1000, 0, { ball: 3000 }, "en");
+    expect(report.lines[0]).toMatchObject({ netCents: -2000, getsBackCents: 2000, owesCents: 0, status: "refund" });
+    expect(report.shortfallCents).toBe(2000);
+    expect(report.summary).toContain("$20.00 short in the pot");
+
+    const covered = settleVaquita([player("a", false, ["ball"])], 1000, 5000, { ball: 3000 }, "pt");
+    expect(covered.shortfallCents).toBe(0);
+    expect(covered.summary).toContain("tudo coberto");
+  });
+
+  it("rejects non-integer or negative amounts with the coded error", () => {
+    expect(() => settleVaquita([player("a", false)], 1000.5, 0, {}, "es")).toThrow("vaquita_amount");
+    expect(() => settleVaquita([player("a", false)], -100, 0, {}, "es")).toThrow("vaquita_amount");
+    expect(() => settleVaquita([player("a", false)], 1000, 0, { ball: 10.5 }, "es")).toThrow("vaquita_amount");
+  });
+
+  it("settles an empty roster to zeros", () => {
+    const report = settleVaquita([], 1000, 5000, {}, "es");
+    expect(report.lines).toHaveLength(0);
+    expect(report.incomingCents).toBe(0);
+    expect(report.payoutCents).toBe(0);
+    expect(report.shortfallCents).toBe(0);
+  });
+});
+
+describe("premios del picadito poster", () => {
+  it("renders the champion, prize and optional lines in three languages", () => {
+    const es = buildPrizePoster({
+      locale: "es",
+      champion: "Las Tiburonas",
+      potCents: 12345,
+      runnerUp: "Cóndores",
+      mvp: "Rocío",
+      date: "26/10",
+      venue: "Cancha Norte",
+    });
+    expect(es).toContain("PREMIOS DEL PICADITO");
+    expect(es).toContain("Las Tiburonas");
+    expect(es).toContain("$123.45");
+    expect(es).toContain("Cóndores");
+    expect(es).toContain("Rocío");
+    expect(es).toContain("Cancha Norte");
+
+    const en = buildPrizePoster({ locale: "en", champion: "Sharks", potCents: 0, date: "10/26" });
+    expect(en).toContain("PICKUP PRIZES");
+    expect(en).toContain("CHAMPION");
+    expect(en).toContain("$0.00");
+    expect(en).not.toContain("CAMPEÓN");
+    expect(en).not.toContain("SUBCAMPEÓN");
+
+    const pt = buildPrizePoster({ locale: "pt", champion: "Tubarões", potCents: 5, date: "26/10" });
+    expect(pt).toContain("PRÊMIOS DA RACHINHA");
+    expect(pt).toContain("CAMPEÃO");
+    expect(pt).toContain("$0.05");
+  });
+
+  it("escapes hostile names instead of injecting markup", () => {
+    const svg = buildPrizePoster({
+      locale: "es",
+      champion: `<script>alert("x")</script>`,
+      potCents: 0,
+      date: "",
+    });
+    expect(svg).toContain("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
+    expect(svg).not.toContain("<script>");
+    expect(svg).toContain("VolleyOS");
   });
 });

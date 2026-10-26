@@ -713,3 +713,181 @@ export function warmupClock(elapsed: number): string {
   const seconds = Math.max(0, Math.min(WARMUP_TOTAL_SECONDS, Math.floor(elapsed)));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
+
+/* ------------------------------------------------------------------ *
+ * 7. La Vaquita 2.0 Compensada (settlement, integer cents only)
+ * ------------------------------------------------------------------ */
+
+/** Strict amount parser: "1000", "1000.50" and "1000,50" -> integer cents. */
+export function parseCents(raw: string): number | null {
+  const match = /^(\d+)(?:[.,](\d{1,2}))?$/.exec(raw.trim());
+  if (!match) return null;
+  const units = Number(match[1]);
+  const frac = (match[2] ?? "").padEnd(2, "0");
+  const cents = units * 100 + Number(frac || "0");
+  return Number.isSafeInteger(cents) ? cents : null;
+}
+
+/** Money formatting with zero float arithmetic: "$1,234.56". */
+export function formatCents(cents: number): string {
+  const abs = Math.abs(Math.trunc(cents));
+  const sign = cents < 0 ? "-" : "";
+  const units = Math.trunc(abs / 100);
+  const frac = String(abs % 100).padStart(2, "0");
+  return `${sign}$${units.toLocaleString("en-US")}.${frac}`;
+}
+
+export interface VaquitaLine {
+  id: string;
+  name: string;
+  entryCents: number;
+  creditCents: number;
+  /** entry minus gear compensation; positive = owes, negative = refund. */
+  netCents: number;
+  owesCents: number;
+  getsBackCents: number;
+  alreadyPaidCents: number;
+  status: "pays" | "settled" | "refund";
+}
+
+export interface VaquitaReport {
+  lines: VaquitaLine[];
+  potCents: number;
+  incomingCents: number;
+  payoutCents: number;
+  shortfallCents: number;
+  summary: string;
+}
+
+/**
+ * La Vaquita 2.0: everyone owes the entry fee, gear carriers are compensated
+ * from the pot (credit offsets the fee first, anything left is paid back),
+ * and players who already handed cash are marked settled. Integer cents only
+ * — non-integer input throws the coded `vaquita_amount` error.
+ */
+export function settleVaquita(
+  players: OrganizerPlayer[],
+  feeCents: number,
+  potCents: number,
+  credits: Partial<Record<GearFlag, number>>,
+  locale: Locale,
+): VaquitaReport {
+  const creditValues = GEAR_FLAGS.map((flag) => credits[flag] ?? 0);
+  const amounts = [feeCents, potCents, ...creditValues];
+  if (amounts.some((value) => !Number.isInteger(value) || value < 0)) throw new Error("vaquita_amount");
+
+  const lines: VaquitaLine[] = players.map((player) => {
+    const credit = GEAR_FLAGS.reduce(
+      (sum, flag) => sum + (player.gear.includes(flag) ? credits[flag] ?? 0 : 0),
+      0,
+    );
+    const net = feeCents - credit;
+    const getsBack = Math.max(0, -net);
+    const stillOwes = player.paid ? 0 : Math.max(0, net);
+    const alreadyPaid = player.paid ? Math.max(0, net) : 0;
+    const status: VaquitaLine["status"] = getsBack > 0 ? "refund" : stillOwes > 0 ? "pays" : "settled";
+    return {
+      id: player.id,
+      name: player.name,
+      entryCents: feeCents,
+      creditCents: credit,
+      netCents: net,
+      owesCents: stillOwes,
+      getsBackCents: getsBack,
+      alreadyPaidCents: alreadyPaid,
+      status,
+    };
+  });
+
+  const incomingCents = lines.reduce((sum, line) => sum + line.owesCents, 0);
+  const payoutCents = lines.reduce((sum, line) => sum + line.getsBackCents, 0);
+  const shortfallCents = Math.max(0, payoutCents - (potCents + incomingCents));
+  const summary =
+    shortfallCents > 0
+      ? t(
+          locale,
+          `⚠️ Faltan ${formatCents(shortfallCents)} en la caja para pagar los premios.`,
+          `⚠️ ${formatCents(shortfallCents)} short in the pot to pay the prizes.`,
+          `⚠️ Faltam ${formatCents(shortfallCents)} no caixa para pagar os prêmios.`,
+        )
+      : t(
+          locale,
+          `💳 Entran ${formatCents(incomingCents)} · 💰 La caja devuelve ${formatCents(payoutCents)} · ✅ todo cubierto`,
+          `💳 ${formatCents(incomingCents)} coming in · 💰 the pot pays back ${formatCents(payoutCents)} · ✅ all covered`,
+          `💳 Entram ${formatCents(incomingCents)} · 💰 a caixa devolve ${formatCents(payoutCents)} · ✅ tudo coberto`,
+        );
+  return { lines, potCents, incomingCents, payoutCents, shortfallCents, summary };
+}
+
+/* ------------------------------------------------------------------ *
+ * 8. Premios del Picadito (shareable prize poster)
+ * ------------------------------------------------------------------ */
+
+export interface PrizePosterInput {
+  locale: Locale;
+  champion: string;
+  potCents: number;
+  runnerUp?: string;
+  mvp?: string;
+  date: string;
+  venue?: string;
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+/** Static SVG prize poster: every user string is XML-escaped. */
+export function buildPrizePoster(input: PrizePosterInput): string {
+  const esc = escapeXml;
+  const title = t(input.locale, "🏆 PREMIOS DEL PICADITO", "🏆 PICKUP PRIZES", "🏆 PRÊMIOS DA RACHINHA");
+  const champLabel = t(input.locale, "CAMPEÓN", "CHAMPION", "CAMPEÃO");
+  const prizeLabel = t(input.locale, "PREMIO", "PRIZE", "PRÊMIO");
+  const runnerLabel = t(input.locale, "SUBCAMPEÓN", "RUNNER-UP", "VICE-CAMPEÃO");
+  const mvpLabel = t(input.locale, "MVP DEL DÍA", "MVP OF THE DAY", "MVP DO DIA");
+
+  const blocks: string[] = [];
+  let y = 150;
+  const label = (text: string): void => {
+    blocks.push(
+      `<text x="360" y="${y}" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" letter-spacing="4" fill="#8A8A99">${esc(text)}</text>`,
+    );
+    y += 30;
+  };
+  const value = (text: string, size: number, fill: string): void => {
+    blocks.push(
+      `<text x="360" y="${y}" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="${size}" fill="${fill}">${esc(text)}</text>`,
+    );
+    y += size + 34;
+  };
+
+  label(champLabel);
+  value(input.champion, 46, "#EAB308");
+  label(prizeLabel);
+  value(formatCents(input.potCents), 34, "#FFFFFF");
+  if (input.runnerUp) {
+    label(runnerLabel);
+    value(input.runnerUp, 24, "#C9C9D4");
+  }
+  if (input.mvp) {
+    label(mvpLabel);
+    value(input.mvp, 24, "#FF3B5C");
+  }
+
+  const footer = [input.date, input.venue, "VolleyOS"].filter((part) => part && part.trim().length > 0).join(" · ");
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 540" width="720" height="540" role="img">`,
+    `<rect width="720" height="540" fill="#0B0B0F"/>`,
+    `<rect width="720" height="6" fill="#FF3B5C"/>`,
+    `<text x="360" y="72" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="30" fill="#FF3B5C">${esc(title)}</text>`,
+    `<line x1="180" y1="96" x2="540" y2="96" stroke="#2A2A33" stroke-width="2"/>`,
+    ...blocks,
+    `<text x="360" y="514" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#6B6B78">${esc(footer)}</text>`,
+    `</svg>`,
+  ].join("");
+}

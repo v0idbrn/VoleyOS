@@ -16,14 +16,18 @@ import {
   benchFairness,
   benchSwapMessage,
   buildOrganizer,
+  buildPrizePoster,
   capacityLabel,
   dropPlayer,
   formatMatchSheet,
   formatMissingBanner,
+  formatCents,
   judgeVerdict,
   missingCount,
   newBenchTeam,
+  parseCents,
   rotateWithBench,
+  settleVaquita,
   toggleGear,
   togglePaid,
   translateCry,
@@ -31,6 +35,7 @@ import {
   warmupPhaseAt,
   type BenchEntry,
   type BenchTeamState,
+  type GearFlag,
   type JudgeDispute,
   type JudgeVerdict,
   type OrganizerRoster,
@@ -45,6 +50,13 @@ const INPUT =
 const LABEL = "text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50";
 const CHIP_ON = "rounded-lg border border-volt bg-volt/15 px-2 py-1 text-[9px] font-bold text-volt";
 const CHIP_OFF = "rounded-lg border border-white/10 px-2 py-1 text-[9px] font-bold text-white/50";
+
+interface SuitePanelProps {
+  locale: Locale;
+  roster: OrganizerRoster | null;
+  onRosterChange: (next: OrganizerRoster | null) => void;
+  goToSection: (id: SuiteSection) => void;
+}
 
 /**
  * 🔄 Rotador Automático de 7 a 10 jugadores con el Banco: rotates the six
@@ -196,18 +208,17 @@ export function BenchRotator({ locale }: { locale: Locale }) {
  * 📋 Armador de Lista de WhatsApp: bulk paste, smart parsing, waitlist
  * promotion on "se bajó", payment/gear checklist and 1-tap WhatsApp copy.
  */
-export function WhatsAppMatchOrganizer({ locale }: { locale: Locale }) {
+export function WhatsAppMatchOrganizer({ locale, roster, onRosterChange }: SuitePanelProps) {
   const [paste, setPaste] = useState("");
   const [capacity, setCapacity] = useState(12);
   const [venue, setVenue] = useState(t(locale, "Cancha Municipal", "Municipal Court", "Quadra Municipal"));
   const [time, setTime] = useState("21:00");
-  const [roster, setRoster] = useState<OrganizerRoster | null>(null);
   const [manual, setManual] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
   const build = (): void => {
     const next = buildOrganizer(paste, capacity, venue, time);
-    setRoster(next);
+    onRosterChange(next);
     setToast(
       t(
         locale,
@@ -221,18 +232,16 @@ export function WhatsAppMatchOrganizer({ locale }: { locale: Locale }) {
 
   const applyCapacity = (cap: number): void => {
     setCapacity(cap);
-    setRoster((current) => {
-      if (!current) return null;
-      const all = [...current.confirmed, ...current.waitlist];
-      return { ...current, capacity: cap, confirmed: all.slice(0, cap), waitlist: all.slice(cap) };
-    });
+    if (!roster) return;
+    const all = [...roster.confirmed, ...roster.waitlist];
+    onRosterChange({ ...roster, capacity: cap, confirmed: all.slice(0, cap), waitlist: all.slice(cap) });
   };
 
   const addManual = (): void => {
     const base = roster ?? buildOrganizer([], capacity, venue, time);
     const before = base.confirmed.length + base.waitlist.length;
     const next = addPlayer(base, manual);
-    setRoster(next);
+    onRosterChange(next);
     if (next.confirmed.length + next.waitlist.length === before) {
       setToast(t(locale, "Ese nombre ya estaba en la lista.", "That name was already on the list.", "Esse nome já estava na lista."));
     } else {
@@ -248,7 +257,7 @@ export function WhatsAppMatchOrganizer({ locale }: { locale: Locale }) {
   const drop = (id: string): void => {
     if (!roster) return;
     const { roster: next, promoted } = dropPlayer(roster, id);
-    setRoster(next);
+    onRosterChange(next);
     triggerCourtHaptics([25, 30]);
     setToast(
       promoted
@@ -344,7 +353,7 @@ export function WhatsAppMatchOrganizer({ locale }: { locale: Locale }) {
                     type="button"
                     className={`${player.paid ? CHIP_ON : CHIP_OFF} shrink-0`}
                     aria-pressed={player.paid}
-                    onClick={() => setRoster(togglePaid(roster, player.id))}
+                    onClick={() => onRosterChange(togglePaid(roster, player.id))}
                   >
                     💸 {t(locale, "Seña/Pagó", "Deposit/Paid", "Sinal/Pagou")}
                   </button>
@@ -355,7 +364,7 @@ export function WhatsAppMatchOrganizer({ locale }: { locale: Locale }) {
                       key={flag}
                       type="button"
                       aria-pressed={player.gear.includes(flag)}
-                      onClick={() => setRoster(toggleGear(roster, player.id, flag))}
+                      onClick={() => onRosterChange(toggleGear(roster, player.id, flag))}
                       className={player.gear.includes(flag) ? CHIP_ON : CHIP_OFF}
                     >
                       {GEAR_LABELS[flag][locale]}
@@ -606,7 +615,231 @@ function WarmupExpress({ locale }: { locale: Locale }) {
   );
 }
 
-type SuiteSection = "lista" | "banco" | "juez" | "senas" | "calor";
+/** 💰 La Vaquita 2.0 Compensada: fee, gear credits and pot settlement. */
+function VaquitaPanel({ locale, roster, goToSection }: SuitePanelProps) {
+  const [fee, setFee] = useState("0");
+  const [pot, setPot] = useState("0");
+  const [credits, setCredits] = useState<Record<GearFlag, string>>({ ball: "0", pump: "0", court: "0", water: "0" });
+
+  const feeCents = parseCents(fee);
+  const potCents = parseCents(pot);
+  const creditMap: Partial<Record<GearFlag, number>> = {};
+  let creditsOk = true;
+  for (const flag of GEAR_FLAGS) {
+    const parsed = parseCents(credits[flag]);
+    if (parsed === null) creditsOk = false;
+    creditMap[flag] = parsed ?? 0;
+  }
+  const invalid = feeCents === null || potCents === null || !creditsOk;
+  const players = roster?.confirmed ?? [];
+  const report =
+    invalid || feeCents === null || potCents === null || players.length === 0
+      ? null
+      : settleVaquita(players, feeCents, potCents, creditMap, locale);
+
+  return (
+    <section className="vos-section-card vos-stack">
+      <p className={LABEL}>💰 {t(locale, "La Vaquita 2.0 Compensada", "The Compensated Pot 2.0", "A Vaquinha 2.0 Compensada")}</p>
+      {players.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-white/15 px-3 py-4 text-center">
+          <p className="text-[11px] text-white/55">
+            {t(
+              locale,
+              "Armá la lista en 📋 primero: la vaquita se calcula sobre los confirmados.",
+              "Build the roster in 📋 first: the pot settles over confirmed players.",
+              "Monte a lista em 📋 primeiro: a vaquinha fecha sobre os confirmados.",
+            )}
+          </p>
+          <button type="button" className={`${BTN} mt-2`} onClick={() => goToSection("lista")}>
+            📋 {t(locale, "Ir a la Lista", "Go to the Roster", "Ir pra Lista")}
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-1">
+            <label className="text-xs">
+              <span className={LABEL}>{t(locale, "Cuota por jugador", "Entry fee", "Taxa por jogador")}</span>
+              <input
+                value={fee}
+                onChange={(event) => setFee(event.target.value)}
+                inputMode="decimal"
+                className={`${INPUT} mt-1 text-xs`}
+              />
+            </label>
+            <label className="text-xs">
+              <span className={LABEL}>{t(locale, "Caja actual", "Pot on hand", "Caixa atual")}</span>
+              <input
+                value={pot}
+                onChange={(event) => setPot(event.target.value)}
+                inputMode="decimal"
+                className={`${INPUT} mt-1 text-xs`}
+              />
+            </label>
+          </div>
+          <p className={LABEL}>{t(locale, "Compensación por equipo (crédito)", "Gear compensation (credit)", "Compensação por equipamento (crédito)")}</p>
+          <div className="grid grid-cols-2 gap-1">
+            {GEAR_FLAGS.map((flag) => (
+              <label key={`credit-${flag}`} className="text-xs">
+                <span className="text-[10px] text-white/55">{GEAR_LABELS[flag][locale]}</span>
+                <input
+                  value={credits[flag]}
+                  onChange={(event) => setCredits((current) => ({ ...current, [flag]: event.target.value }))}
+                  inputMode="decimal"
+                  className={`${INPUT} mt-1 text-xs`}
+                />
+              </label>
+            ))}
+          </div>
+          {invalid ? (
+            <p role="alert" className="text-[10px] font-semibold text-crimson">
+              {t(locale, "Importe inválido: usá 1000 o 1000.50.", "Invalid amount: use 1000 or 1000.50.", "Valor inválido: use 1000 ou 1000.50.")}
+            </p>
+          ) : null}
+          {report ? (
+            <>
+              <ul className="space-y-0.5">
+                {report.lines.map((line) => (
+                  <li key={`vaquita-${line.id}`} className="flex items-center justify-between gap-2 rounded bg-white/5 px-2 py-1 text-[10px]">
+                    <span className="min-w-0 truncate font-bold text-white/75">
+                      {line.status === "pays" ? "💳" : line.status === "refund" ? "💰" : "✅"} {line.name}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-white/55">
+                      {line.status === "pays"
+                        ? `${formatCents(line.owesCents)} ${t(locale, "por entrar", "to put in", "por entrar")}`
+                        : line.status === "refund"
+                          ? `${formatCents(line.getsBackCents)} ${t(locale, "a cobrar", "to collect", "a receber")}`
+                          : line.alreadyPaidCents > 0
+                            ? `${formatCents(line.alreadyPaidCents)} ${t(locale, "ya pagado", "already paid", "já pago")}`
+                            : t(locale, "al día", "square", "em dia")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p
+                role="status"
+                className={`rounded-lg px-2 py-1.5 text-[10px] font-semibold ${
+                  report.shortfallCents > 0 ? "bg-crimson/15 text-crimson" : "bg-emerald/15 text-emerald"
+                }`}
+              >
+                {report.summary}
+              </p>
+            </>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
+}
+
+/** 🏆 Premios del Picadito: one-tap shareable SVG prize poster. */
+function PrizePanel({ locale, roster }: SuitePanelProps) {
+  const [champion, setChampion] = useState("");
+  const [runnerUp, setRunnerUp] = useState("");
+  const [mvp, setMvp] = useState("");
+  const [pot, setPot] = useState("");
+  const [date, setDate] = useState("");
+  const [poster, setPoster] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const generate = (): void => {
+    const cents = parseCents(pot.trim() || "0");
+    if (!champion.trim()) {
+      setError(t(locale, "Poné al campeón para generar el cartel.", "Enter the champion to build the poster.", "Coloque o campeão para gerar o cartaz."));
+      return;
+    }
+    if (cents === null) {
+      setError(t(locale, "Premio inválido: usá 1000 o 1000.50.", "Invalid prize: use 1000 or 1000.50.", "Prêmio inválido: use 1000 ou 1000.50."));
+      return;
+    }
+    setPoster(
+      buildPrizePoster({
+        locale,
+        champion: champion.trim(),
+        potCents: cents,
+        runnerUp: runnerUp.trim() || undefined,
+        mvp: mvp.trim() || undefined,
+        date: date.trim(),
+        venue: roster?.venue,
+      }),
+    );
+    setError(null);
+    setNotice(null);
+    triggerCourtHaptics(25);
+  };
+
+  const copy = async (): Promise<void> => {
+    if (!poster) return;
+    try {
+      await navigator.clipboard.writeText(poster);
+      setNotice(t(locale, "📋 SVG copiado.", "📋 SVG copied.", "📋 SVG copiado."));
+      triggerCourtHaptics(15);
+    } catch {
+      setNotice(t(locale, "El navegador bloqueó el copiado.", "The browser blocked copying.", "O navegador bloqueou a cópia."));
+    }
+  };
+
+  return (
+    <section className="vos-section-card vos-stack">
+      <p className={LABEL}>🏆 {t(locale, "Premios del Picadito", "Pickup Prizes", "Prêmios da Rachinha")}</p>
+      <div className="grid grid-cols-2 gap-1">
+        <label className="text-xs">
+          <span className={LABEL}>{t(locale, "Campeón", "Champion", "Campeão")}</span>
+          <input
+            value={champion}
+            onChange={(event) => setChampion(event.target.value)}
+            placeholder={roster?.confirmed[0]?.name ?? t(locale, "Las Tiburonas", "The Sharks", "Os Tubarões")}
+            className={`${INPUT} mt-1 text-xs`}
+          />
+        </label>
+        <label className="text-xs">
+          <span className={LABEL}>{t(locale, "Premio", "Prize", "Prêmio")}</span>
+          <input value={pot} onChange={(event) => setPot(event.target.value)} inputMode="decimal" placeholder="1000" className={`${INPUT} mt-1 text-xs`} />
+        </label>
+        <label className="text-xs">
+          <span className={LABEL}>{t(locale, "Subcampeón", "Runner-up", "Vice-campeão")}</span>
+          <input value={runnerUp} onChange={(event) => setRunnerUp(event.target.value)} className={`${INPUT} mt-1 text-xs`} />
+        </label>
+        <label className="text-xs">
+          <span className={LABEL}>MVP</span>
+          <input value={mvp} onChange={(event) => setMvp(event.target.value)} className={`${INPUT} mt-1 text-xs`} />
+        </label>
+        <label className="text-xs col-span-2">
+          <span className={LABEL}>{t(locale, "Fecha (compartible)", "Date (shareable)", "Data (compartível)")}</span>
+          <input
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+            placeholder="26/10/2026"
+            className={`${INPUT} mt-1 text-xs`}
+          />
+        </label>
+      </div>
+      <button type="button" className={BTN_PRIMARY} onClick={generate}>
+        🎨 {t(locale, "Generar cartel", "Build poster", "Gerar cartaz")}
+      </button>
+      {error ? (
+        <p role="alert" className="text-[10px] font-semibold text-crimson">
+          {error}
+        </p>
+      ) : null}
+      {poster ? (
+        <div className="space-y-1">
+          <div dangerouslySetInnerHTML={{ __html: poster }} className="overflow-hidden rounded-xl border border-white/10" />
+          <button type="button" className={BTN} onClick={() => void copy()}>
+            📋 {t(locale, "Copiar SVG", "Copy SVG", "Copiar SVG")}
+          </button>
+        </div>
+      ) : null}
+      {notice ? (
+        <p role="status" className="rounded-lg bg-emerald/15 px-2 py-1 text-[10px] font-semibold text-emerald">
+          {notice}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+type SuiteSection = "lista" | "banco" | "juez" | "senas" | "calor" | "vaquita" | "premios";
 
 const SECTIONS: Array<{ id: SuiteSection; label: Record<Locale, string> }> = [
   { id: "lista", label: { es: "📋 Lista de WhatsApp", en: "📋 WhatsApp Roster", pt: "📋 Lista do WhatsApp" } },
@@ -614,19 +847,24 @@ const SECTIONS: Array<{ id: SuiteSection; label: Record<Locale, string> }> = [
   { id: "juez", label: { es: "⚖️ El Juez", en: "⚖️ The Judge", pt: "⚖️ O Juiz" } },
   { id: "senas", label: { es: "📣 Señas & Gritos", en: "📣 Shouts & Calls", pt: "📣 Sinais & Gritos" } },
   { id: "calor", label: { es: "🔥 Calentamiento 4′", en: "🔥 4′ Warmup", pt: "🔥 Aquecimento 4′" } },
+  { id: "vaquita", label: { es: "💰 La Vaquita 2.0", en: "💰 The Pot 2.0", pt: "💰 A Vaquinha 2.0" } },
+  { id: "premios", label: { es: "🏆 Premios", en: "🏆 Prizes", pt: "🏆 Prêmios" } },
 ];
 
-const PANELS: Record<SuiteSection, (props: { locale: Locale }) => React.ReactElement> = {
+const PANELS: Record<SuiteSection, (props: SuitePanelProps) => React.ReactElement> = {
   lista: WhatsAppMatchOrganizer,
   banco: BenchRotator,
   juez: JudgePanel,
   senas: CryTranslator,
   calor: WarmupExpress,
+  vaquita: VaquitaPanel,
+  premios: PrizePanel,
 };
 
 /** 🍻 Picadito & Amigos suite: pre-match organisation and bench rotation. */
 export function CasualPlayerSuite({ locale }: { locale: Locale }) {
   const [section, setSection] = useState<SuiteSection>("lista");
+  const [roster, setRoster] = useState<OrganizerRoster | null>(null);
   const Panel = PANELS[section];
   return (
     <div className="space-y-3">
@@ -653,7 +891,7 @@ export function CasualPlayerSuite({ locale }: { locale: Locale }) {
           </button>
         ))}
       </div>
-      <Panel locale={locale} />
+      <Panel locale={locale} roster={roster} onRosterChange={setRoster} goToSection={setSection} />
     </div>
   );
 }
