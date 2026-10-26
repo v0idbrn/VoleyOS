@@ -35,6 +35,7 @@ O app é um casco fixo `100dvh` com cara de Android. Na primeira abertura, um **
 - Filtre os 61 módulos pelo seu papel na quadra (6 perfis, 10 ou 11 módulos cada) ou busque pelo nome.
 - Marque com estrela para fixar no topo: sua estação diária fica a um toque.
 - Cada card carrega número, ícone e tagline para achar "o do rodízio" sem saber slugs.
+- Abra a suíte 🍻 Picadito & Amigos pela barra superior: as 8 ferramentas casuais para o vôlei de todo dia, também destacada no modo 🌱 Novato.
 
 ### ⏱️ Quadra
 
@@ -65,6 +66,21 @@ O app é um casco fixo `100dvh` com cara de Android. Na primeira abertura, um **
 - Clone um placar ao vivo para outro celular via **QR multiframe** (tokens assinados HMAC) com os dois aparelhos offline.
 - Guarde relatórios no **cofre efêmero** e destrua com um toque (delete real, sem lixeira).
 - Copiar/colar nativo funciona em toda entrada de texto — cole uma lista ou uma chave sem brigar.
+
+### 🍻 Picadito & Amigos
+
+Oito ferramentas para o jogador do dia a dia, a um toque da barra do Início e destacadas no modo 🌱 Novato; o placar também traz o rodízio com banco e o limite de saques.
+
+| Ferramenta | O que faz |
+| --- | --- |
+| 📋 Montador de Lista do WhatsApp | Cole a lista do grupo, defina o limite, promova a fila quando alguém cai fora e copie a lista atualizada ou o cartaz "falta 1". |
+| 🪇 Rodízio com Banco (7-10) | Gira as 6 zonas a cada saída de bola e entra o próximo do banco na posição I ou VI, com tabela de rodízios justa. |
+| 🎯 Limite de Saques Recreativo | Off / 3 / 5 saques seguidos no placar da rachinha, com aviso amigável quando um sacador segura o jogo. |
+| ⚖️ O Juiz da Rachinha | Resolve as 5 clássicas (pé na linha, mão dura, dedo, dois toques e rede) pelo observável acordado e a regra em 3 idiomas. |
+| 📣 Tradutor de Sinais e Gritos | Busca de gritos de quadra ES/EN/PT sem depender de acento, com o contexto de uso. |
+| 🔥 Aquecimento Express (4 min) | Cronômetro de 4 fases: mobilidade, ativação, rebote e golpes, pronto em quatro minutos. |
+| 💰 A Vaquinha 2.0 Compensada | Fecha as taxas contra créditos de equipamento em centavos inteiros e avisa se falta grana no caixa. |
+| 🏆 Prêmios da Rachinha | Cartaz SVG compartilhável em um toque: campeão, prêmio, vice e MVP. |
 
 ## Enciclopédia dos 61 módulos
 

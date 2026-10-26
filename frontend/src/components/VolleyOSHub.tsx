@@ -18,6 +18,7 @@ import { setSoundEffectsEnabled } from "@/lib/sound-effects";
 import { EphemeralVaultBar } from "@/components/EphemeralVaultBar";
 import { STATIONS } from "@/components/stations";
 import { GymScreenModule } from "@/components/GymScreenModule";
+import { CasualPlayerSuite } from "@/components/CasualPlayerSuite";
 
 const FILTERS: Array<Profile | "all"> = ["all", "players", "coaches", "court", "referees", "fans", "tournaments"];
 const LOCALES: Locale[] = ["es", "en", "pt"];
@@ -186,6 +187,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [profile, setProfile] = useState<Profile | "all">("all");
   const [favOnly, setFavOnly] = useState(false);
   const [guidedMode, setGuidedMode] = useState<GuidedModeId | null>(null);
+  const [casualOpen, setCasualOpen] = useState(false);
   const [openDrawers, setOpenDrawers] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState("");
   const [pinned, setPinned] = useState<string[]>([]);
@@ -547,7 +549,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     <main
       id="main"
       lang={locale}
-      data-view={activeMeta ? "module" : "tabs"}
+      data-view={activeMeta ? "module" : casualOpen ? "casual" : "tabs"}
       data-dialog={keyOpen || checkout ? "open" : "closed"}
       className="flex h-[100dvh] w-full flex-col overflow-hidden bg-obsidian text-white"
     >
@@ -596,6 +598,28 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
               <span aria-hidden>⚡</span>
               {shell.demo}
             </button>
+          </div>
+        </header>
+      ) : casualOpen ? (
+        <header className="safe-top z-30 shrink-0 border-b border-white/10 bg-obsidian/95">
+          <div className="mx-auto flex h-14 max-w-3xl items-center gap-1 px-2">
+            <button
+              type="button"
+              onClick={() => setCasualOpen(false)}
+              aria-label={shell.back}
+              className="tap flex h-10 items-center gap-1 rounded-xl px-2 text-[12px] font-bold text-white/80"
+            >
+              <span aria-hidden className="text-lg leading-none">←</span>
+              {shell.back}
+            </button>
+            <div className="min-w-0 flex-1 text-center">
+              <p className="truncate text-[13px] font-black leading-tight">
+                🍻 {t(locale, "Picadito & Amigos", "Pickup & Friends", "Picadito & Amigos")}
+              </p>
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">
+                {t(locale, "Suite casual · 8 herramientas", "Casual suite · 8 tools", "Suíte casual · 8 ferramentas")}
+              </p>
+            </div>
           </div>
         </header>
       ) : (
@@ -707,6 +731,12 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
               </div>
             </div>
           </>
+        ) : casualOpen ? (
+          <div className="h-full overflow-y-auto no-scrollbar px-3 pb-28 pt-3">
+            <div className="mx-auto w-full max-w-2xl space-y-3">
+              <CasualPlayerSuite locale={locale} />
+            </div>
+          </div>
         ) : (
           <div className="h-full overflow-y-auto no-scrollbar">
             {tab === "home" ? (
@@ -724,6 +754,20 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                     className="w-full rounded-xl border border-white/10 bg-panel py-2.5 pl-9 pr-3 text-[13px] text-white outline-none placeholder:text-white/35 focus:border-volt"
                   />
                 </label>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCasualOpen(true);
+                    triggerCourtHaptics(22);
+                  }}
+                  className="tap mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-crimson/60 bg-crimson/15 px-3 py-2.5 text-[12px] font-black uppercase tracking-wider text-white"
+                >
+                  🍻 {t(locale, "Picadito & Amigos", "Pickup & Friends", "Picadito & Amigos")}
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[9px] font-black text-white/70">
+                    {t(locale, "8 herramientas", "8 tools", "8 ferramentas")}
+                  </span>
+                </button>
 
                 <div className="snap-row mt-3 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={t(locale, "Modos guiados", "Guided modes", "Modos guiados")}>
                   {GUIDED_MODES.map((mode) => (
@@ -787,6 +831,18 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 {guidedMode && GUIDED_MODE_BY_ID.has(guidedMode) ? (
                   <section className="mt-5 space-y-3" data-testid="guided-drawers">
                     <ModuleGuideBanner slug="home" locale={locale} defaultOpen={guidedMode === "novice"} />
+                    {guidedMode === "novice" ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCasualOpen(true);
+                          triggerCourtHaptics(22);
+                        }}
+                        className="tap w-full rounded-xl border border-crimson/50 bg-crimson/15 px-3 py-2.5 text-left text-[11px] font-black text-white"
+                      >
+                        🍻 {t(locale, "Picadito & Amigos: lista, banco, juez, calentamiento y vaquita", "Pickup & Friends: roster, bench, judge, warmup and pot", "Picadito & Amigos: lista, banco, juiz, aquecimento e vaquinha")}
+                      </button>
+                    ) : null}
                     {GUIDED_MODE_BY_ID.get(guidedMode)?.drawers.map((drawer) => (
                       <div key={drawer.id} className="vos-section-card vos-stack">
                         <button

@@ -35,6 +35,7 @@ La app es un cascarón fijo `100dvh` con tacto Android. Al primer arranque, un *
 - Filtrá los 61 módulos por tu rol (6 perfiles, 10 u 11 módulos cada uno) o buscá por nombre.
 - Marcala con estrella para fijarla arriba: tu estación diaria queda a un toque.
 - Cada tarjeta trae número, ícono y tagline para que encuentres "la de rotación" sin saber slugs.
+- Abrí la suite 🍻 Picadito & Amigos desde la barra superior: las 8 herramientas casuales para el picadito de todos los días, también resaltada dentro del modo 🌱 Novato.
 
 ### ⏱️ Cancha
 
@@ -65,6 +66,21 @@ La app es un cascarón fijo `100dvh` con tacto Android. Al primer arranque, un *
 - Cloná una pizarra viva a otro teléfono vía **QR multiframe** (tokens firmados HMAC) con ambos aparatos offline.
 - Guardá reportes en la **bóveda efímera** y destruílos con un toque (delete real, sin papelera).
 - El copiar/pegar nativo funciona en toda entrada de texto — pegá una planilla o una llave sin pelear.
+
+### 🍻 Picadito & Amigos
+
+Ocho herramientas para el jugador de todos los días, a un toque desde la barra de Inicio y resaltadas dentro del modo 🌱 Novato; el tablero también trae el rotador con banco y el límite de saques.
+
+| Herramienta | Qué hace |
+| --- | --- |
+| 📋 Armador de Lista de WhatsApp | Pegá la lista del grupo, poné el cupo, promové la lista de espera cuando alguien se baja y copiá la lista actualizada o el cartel "nos falta 1". |
+| 🪇 Rotador con Banco (7-10) | Rota las 6 zonas en cada recuperación y mete al próximo del banco en la posición I o VI, con tabla de rotaciones justa. |
+| 🎯 Límite de Saques Recreativo | Off / 3 / 5 saques seguidos en el picadito, con cartel amistoso cuando un sacador se lleva el partido. |
+| ⚖️ El Juez del Picadito | Resuelve las 5 clásicas (roqueta, mano dura, dedo, doble toque y red) con lo que los capitanes acuerdan y la regla en 3 idiomas. |
+| 📣 Traductor de Señas y Gritos | Buscador de gritos de cancha ES/EN/PT sin importar acentos, con el contexto de uso. |
+| 🔥 Entrada en Calor Express (4 min) | Cronómetro de 4 fases: movilidad, activación, rebote y golpes, listo en cuatro minutos. |
+| 💰 La Vaquita 2.0 Compensada | Cierra cuotas contra créditos por equipo en centavos enteros y avisa si falta plata en la caja. |
+| 🏆 Premios del Picadito | Cartel SVG para compartir en un toque: campeón, premio, subcampeón y MVP. |
 
 ## Enciclopedia de los 61 módulos
 

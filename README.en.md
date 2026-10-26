@@ -35,6 +35,7 @@ The app is a fixed 100dvh Android-feel shell. On first open, a 3-tap onboarding 
 - Filter the 61 modules by your court role (6 profiles, 10 or 11 modules each) or search by name.
 - Star modules to pin them at the top: your daily station is one tap away.
 - Every card carries the number, icon and tagline so you can find "the rotation one" without knowing slugs.
+- Open the 🍻 Picadito & Amigos suite from the top bar: the eight casual tools for everyday pickup games, also highlighted inside the 🌱 Novice mode.
 
 ### ⏱️ Cancha / Court
 
@@ -65,6 +66,21 @@ The app is a fixed 100dvh Android-feel shell. On first open, a 3-tap onboarding 
 - Clone a live scoreboard to another phone via multi-frame QR (HMAC-signed tokens) with both devices offline.
 - Store reports in the ephemeral vault and destroy them with one tap (real delete, no trash can).
 - Native copy/paste works in every text input — paste a roster or a licence key comfortably.
+
+### 🍻 Picadito & Amigos / Casual suite
+
+Eight everyday-player tools, one tap from the home top bar and highlighted inside the 🌱 Novice mode; the scoreboard also carries the bench rotator and the recreational serve cap.
+
+| Tool | What it does |
+| --- | --- |
+| 📋 WhatsApp Roster Builder | Paste the group chat list, cap the court, promote the waitlist when someone drops out, and copy the updated roster or the "we're 1 short" sign. |
+| 🪇 Bench Rotator (7-10) | Rotates the six zones on every side-out and swaps the next bench player in at position I or VI, with a fair play-time table so nobody sits out twice. |
+| 🎯 Recreational Serve Cap | Off / 3 / 5 consecutive serves on the picadito scoreboard, with a friendly banner when one server runs the game. |
+| ⚖️ El Juez del Picadito | Rules the five classic disputes (foot fault, lift, finger set, double contact, net touch) from the agreed observable, with the rule shown in three languages. |
+| 📣 Signals & Shouts Translator | Accent-insensitive ES/EN/PT lookup for every court cry plus when to shout it. |
+| 🔥 Express Warmup (4 min) | Strict four-phase countdown: mobility, activation, bounce, swings - done in four minutes. |
+| 💰 La Vaquita 2.0 | Settles entry fees against gear compensation credits in integer cents and flags any pot shortfall. |
+| 🏆 Premios del Picadito | One-tap shareable SVG prize poster: champion, prize, runner-up and MVP. |
 
 ## Encyclopedia of the 61 modules
 
