@@ -2,7 +2,7 @@
 
 [English](README.md) · [Español](README.es.md) · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v9.2.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v9.3.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Modules](https://img.shields.io/badge/modules-61-FF3B5C?style=for-the-badge&color=EAB308)](#encyclopedia-of-the-61-modules)
 [![Offline](https://img.shields.io/badge/100%25-offline--first-FF3B5C?style=for-the-badge&color=EAB308)](#why-volleyos-exists)
 [![Android](https://img.shields.io/badge/Android%20APK-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -14,14 +14,13 @@
 
 Signed universal APK built by GitHub Actions on every `v*` tag. Android 7.0+ (minSdk 24), trilingual, offline-first, no accounts and no telemetry. F-Droid ready.
 
-## 🆕 What's new in v9.2.0
+## 🆕 What's new in v9.3.0 — 3-Mode Live Match Broadcast
 
-- **Native Android home-screen widget** (pure SDK, zero androidx): live score line, next scheduled match and 1-tap buttons straight into ⏱️ Marcador and 🍻 Picadito, plus long-press launcher shortcuts.
-- **🏆 Mi Temporada**: every finished match is stored locally with win rates, 🔥 streaks, head-to-head rivalries, an SVG win-trend chart and WhatsApp / CSV / printable exports.
-- **Sticky mini-scoreboard** that follows you across every tab with `+1 A`, `+1 B`, swap sides and a 1-tap jump back to the court.
-- **Interactive coach-marks wizard**: the module guides became a 3-step visual spotlight tour, one tap from every card.
-- **Full court audio suite + voice announcer**: picadito cues (ace / side-out / kill / serve-cap), a stadium crowd layer behind the set fanfare, 3-2-1 warmup ticks, the Vaquita coin clink, the Judge's gavel and a hands-free score announcer in ES / EN / PT.
-- **Honest support flow**: a once-a-week support sheet, `VOS-CHIP` supporter codes with a golden 👑 Patrocinador badge, a Wall of Supporters and a tap-only GitHub update checker.
+- **📶 Court Hotspot mode (0% internet / $0 balance)**: a pure-Java server inside the APK turns the scorer's phone into a live scoreboard at `http://<LAN_IP>:8765`. Friends join your Wi-Fi hotspot, scan the QR and watch a giant scoreboard with whistle/buzzer cues while every point streams over local Wi-Fi with zero mobile data.
+- **💬 "WhatsApp Gratis" `VOS1:` pulse**: one tap drops a rich score card plus a `VOS1:` capsule into the group; a phone with only carrier free-WhatsApp pastes it back to clone the whole match offline.
+- **🌎 Cloud Live QR (`CANCHA-XXXX`)**: an ultra-light ~120-byte packet over the ntfy.sh SSE relay (plus a 3s poll fallback and local BroadcastChannel), a QR pointing to the GitHub Pages spectator scoreboard that opens in any iPhone/Android browser, and join-by-code inside the app.
+- **🔋 Scorer battery handover**: a handover QR passes the signed host secret to a second phone so scoring continues seamlessly when the scorer's battery dies.
+- **Keeps everything from v9.2.0**: the native home-screen widget, 🏆 Mi Temporada, the sticky mini-scoreboard, the coach-marks wizard, the full court audio suite and the honest support flow.
 
 ## ❤️ Support VolleyOS
 

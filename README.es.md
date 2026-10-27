@@ -2,7 +2,7 @@
 
 [English](README.md) · **Español** · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v9.2.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v9.3.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Módulos](https://img.shields.io/badge/módulos-61-FF3B5C?style=for-the-badge&color=EAB308)](#enciclopedia-de-los-61-módulos)
 [![Offline](https://img.shields.io/badge/100%25-offline--primero-FF3B5C?style=for-the-badge&color=EAB308)](#por-qué-existe-volleyos)
 [![Android](https://img.shields.io/badge/APK%20Android-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -14,14 +14,13 @@
 
 APK universal firmado, construido por GitHub Actions en cada tag `v*`. Android 7.0+ (minSdk 24), trilingüe, offline primero, sin cuentas y sin telemetría. Listo para F-Droid.
 
-## 🆕 Novedades de v9.2.0
+## 🆕 Novedades de v9.3.0 — Transmisión en Vivo en 3 Modos
 
-- **Widget nativo de Android para el inicio** (SDK puro, cero androidx): marcador en vivo, próximo partido y botones de 1 toque a ⏱️ Marcador y 🍻 Picadito, más accesos largos del ícono.
-- **🏆 Mi Temporada**: cada partido cerrado se guarda con récords, 🔥 rachas, clásicos del head-to-head, gráfico de tendencia SVG y exportes a WhatsApp / CSV / imprimible.
-- **Marcador flotante** que te sigue por todas las pestañas con `+1 A`, `+1 B`, cambio de lado y salto de 1 toque a la cancha.
-- **Guía interactiva con coach marks**: las guías de módulos ahora son un recorrido visual de 3 pasos.
-- **Suite de sonidos completa + anunciador por voz**: cues de picadito (saque, recuperación, kill, límite de saques), público de estadio detrás del fanfare, ticks 3-2-1 del calentamiento, moneda de La Vaquita, martillo del Juez y anunciador de marcador sin manos en ES / EN / PT.
-- **Apoyo honesto**: hoja de apoyo una vez por semana, códigos `VOS-CHIP` con dorada 👑 Patrocinador, Muro de la Comunidad y verificador de versiones de GitHub en un toque.
+- **📶 Modo Hotspot sin saldo ni señal (0% internet / $0)**: un servidor Java puro dentro de la APK convierte el celular del anotador en un marcador en vivo en `http://<LAN_IP>:8765`. Tus amigos se conectan a tu Wi-Fi, escanean el QR y ven un marcador gigante con silbato/buzzer mientras cada punto viaja por Wi-Fi local sin datos móviles.
+- **💬 Pulso "WhatsApp Gratis" `VOS1:`**: un toque manda una tarjeta de puntaje más una cápsula `VOS1:` al grupo; quien solo tiene WhatsApp sin megas la pega de vuelta y clona el partido completo offline.
+- **🌎 QR en la Nube (`CANCHA-XXXX`)**: paquete ultraliviano de ~120 bytes por el relé SSE ntfy.sh (con fallback de 3s y BroadcastChannel local), un QR hacia el marcador espectador en GitHub Pages que abre en cualquier navegador iPhone/Android, y unirse por código dentro de la app.
+- **🔁 Relevo de Anotador por batería**: un QR de relevo pasa el secreto firmado del host a otro celular para seguir anotando sin cortar la sala.
+- **Mantiene todo lo de v9.2.0**: el widget nativo, 🏆 Mi Temporada, el marcador flotante, la guía con coach marks, la suite de sonidos completa y el apoyo honesto.
 
 ## ❤️ Apoyá VolleyOS
 
