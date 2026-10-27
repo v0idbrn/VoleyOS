@@ -18,6 +18,7 @@ import {
   benchSwapMessage,
   buildOrganizer,
   buildPrizePoster,
+  loadPlayerDirectory,
   capacityLabel,
   dropPlayer,
   formatMatchSheet,
@@ -41,6 +42,7 @@ import {
   type JudgeVerdict,
   type OrganizerRoster,
 } from "@/lib/casual-engines";
+import { sharePng } from "@/lib/png-exporter";
 import { openPrintableReport, type ReportSpec } from "@/lib/offline-xlsx";
 import {
   loadFlowRoster,
@@ -154,6 +156,7 @@ export function BenchRotator({ locale }: { locale: Locale }) {
             aria-label={t(locale, "Jugadores del equipo", "Team players", "Jogadores do time")}
             className={`${INPUT} font-mono text-xs`}
           />
+          <PlayerChips locale={locale} onPick={(name) => setNamesText((current) => (current ? `${current}\n${name}` : name))} testId="bench-player-chips" />
           {entryButtons}
           <button type="button" className={`${BTN_PRIMARY} w-full`} onClick={load}>
             ▶ {t(locale, "Cargar equipo", "Load squad", "Carregar time")}
@@ -350,6 +353,7 @@ export function WhatsAppMatchOrganizer({ locale, roster, onRosterChange }: Suite
           +
         </button>
       </div>
+      <PlayerChips locale={locale} onPick={(name) => setManual(name)} testId="organizer-player-chips" />
 
       {roster ? (
         <>
@@ -638,6 +642,39 @@ function WarmupExpress({ locale }: { locale: Locale }) {
   );
 }
 
+/** v9.4 unified player memory: 1-tap chips that end double typing everywhere. */
+export function PlayerChips({
+  locale,
+  onPick,
+  testId = "player-chips",
+}: {
+  locale: Locale;
+  onPick: (name: string) => void;
+  testId?: string;
+}) {
+  const players = loadPlayerDirectory();
+  if (players.length === 0) return null;
+  return (
+    <div data-testid={testId} className="space-y-1">
+      <p className="text-[9px] font-bold uppercase tracking-wider text-white/40">
+        👥 {t(locale, "Últimos jugadores (1 toque)", "Recent players (1 tap)", "Jogadores recentes (1 toque)")}
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {players.slice(-10).map((name) => (
+          <button
+            key={name}
+            type="button"
+            onClick={() => onPick(name)}
+            className="rounded-full border border-volt/40 bg-volt/10 px-2 py-0.5 text-[9px] font-bold text-volt"
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** 💰 La Vaquita 2.0 Compensada: fee, gear credits and pot settlement. */
 function VaquitaPanel({ locale, roster, goToSection }: SuitePanelProps) {
   const [fee, setFee] = useState("0");
@@ -891,6 +928,24 @@ function PrizePanel({ locale, roster }: SuitePanelProps) {
           <div dangerouslySetInnerHTML={{ __html: poster }} className="overflow-hidden rounded-xl border border-white/10" />
           <button type="button" className={BTN} onClick={() => void copy()}>
             📋 {t(locale, "Copiar SVG", "Copy SVG", "Copiar SVG")}
+          </button>
+          <button
+            type="button"
+            data-testid="poster-png-share"
+            className={BTN}
+            onClick={() => {
+              void sharePng(poster, "premios-del-picadito.png").then((outcome) =>
+                setNotice(
+                  outcome === "shared"
+                    ? t(locale, "📸 PNG compartido.", "📸 PNG shared.", "📸 PNG compartido.")
+                    : outcome === "downloaded"
+                      ? t(locale, "📸 PNG descargado.", "📸 PNG downloaded.", "📸 PNG baixado.")
+                      : t(locale, "❌ No se pudo generar el PNG aquí.", "❌ PNG not supported here.", "❌ PNG não suportado aqui."),
+                ),
+              );
+            }}
+          >
+            📸 {t(locale, "Compartir PNG 1080×1350", "Share PNG 1080×1350", "Compartir PNG 1080×1350")}
           </button>
         </div>
       ) : null}

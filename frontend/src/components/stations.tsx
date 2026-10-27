@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 import jsQR from "jsqr";
 
@@ -17,8 +18,9 @@ import { announceScoreTTS, isMatchActive, persistLiveScoreboard, readLiveScorebo
 import { clearClonedScoreboard, createQrFrames, emptyIngest, ingestQrFrame, readClonedScoreboard, renderQrSvg, storeClonedScoreboard, type IngestResult, type QrFrame } from "@/lib/qr-transfer";
 import { localizeReactTree } from "@/lib/engine-l10n";
 import { COPY, t } from "@/lib/i18n";
-import { BenchRotator, FlowWizard } from "@/components/CasualPlayerSuite";
+import { BenchRotator, FlowWizard, PlayerChips } from "@/components/CasualPlayerSuite";
 import { LiveCastModal } from "@/components/LiveCastModal";
+import { sharePng } from "@/lib/png-exporter";
 import {
   buildPacket,
   createHostSecret,
@@ -30,7 +32,7 @@ import {
 } from "@/lib/live-cast-engine";
 import { saveSeasonMatch, seasonMatchFromState } from "@/lib/season-vault";
 import { syncWidgetSnapshot } from "@/lib/widget-bridge";
-import { nextServeStreak, serveCapHit, serveCapMessage, type ServeCapLimit } from "@/lib/casual-engines";
+import { nextServeStreak, rememberPlayerNames, serveCapHit, serveCapMessage, type ServeCapLimit } from "@/lib/casual-engines";
 import {
   FAN_QUESTIONS,
   REFEREE_GESTURES,
@@ -750,6 +752,12 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const saveRoster = (): void => {
     try {
       const team = teamFromRosterSheet(rosterName, rosterCode, rosterSheet);
+      rememberPlayerNames(
+        rosterSheet
+          .split(/\n+/)
+          .map((line) => line.replace(/^\s*\d+\s+/, "").replace(/\s+(C\/L|C|L|S|OH|MB|OPP)$/i, "").trim())
+          .filter((name) => name.length >= 2),
+      );
       setTeams(saveTeam(team));
       applyRoster(team, teamAId ? "B" : "A");
       setRosterError(null);
@@ -1139,6 +1147,8 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
             className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 font-mono text-[10px]"
           />
           <p className="text-[9px] text-white/40">{t(locale, "Dorsal nombre rol (S OH MB OPP L) y C/L para capitan o libero.", "Number name role (S OH MB OPP L), C/L for captain or libero.", "Numero nome posicao (S OH MB OPP L), C/L para capitao ou libero.")}</p>
+          <PlayerChips locale={locale} onPick={(name) => setRosterSheet((current) => (current ? `${current}
+${name}` : name))} testId="cancha-player-chips" />
           {rosterError ? <p className="text-[10px] text-crimson">{rosterError}</p> : null}
           <button type="button" className={`${BTN} w-full`} onClick={saveRoster}>{t(locale, "Guardar plantilla", "Save roster", "Salvar elenco")}</button>
           {teams.length > 0 ? (
@@ -1669,6 +1679,7 @@ function RadarHex({ attributes }: { attributes: SixAttributes }) {
 }
 
 export function VolleycardStation({ meta, locale, onSave }: StationProps) {
+  const [pngNotice, setPngNotice] = useState<string | null>(null);
   const [height, setHeight] = useState(190);
   const [reach, setReach] = useState(250);
   const [jump, setJump] = useState(78);
@@ -1680,6 +1691,20 @@ export function VolleycardStation({ meta, locale, onSave }: StationProps) {
       return null;
     }
   }, [height, reach, jump]);
+
+  const shareCard = (): void => {
+    if (!card) return;
+    const svg = renderToStaticMarkup(<RadarHex attributes={card.attributes} />);
+    void sharePng(svg, "volleycard.png").then((outcome) =>
+      setPngNotice(
+        outcome === "shared"
+          ? t(locale, "📸 PNG compartido.", "📸 PNG shared.", "📸 PNG compartido.")
+          : outcome === "downloaded"
+            ? t(locale, "📸 PNG descargado.", "📸 PNG downloaded.", "📸 PNG baixado.")
+            : t(locale, "❌ PNG no disponible aquí.", "❌ PNG unavailable here.", "❌ PNG indisponível aqui."),
+      ),
+    );
+  };
 
   return (
     <StationShell meta={meta} locale={locale} rows={6} onSave={onSave} onExample={() => { setHeight(190); setReach(250); setJump(78); }}>
@@ -1696,6 +1721,10 @@ export function VolleycardStation({ meta, locale, onSave }: StationProps) {
             <p className="text-[10px] text-white/50">{card.archetype} · {card.rarity}</p>
           <p className="text-[11px]">{t(locale, "Ataque", "Attack", "Ataque")} <strong className="text-crimson">{card.spikeReachCm.toFixed(1)} cm</strong></p>
           <p className="text-[11px]">{t(locale, "Bloqueo", "Block", "Bloqueio")} <strong className="text-emerald">{card.blockReachCm.toFixed(1)} cm</strong></p>
+            <button type="button" data-testid="volleycard-png-share" className={BTN} onClick={shareCard}>
+              📸 {t(locale, "Compartir PNG de la tarjeta", "Share card PNG", "Compartir PNG do cartão")}
+            </button>
+            {pngNotice ? <p role="status" className="text-[10px] text-emerald">{pngNotice}</p> : null}
           </div>
         </div>
       ) : (
@@ -2640,6 +2669,7 @@ const CHALK_SAMPLE = [
 ];
 
 export function TimeoutChalkboardStation({ meta, locale, onSave }: StationProps) {
+  const [pngNotice, setPngNotice] = useState<string | null>(null);
   const [reason, setReason] = useState<ChalkReason>("stop_serve_run");
   const report = useMemo(
     () => buildChalkboard({ reason, rotation: 4, scoreA: 18, scoreB: 21, strokes: CHALK_SAMPLE }),
@@ -2650,6 +2680,34 @@ export function TimeoutChalkboardStation({ meta, locale, onSave }: StationProps)
     { key: "organize_sideout", label: t(locale, "Side-out", "Side-out", "Side-out") },
     { key: "match_point_defense", label: t(locale, "Defensa MP", "Match point D", "Defesa MP") },
   ];
+  const shareBoard = (): void => {
+    const esc = (value: string): string => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const rows = report.cues
+      .map(
+        (cue, index) =>
+          `<text x="60" y="${250 + index * 96}" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#FF3B5C">${esc(`${cue.priority} · ${cue.code}`)}</text>` +
+          `<text x="60" y="${294 + index * 96}" font-family="Arial, sans-serif" font-size="34" fill="#FFFFFF">${esc(cue.text)}</text>`,
+      )
+      .join("");
+    const height = 260 + report.cues.length * 96;
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 ${height}">` +
+      `<rect width="720" height="${height}" fill="#0B0B0F"/>` +
+      `<text x="60" y="90" font-family="Arial, sans-serif" font-size="44" font-weight="bold" fill="#EAB308">⏰ ${esc(t(locale, "Chalkboard táctico", "Tactical chalkboard", "Lousa tática"))}</text>` +
+      `<text x="60" y="170" font-family="Arial, sans-serif" font-size="64" font-weight="bold" fill="#FFFFFF">${esc(`${report.seconds.toFixed(1)}s`)}</text>` +
+      rows +
+      `</svg>`;
+    void sharePng(svg, "chalkboard.png").then((outcome) =>
+      setPngNotice(
+        outcome === "shared"
+          ? t(locale, "📸 PNG compartido.", "📸 PNG shared.", "📸 PNG compartido.")
+          : outcome === "downloaded"
+            ? t(locale, "📸 PNG descargado.", "📸 PNG downloaded.", "📸 PNG baixado.")
+            : t(locale, "❌ PNG no disponible aquí.", "❌ PNG unavailable here.", "❌ PNG indisponível aqui."),
+      ),
+    );
+  };
+
   return (
     <StationShell meta={meta} locale={locale} rows={report.cues.length} onSave={onSave} onExample={() => setReason("stop_serve_run")}>
       <div className="flex flex-wrap gap-1">
@@ -2672,6 +2730,12 @@ export function TimeoutChalkboardStation({ meta, locale, onSave }: StationProps)
         ))}
       </div>
       <p className="mt-1 text-[10px] text-white/40">{report.strokes.length} {t(locale, "trazos", "strokes", "traços")} · {report.totalLengthM.toFixed(2)} m</p>
+      <button type="button" data-testid="chalkboard-png-share" className={`${BTN} mt-2`} onClick={shareBoard}>
+        📸 {t(locale, "Compartir PNG del chalkboard", "Share chalkboard PNG", "Compartir PNG da lousa")}
+      </button>
+      {pngNotice ? (
+        <p role="status" className="mt-1 text-[10px] text-emerald">{pngNotice}</p>
+      ) : null}
     </StationShell>
   );
 }
@@ -2884,6 +2948,18 @@ export function MatchPosterStation({ meta, locale, onSave }: StationProps) {
           <div className="mt-2 flex items-center justify-between gap-2">
             <p className="break-all font-mono text-[9px] text-volt">{report.seal}</p>
             <button type="button" className={BTN} onClick={download}>{t(locale, "Descargar SVG", "Download SVG", "Baixar SVG")}</button>
+            <button
+              type="button"
+              data-testid="matchposter-png-share"
+              className={BTN}
+              onClick={() => {
+                void sharePng(report.svg, report.filename.replace(/\.svg$/u, ".png")).then((outcome) => {
+                  if (outcome === "failed") setError(t(locale, "❌ PNG no disponible aquí.", "❌ PNG unavailable here.", "❌ PNG indisponível aqui."));
+                });
+              }}
+            >
+              📸 {t(locale, "PNG 1080×1350", "PNG 1080×1350", "PNG 1080×1350")}
+            </button>
           </div>
         </>
       ) : null}

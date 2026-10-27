@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { LOCALE_NAMES, SHELL, t } from "@/lib/i18n";
 import { awardIndoorPoint, buildTarget, jumpLoad, newScoreboard, paywallEnabled, swapCourt, type Locale, type Profile, type ScoreboardState } from "@/lib/local-engines";
@@ -27,6 +27,7 @@ import { CasualPlayerSuite, type SuiteSection } from "@/components/CasualPlayerS
 import { LiveCastModal } from "@/components/LiveCastModal";
 import { ModuleErrorBoundary } from "@/components/ModuleErrorBoundary";
 import { createHostSecret, createRoomId, parseRoomParams } from "@/lib/live-cast-engine";
+import { applyVosBackup, downloadVosBackup, verifyVosBackup } from "@/lib/backup-vos";
 import { loadFlowRoster } from "@/lib/season-vault";
 import { acwrSample } from "@/lib/samples";
 
@@ -299,6 +300,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   // v9.3.0 live broadcast: the Hub is also a spectator entry point (QR → ?room=).
   const [castOpen, setCastOpen] = useState(false);
   const [castJoinRoom, setCastJoinRoom] = useState<string | null>(null);
+  const [vosMsg, setVosMsg] = useState<string | null>(null);
   const castRoomRef = useRef<string>("");
   const castSecretRef = useRef<string>("");
   if (!castRoomRef.current) castRoomRef.current = createRoomId();
@@ -315,6 +317,34 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
       setCastOpen(true);
     }
   }, []);
+
+  // v9.4: restore a signed .vos full backup from a file pick.
+  const restoreVosFile = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("read_failed"));
+        reader.onload = () => resolve(String(reader.result ?? ""));
+        reader.readAsText(file);
+      });
+      const result = verifyVosBackup(text);
+      if (!result.ok) {
+        setVosMsg(t(locale, "❌ Copia inválida o corrupta.", "❌ Invalid or corrupt backup.", "❌ Cópia inválida ou corrompida."));
+        return;
+      }
+      const applied = applyVosBackup(result.backup);
+      setVosMsg(
+        applied
+          ? t(locale, "✅ Copia restaurada: equipos, jugadores, temporada y fijas.", "✅ Backup restored: teams, players, season and pins.", "✅ Cópia restaurada: times, jogadores, temporada e fixos.")
+          : t(locale, "❌ No se pudo restaurar.", "❌ Restore failed.", "❌ Falha ao restaurar."),
+      );
+    } catch {
+      setVosMsg(t(locale, "❌ No se pudo leer el archivo.", "❌ Could not read the file.", "❌ Não foi possível ler o arquivo."));
+    }
+  };
 
   const visible = useMemo(() => {
     const needle = query.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -1013,6 +1043,29 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
           <div className="h-full overflow-y-auto no-scrollbar">
             {tab === "home" ? (
               <div className="mx-auto max-w-3xl px-3 pb-28 pt-3">
+                {pinned.length > 0 ? (
+                  <section data-testid="mis-fijas" className="mb-3">
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-volt">
+                      ⭐ {t(locale, "Mis Fijas (Acceso Rápido)", "My Pins (Quick Access)", "Minhas Fixas (Acesso Rápido)")}
+                    </p>
+                    <div className="snap-row mt-1 flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                      {pinned.map((slug) => {
+                        const module = MODULE_BY_SLUG.get(slug);
+                        if (!module) return null;
+                        return (
+                          <button
+                            key={slug}
+                            type="button"
+                            onClick={() => openModule(slug)}
+                            className="tap shrink-0 rounded-full border border-volt/40 bg-volt/10 px-3 py-1.5 text-[10px] font-bold text-volt"
+                          >
+                            {module.icon} {module.name[locale]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ) : null}
                 {reminder ? (
                   <section data-testid="next-match-banner" className="mb-3 rounded-2xl border border-volt/30 bg-volt/10 px-3 py-2">
                     <p className="text-[11px] font-black text-volt">
@@ -1396,6 +1449,42 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                     }
                   }}
                 />
+
+                <h2 className="mt-5 px-1 pb-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
+                  {t(locale, "Copia de seguridad", "Backup", "Cópia de segurança")}
+                </h2>
+                <div className="grid gap-2">
+                  <button
+                    type="button"
+                    data-testid="vos-export"
+                    onClick={() => {
+                      const name = downloadVosBackup();
+                      setVosMsg(
+                        name
+                          ? t(locale, `📦 ${name} guardada.`, `📦 ${name} saved.`, `📦 ${name} salva.`)
+                          : t(locale, "❌ No se pudo exportar.", "❌ Export failed.", "❌ Falha ao exportar."),
+                      );
+                    }}
+                    className="tap w-full rounded-xl border border-white/10 bg-panel px-4 py-3 text-left text-[13px] font-semibold"
+                  >
+                    📦 {t(locale, "Exportar / Restaurar Copia de Seguridad Completa (.vos)", "Export / Restore Full Backup (.vos)", "Exportar / Restaurar Backup Completo (.vos)")}
+                  </button>
+                  <label className="tap flex w-full cursor-pointer items-center justify-between rounded-xl border border-white/10 bg-panel px-4 py-3 text-[13px] font-semibold">
+                    <span>📥 {t(locale, "Restaurar desde archivo .vos", "Restore from .vos file", "Restaurar de arquivo .vos")}</span>
+                    <input
+                      type="file"
+                      accept=".vos,application/json"
+                      data-testid="vos-import"
+                      className="hidden"
+                      onChange={(event) => void restoreVosFile(event)}
+                    />
+                  </label>
+                  {vosMsg ? (
+                    <p data-testid="vos-msg" role="status" className="text-[10px] text-emerald">
+                      {vosMsg}
+                    </p>
+                  ) : null}
+                </div>
 
                 <button
                   type="button"

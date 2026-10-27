@@ -6,6 +6,7 @@
 
 import { t } from "@/lib/i18n";
 import type { Locale } from "@/lib/local-engines";
+import { safeJsonParse } from "@/lib/security-shield";
 
 /* ------------------------------------------------------------------ *
  * 1. WhatsApp list manager
@@ -96,6 +97,7 @@ export function buildOrganizer(
   time: string,
 ): OrganizerRoster {
   const names = dedupeNames(typeof raw === "string" ? parseWhatsAppList(raw) : raw);
+  rememberPlayerNames(names);
   const cap = Number.isFinite(capacity) && capacity >= 1 ? Math.floor(capacity) : 1;
   const toPlayer = (name: string): OrganizerPlayer => ({ id: playerId(name), name, paid: false, gear: [] });
   return {
@@ -111,6 +113,7 @@ export function buildOrganizer(
 export function addPlayer(roster: OrganizerRoster, name: string): OrganizerRoster {
   const clean = name.trim().replace(/\s+/g, " ");
   if (!clean) return roster;
+  rememberPlayerNames([clean]);
   const id = playerId(clean);
   if ([...roster.confirmed, ...roster.waitlist].some((player) => player.id === id)) return roster;
   const player: OrganizerPlayer = { id, name: clean, paid: false, gear: [] };
@@ -273,6 +276,7 @@ export interface BenchTeamState {
 export function newBenchTeam(names: string[], entry: BenchEntry): BenchTeamState {
   const clean = dedupeNames(names);
   if (clean.length < 7 || clean.length > 10) throw new Error("bench_size");
+  rememberPlayerNames(clean);
   const rotations: Record<string, number> = {};
   for (const name of clean) rotations[name] = 0;
   return {
@@ -897,4 +901,59 @@ export function buildPrizePoster(input: PrizePosterInput): string {
     `<text x="360" y="514" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#6B6B78">${esc(footer)}</text>`,
     `</svg>`,
   ].join("");
+}
+
+/* ------------------------------------------------------------------ *
+ * 9. Unified Player Memory (cross-module directory, v9.4)
+ * ------------------------------------------------------------------ */
+
+export const PLAYER_DIRECTORY_KEY = "voleyos_player_directory_v1";
+
+const DIRECTORY_CAP = 200;
+
+/** Loads every remembered player name (accent-preserving, deduped). */
+export function loadPlayerDirectory(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(PLAYER_DIRECTORY_KEY);
+    if (!raw) return [];
+    const parsed = safeJsonParse<unknown>(raw, null);
+    return Array.isArray(parsed) ? parsed.filter((name): name is string => typeof name === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Remembers players typed anywhere (WhatsApp organizer, team rosters, bench)
+ * so no VolleyOS tool ever asks for the same name twice. Case-insensitive
+ * dedupe, whitespace-normalised, capped at the 200 most recent.
+ */
+export function rememberPlayerNames(names: Iterable<string>): string[] {
+  const current = loadPlayerDirectory();
+  const seen = new Set(current.map((name) => name.toLowerCase()));
+  for (const raw of names) {
+    const name = String(raw).replace(/\s+/g, " ").trim();
+    if (name.length < 2 || name.length > 40) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    current.push(name);
+  }
+  const trimmed = current.slice(-DIRECTORY_CAP);
+  try {
+    if (typeof window !== "undefined") window.localStorage.setItem(PLAYER_DIRECTORY_KEY, JSON.stringify(trimmed));
+  } catch {
+    /* storage unavailable */
+  }
+  return trimmed;
+}
+
+export function clearPlayerDirectory(): string[] {
+  try {
+    if (typeof window !== "undefined") window.localStorage.removeItem(PLAYER_DIRECTORY_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+  return [];
 }
