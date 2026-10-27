@@ -2,7 +2,7 @@
 
 [English](README.md) · **Español** · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v9.3.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v9.4.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Módulos](https://img.shields.io/badge/módulos-61-FF3B5C?style=for-the-badge&color=EAB308)](#enciclopedia-de-los-61-módulos)
 [![Offline](https://img.shields.io/badge/100%25-offline--primero-FF3B5C?style=for-the-badge&color=EAB308)](#por-qué-existe-volleyos)
 [![Android](https://img.shields.io/badge/APK%20Android-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -14,13 +14,15 @@
 
 APK universal firmado, construido por GitHub Actions en cada tag `v*`. Android 7.0+ (minSdk 24), trilingüe, offline primero, sin cuentas y sin telemetría. Listo para F-Droid.
 
-## 🆕 Novedades de v9.3.0 — Transmisión en Vivo en 3 Modos
+## 🆕 Novedades de v9.4.0 — Pulido de Mercado, Escudo Anti-Hack y Bóveda a Prueba de Fallos
 
-- **📶 Modo Hotspot sin saldo ni señal (0% internet / $0)**: un servidor Java puro dentro de la APK convierte el celular del anotador en un marcador en vivo en `http://<LAN_IP>:8765`. Tus amigos se conectan a tu Wi-Fi, escanean el QR y ven un marcador gigante con silbato/buzzer mientras cada punto viaja por Wi-Fi local sin datos móviles.
-- **💬 Pulso "WhatsApp Gratis" `VOS1:`**: un toque manda una tarjeta de puntaje más una cápsula `VOS1:` al grupo; quien solo tiene WhatsApp sin megas la pega de vuelta y clona el partido completo offline.
-- **🌎 QR en la Nube (`CANCHA-XXXX`)**: paquete ultraliviano de ~120 bytes por el relé SSE ntfy.sh (con fallback de 3s y BroadcastChannel local), un QR hacia el marcador espectador en GitHub Pages que abre en cualquier navegador iPhone/Android, y unirse por código dentro de la app.
-- **🔁 Relevo de Anotador por batería**: un QR de relevo pasa el secreto firmado del host a otro celular para seguir anotando sin cortar la sala.
-- **Mantiene todo lo de v9.2.0**: el widget nativo, 🏆 Mi Temporada, el marcador flotante, la guía con coach marks, la suite de sonidos completa y el apoyo honesto.
+- **🛡️ App blindada**: endurecimiento de la WebView, saneador anti-pollution de entradas, almacenamiento atómico de doble ranura — una escritura corrupta ya no puede borrar tus datos — y un error boundary global.
+- **🏎️ Ergonomía de cancha**: modo Bolsillo Bloqueado, vibraciones diferenciadas por evento, ahorro de batería OLED con WakeLock y modo Sol de Afuera para pantallas con brillo.
+- **👥 Memoria unificada de jugadores**: los chips del directorio rellenan la suite 🍻 Picadito, el rotador del banco y la plantilla de la Cancha con un toque, en toda la app.
+- **🖼️ PNG en todas partes**: el chalkboard, el póster de partido y la tarjeta de jugador se comparten como imagen `.PNG` de 1080 px directo a cualquier chat — no solo SVG.
+- **⭐ Barra Mis Fijas**: tus módulos fijados quedan en una barra persistente arriba del Inicio, a un toque desde cualquier pestaña.
+- **📦 Bóveda de respaldo `.vos`**: un solo archivo con checksum verifica equipos, jugadores, 🏆 Mi Temporada, fijas y licencias; restaurá todo en un celular nuevo desde Ajustes.
+- **Mantiene todo lo de v9.3.0**: la transmisión en 3 modos, el marcador por hotspot con 0 MB, el pulso WhatsApp Gratis `VOS1:`, la sala QR en la nube y el relevo del anotador.
 
 ## ❤️ Apoyá VolleyOS
 

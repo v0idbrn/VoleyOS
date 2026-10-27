@@ -1,0 +1,4 @@
+Escudo anti-hack: WebView blindada, saneador anti-pollution, almacenamiento atómico de doble ranura y error boundary global.
+Ergonomía de cancha: modo Bolsillo Bloqueado, vibraciones por evento, ahorro OLED con WakeLock y modo Sol de Afuera.
+Chips de jugadores en toda la app (suite Picadito, banco y plantilla de la Cancha) y compartir PNG desde chalkboard, póster y tarjeta.
+⭐ Barra Mis Fijas y bóveda de respaldo .vos firmada (equipos, jugadores, temporada, fijas y licencias).

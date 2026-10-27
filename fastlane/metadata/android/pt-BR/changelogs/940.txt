@@ -1,0 +1,4 @@
+Escudo anti-hack: WebView reforçada, sanitizador anti-pollution, armazenamento atômico de slots duplos e error boundary global.
+Ergonomia de quadra: modo Bolso Travado, vibrações por evento, economia OLED com WakeLock e modo Sol de Fora.
+Chips de jogadores em todo o app (suíte Picadito, banco e modelo de elenco) e compartilhar PNG da lousa, pôster e cartao.
+⭐ Barra Mis Fijas e cofre de backup .vos assinado (times, jogadores, temporada, fixos e licenças).

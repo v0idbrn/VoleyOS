@@ -2,7 +2,7 @@
 
 [English](README.md) · [Español](README.es.md) · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v9.3.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v9.4.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Modules](https://img.shields.io/badge/modules-61-FF3B5C?style=for-the-badge&color=EAB308)](#encyclopedia-of-the-61-modules)
 [![Offline](https://img.shields.io/badge/100%25-offline--first-FF3B5C?style=for-the-badge&color=EAB308)](#why-volleyos-exists)
 [![Android](https://img.shields.io/badge/Android%20APK-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -14,13 +14,15 @@
 
 Signed universal APK built by GitHub Actions on every `v*` tag. Android 7.0+ (minSdk 24), trilingual, offline-first, no accounts and no telemetry. F-Droid ready.
 
-## 🆕 What's new in v9.3.0 — 3-Mode Live Match Broadcast
+## 🆕 What's new in v9.4.0 — Market-Leading Polish, Anti-Hack Shield & Crash-Proof Vault
 
-- **📶 Court Hotspot mode (0% internet / $0 balance)**: a pure-Java server inside the APK turns the scorer's phone into a live scoreboard at `http://<LAN_IP>:8765`. Friends join your Wi-Fi hotspot, scan the QR and watch a giant scoreboard with whistle/buzzer cues while every point streams over local Wi-Fi with zero mobile data.
-- **💬 "WhatsApp Gratis" `VOS1:` pulse**: one tap drops a rich score card plus a `VOS1:` capsule into the group; a phone with only carrier free-WhatsApp pastes it back to clone the whole match offline.
-- **🌎 Cloud Live QR (`CANCHA-XXXX`)**: an ultra-light ~120-byte packet over the ntfy.sh SSE relay (plus a 3s poll fallback and local BroadcastChannel), a QR pointing to the GitHub Pages spectator scoreboard that opens in any iPhone/Android browser, and join-by-code inside the app.
-- **🔋 Scorer battery handover**: a handover QR passes the signed host secret to a second phone so scoring continues seamlessly when the scorer's battery dies.
-- **Keeps everything from v9.2.0**: the native home-screen widget, 🏆 Mi Temporada, the sticky mini-scoreboard, the coach-marks wizard, the full court audio suite and the honest support flow.
+- **🛡️ Hardened app shield**: WebView security hardening, an anti-pollution input sanitizer, dual-slot atomic storage — a corrupt write can never wipe your data again — and a global error boundary.
+- **🏎️ Court ergonomics**: Pocket Lock mode, differentiated haptic patterns per event, a WakeLock OLED battery saver and Outdoor Sun mode for glare-readable screens.
+- **👥 Unified player memory**: shared directory chips pre-fill the 🍻 Picadito suite, the bench rotator and the Cancha roster template — one tap instead of retyping names anywhere in the app.
+- **🖼️ PNG everywhere**: the chalkboard, match poster and player card now share as `.PNG` images at 1080 px straight into any chat — not just SVG.
+- **⭐ Mis Fijas quick bar**: pinned modules sit in a persistent bar at the top of Home, one tap away from any tab.
+- **📦 Signed `.vos` backup vault**: one checksum-verified file packs teams, players, 🏆 Mi Temporada, pins and licences; restore everything on a new phone from Ajustes.
+- **Keeps everything from v9.3.0**: the 3-mode live broadcast, the 0 MB court-hotspot scoreboard, the `VOS1:` WhatsApp-Free pulse, the cloud QR room and the scorer battery handover.
 
 ## ❤️ Support VolleyOS
 
