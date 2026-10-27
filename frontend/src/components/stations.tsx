@@ -1065,7 +1065,12 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     setScout((previous) => (previous.events.length > 0 || previous.undone.length > 0 ? resetScoutSession() : previous));
   }, [freshMatch, state.lineupA, state.lineupB]);
 
-  const scoutAlert = bleedingRotation(scout, "A");
+  // v10.0.0 perf: memoize the O(events) scout derives off the event log.
+  const scoutAlert = useMemo(() => bleedingRotation(scout, "A"), [scout]);
+  const boxRows = useMemo(
+    () => (boxOpen ? [rotationStats(scout, "A"), rotationStats(scout, "B")] : null),
+    [boxOpen, scout],
+  );
 
   const flashUndoPill = (): void => {
     setUndoPill(true);
@@ -1744,7 +1749,7 @@ ${name}` : name))} testId="cancha-player-chips" />
       </button>
       {boxOpen ? (
         <div data-testid="box-score" className="mt-2 space-y-2 rounded-xl border border-white/10 bg-obsidian/80 p-2">
-          {([["A", state.teamA], ["B", state.teamB]] as const).map(([side, teamName]) => (
+          {([["A", state.teamA], ["B", state.teamB]] as const).map(([side, teamName], index) => (
             <div key={side}>
               <p className="text-[9px] font-bold uppercase tracking-widest text-white/50">{teamName}</p>
               <div className="mt-1 grid grid-cols-6 gap-1 text-center text-[9px] font-bold uppercase text-white/40">
@@ -1755,7 +1760,7 @@ ${name}` : name))} testId="cancha-player-chips" />
                 <span>K/E</span>
                 <span>AC/BL</span>
               </div>
-              {rotationStats(scout, side).map((row) => (
+              {(boxRows?.[index] ?? []).map((row) => (
                 <div
                   key={row.rotation}
                   className="mt-1 grid grid-cols-6 gap-1 text-center text-[10px] font-semibold tabular-nums text-white/80"

@@ -1,0 +1,4 @@
+🥊 Micro-scout ao vivo: marcações em 1 toque, box score R1–R6 K1/K2 e alertas de rotação sangrando.
+📺 Overlay de TV VNL/ESPN em /tv com chroma OBS, sala ao vivo e malha LAN.
+🔑 Malha de banco com PIN: placar gigante travado por 4 dígitos no hotspot da quadra.
+🔫 Radar de bola em km/h, teste de reação sem largada errada e Telestrator A/B sincronizado.

@@ -1,0 +1,4 @@
+🥊 Live micro-scout: 1-tap point tags, R1–R6 K1/K2 box score and bleeding-rotation alerts.
+📺 VNL/ESPN TV overlay at /tv with OBS chroma green, live room and LAN mesh feeds.
+🔑 PIN bench mesh: 4-digit locked giant scoreboard on the zero-data court hotspot.
+🔫 km/h ball radar, false-start reaction drill and split-screen Telestrator A/B sync.

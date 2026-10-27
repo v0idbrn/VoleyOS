@@ -2,7 +2,7 @@
 
 [English](README.md) · [Español](README.es.md) · **Português**
 
-[![Version](https://img.shields.io/badge/version-v9.5.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v10.0.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Módulos](https://img.shields.io/badge/módulos-61-FF3B5C?style=for-the-badge&color=EAB308)](#enciclopédia-dos-61-módulos)
 [![Offline](https://img.shields.io/badge/100%25-offline--primeiro-FF3B5C?style=for-the-badge&color=EAB308)](#por-que-o-volleyos-existe)
 [![Android](https://img.shields.io/badge/APK%20Android-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -14,17 +14,17 @@
 
 APK universal assinado, construído pelo GitHub Actions a cada tag `v*`. Android 7.0+ (minSdk 24), trilíngue, offline primeiro, sem contas e sem telemetria. Pronto para F-Droid.
 
-## 🆕 Novidades da v9.5.0 — A vantagem do atleta
+## 🆕 Novidades da v10.0.0 — Edição Olympus Titan
 
-- **👟 Texturas reais de quadra**: chiado de tênis, batida de ataque Mikasa e rede ao vivo sintetizados no WebAudio e somados a cada kill e cada ace.
-- **🎵 Metrônomo acústico de aproximação**: ritmos de plantar o passo para 1/2/3 tempo (0/220/310 · 480 … ms) com 🔁 repetição a cada 5s para treinar sem mãos no laboratório de biomecânica.
-- **🎧 Modo Cego**: deixe o celular no banco e reaja a chamadas de defesa aleatórias com voz, apito e chiado no Treino de Reflexos.
-- **🛫 Laboratório de salto por tempo de voo**: marque decolagem e pouquadapo quadro a quadro no Telestrator para altura exata h = ⅛gt², velocidade de impulso e nota de voo, salvo no seu perfil com histórico.
-- **🕚 Proetor Hora 11 vs 12**: relógio de ombro arrastável sobre o vídeo com a zona potente 10:30–11:15 e a zona de pinçamento 12:00–01:00.
-- **👤 Guia de rotação em 1ª pessoa**: acompanhe seu papel em R1–R6 com destaque Volt Gold, linhas de restrição FIVB vizinha e cartão de "onde ficar / onde correr", ciente de K1/K2.
-- **⏱️ Relógio isométrico de tendão**: o protocolo clínico de parede 5×45s / 90s de descanso com marcas de contagem regressiva e apitos de fase, sem mãos no módulo Joelho do Saltador.
-- **⚡ VolleyCard de carreira**: sincronize JMP/ATK/DEF/IQ/OVR do seu recorde de salto salvo, resultados da Minha Temporada e prêmios de rachinha, com arpeggio de subida quando OVR sobe.
-- **Mantém tudo do v9.4.0**: o escudo anti-hack, ergonomia de quadra, chips unificados de jogador, compartilhar PNG, ⭐ Meus Fixados e o cofre `.vos` assinado.
+- **🛡️ Cofre à prova de falhos e manipulação**: motor IndexedDB de 500 MB acima do teto de 5 MB do WebView, partidas da Minha Temporada encadeadas por Merkle, exportações `.vos` com AES-256-GCM e um relógio monotônico que rejeita viagem no tempo de licenças.
+- **🥊 Micro-scout ao vivo**: marque cada ponto em um toque (ataque/bloqueio/ace/toque/erro do rival) na ⏱️ Cancha e ganhe um box score R1–R6 estilo DataVolley — K1 de side-out, K2 de break-point, eficiência de ataque, aces/bloqueios — mais um 🧠 alerta de rotação sangrando com a zona a cobrir ou o tempo a pedir.
+- **🗺️ Zero digitação dupla**: as coordenadas dos seus remates marcados alimentam sozinhas o Mapa de Calor de Remates, para um relatório completo no fim da partida.
+- **📺 Overlay de TV estilo VNL/ESPN** em `/tv`: chips set a set, placar ao vivo da sala/malha e parâmetros para OBS Browser Source `?chroma=1` (verde EBU `#00B140`) e `?clean=1` (sem controles).
+- **🔑 Malha de banco com PIN**: o hotspot da quadra sem dados trava `/state` atrás de um PIN de 4 dígitos; os celulares do banco escaneiam um QR para o placar gigante travado em `http://<ip>:8765/?pin=NNNN` — 0 MB de internet.
+- **🔫 Radar de bola ao vivo**: arme na soltura, pare no portão e leia km/h com melhor/média e níveis PRO/ÉLITE/CLUBE/BASE em portões de 3 m, 9 m e 18 m.
+- **⚡ Teste de tempo de reação**: pad de estímulo à prova de largada errada (atraso 0,8–2,2 s, janela 80–1200 ms) com média/melhor/nota no Treino de Reflexos.
+- **⫲ Telestrator dividido 2.0**: carregue os vídeos A e B lado a lado com traços independentes e sincronização em um toque.
+- **Mantém tudo do v9.4/v9.5**: o escudo anti-hack, a ergonomia de quadra, o kit Athlete's Edge, ⭐ Meus Fixados e o cofre `.vos` assinado.
 
 ## ❤️ Apoie o VolleyOS
 

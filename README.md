@@ -2,7 +2,7 @@
 
 [English](README.md) · [Español](README.es.md) · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v9.5.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v10.0.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Modules](https://img.shields.io/badge/modules-61-FF3B5C?style=for-the-badge&color=EAB308)](#encyclopedia-of-the-61-modules)
 [![Offline](https://img.shields.io/badge/100%25-offline--first-FF3B5C?style=for-the-badge&color=EAB308)](#why-volleyos-exists)
 [![Android](https://img.shields.io/badge/Android%20APK-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -14,17 +14,17 @@
 
 Signed universal APK built by GitHub Actions on every `v*` tag. Android 7.0+ (minSdk 24), trilingual, offline-first, no accounts and no telemetry. F-Droid ready.
 
-## 🆕 What's new in v9.5.0 — The Athlete's Edge
+## 🆕 What's new in v10.0.0 — Olympus Titan Edition
 
-- **👟 Real court textures**: sneaker squeak, Mikasa spike thump and net-cord snap synthesised live in WebAudio and layered onto kills and aces in every match.
-- **🎵 Acoustic approach metronome**: 1st/2nd/3rd-tempo step-plant rhythms (0/220/310 · 480 … ms) plus a 🔁 repeat-every-5s loop for hands-free approach practice in the Biomechanics lab.
-- **🎧 Blind Court Mode**: leave the phone on the bench and react to randomised voice, whistle and squeak defensive callouts in the Reflex Trainer.
-- **🛫 Video flight-time jump lab**: mark takeoff and landing frame-by-frame in the Telestrator for exact h = ⅛gt² height, take-off speed and hang-time rating, saved to your jump profile with a history sparkline.
-- **🕚 Hora 11 vs 12 protractor**: a draggable shoulder clock over the video with the 10:30–11:15 power zone and the 12:00–01:00 impingement zone.
-- **👤 1st-person rotation guide**: track your role across R1–R6 with Volt Gold highlighting, FIVB neighbour constraint lines and a "where to stand / where to run" action card, K1/K2 aware.
-- **⏱️ Isometric tendon timer**: the clinical 5×45s wall-sit / 90s rest patellar protocol with countdown ticks and phase whistles, hands-free in the Jumper's Knee module.
-- **⚡ Career VolleyCard**: sync JMP/ATK/DEF/IQ/OVR from your saved jump record, Mi Temporada results and pickup awards, with a level-up arpeggio when OVR rises.
-- **Keeps everything from v9.4.0**: the anti-hack shield, court ergonomics, unified player chips, PNG sharing, ⭐ Mis Fijas and the signed `.vos` vault.
+- **🛡️ Crash-proof, tamper-evident vault**: a 500 MB IndexedDB engine past Android WebView's 5 MB ceiling, Merkle-chained Mi Temporada matches, AES-256-GCM password-protected `.vos` exports and a monotonic clock guard that rejects licence time-travel.
+- **🥊 Live micro-scout**: tag every point in one tap (attack/block/ace/tip/opponent error) from ⏱️ Cancha and get a DataVolley-style R1–R6 box score — K1 side-out %, K2 break-point %, attack efficiency, aces/blocks — plus a 🧠 bleeding-rotation alert naming the cover zone or the timeout to call.
+- **🗺️ Zero double typing**: tagged attack coordinates flow straight into the Shot Heatmap for a full end-of-match report.
+- **📺 VNL/ESPN TV broadcast overlay** at `/tv`: set-by-set chips, live room/mesh ticker, and OBS Browser-Source params `?chroma=1` (EBU green `#00B140` key) and `?clean=1` (no chrome).
+- **🔑 PIN bench mesh**: the zero-data court hotspot locks `/state` behind a fresh 4-digit PIN; bench phones scan one QR into the giant PIN-locked scoreboard at `http://<ip>:8765/?pin=NNNN` — 0 MB of internet.
+- **🔫 Live ball radar**: arm at release, stop at the gate, read km/h with best/average stats and PRO/ELITE/CLUB/BASE tiers over 3 m, 9 m and 18 m gates.
+- **⚡ Reaction-time drill**: false-start-safe stimulus pad (0.8–2.2 s hide delay, 80–1200 ms window) scoring mean/best/rating in the Reflex Trainer.
+- **⫲ Split-screen Telestrator 2.0**: load videos A and B side by side with independent drawings and one-tap sync.
+- **Keeps everything from v9.4/v9.5**: the anti-hack shield, court ergonomics, Athlete's Edge toolkit, ⭐ Mis Fijas and the signed `.vos` vault.
 
 ## ❤️ Support VolleyOS
 

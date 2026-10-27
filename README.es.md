@@ -2,7 +2,7 @@
 
 [English](README.md) · **Español** · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v9.5.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v10.0.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Módulos](https://img.shields.io/badge/módulos-61-FF3B5C?style=for-the-badge&color=EAB308)](#enciclopedia-de-los-61-módulos)
 [![Offline](https://img.shields.io/badge/100%25-offline--primero-FF3B5C?style=for-the-badge&color=EAB308)](#por-qué-existe-volleyos)
 [![Android](https://img.shields.io/badge/APK%20Android-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -14,17 +14,17 @@
 
 APK universal firmado, construido por GitHub Actions en cada tag `v*`. Android 7.0+ (minSdk 24), trilingüe, offline primero, sin cuentas y sin telemetría. Listo para F-Droid.
 
-## 🆕 Novedades de v9.5.0 — El borde del atleta
+## 🆕 Novedades de v10.0.0 — Edición Olympus Titan
 
-- **👟 Texturas reales de cancha**: chirrido de zapatilla, remate Mikasa y red en vivo sintetizados en WebAudio y sumados a cada kill y cada ace.
-- **🎵 Metrónomo acústico de aproximación**: ritmos de plantear el paso para 1/2/3 tempo (0/220/310 · 480 … ms) con 🔁 repetición cada 5s para practicar sin manos en la laboratorio de biomecánica.
-- **🎧 Modo Ciego**: dejá el celular en el banco y reaccioná a llamadas de defensa aleatorias con voz, silbato y chirridos en el Entrenador de Reflejos.
-- **🛫 Laboratorio de salto por tiempo de vuelo**: marcá despegue y aterrizaje cuadro por cuadro en el Telestrator para altura exacta h = ⅛gt², velocidad de impulso y rating de vuelo, guardado en tu perfil con histórico.
-- **🕚 Protractor Hora 11 vs 12**: reloj de hombro arrastrable sobre el video con la zona potente 10:30–11:15 y la zona de pinzamiento 12:00–01:00.
-- **👤 Guía de rotación en 1ra persona**: seguí tu rol en R1–R6 con resaltado Volt Gold, líneas de restricción FIVB vecina y tarjeta de "dónde pararse / dónde correr", consciente de K1/K2.
-- **⏱️ Temporizador isométrico de tendón**: el protocolo clínico de pared 5×45s / 90s de descanso con marcas de cuenta regresiva y silbatos de fase, sin manos en el módulo Rodilla del Saltador.
-- **⚡ VolleyCard de carrera**: sincronizá JMP/ATK/DEF/IQ/OVR desde tu récord de salto guardado, resultados de Mi Temporada y premios de picadito, con arpegio de subida cuando sube OVR.
-- **Mantiene todo lo de v9.4.0**: el escudo anti-hack, ergonomía de cancha, chips unificados de jugador, compartir PNG, ⭐ Mis Fijas y la bóveda `.vos` firmada.
+- **🛡️ Bóveda a prueba de fallos y manipulación**: motor IndexedDB de 500 MB que supera el techo de 5 MB del WebView, partidos de Mi Temporada encadenados con Merkle, exportaciones `.vos` con AES-256-GCM y un reloj monotónico que rechaza el viaje en el tiempo de las licencias.
+- **🥊 Micro-scout en vivo**: etiquetá cada punto en un toque (ataque/bloqueo/ace/toque/error rival) desde ⏱️ Cancha y obtené un box score R1–R6 estilo DataVolley — K1 de side-out, K2 de break-point, eficiencia de ataque, aces/bloqueos — más una 🧠 alerta de rotación sangrando con la zona a cubrir o el tiempo muerto a pedir.
+- **🗺️ Cero doble carga**: las coordenadas de tus remates etiquetados alimentan el Mapa de Calor de Remates solas, para un reporte completo al cierre del partido.
+- **📺 Overlay de TV estilo VNL/ESPN** en `/tv`: chips set por set, marcador en vivo de sala/malla y parámetros para OBS Browser Source `?chroma=1` (verde EBU `#00B140`) y `?clean=1` (sin controles).
+- **🔑 Malla de banca con PIN**: el hotspot de cancha sin datos bloquea `/state` tras un PIN de 4 dígitos; los celulares del banco escanean un QR al marcador gigante bloqueado en `http://<ip>:8765/?pin=NNNN` — 0 MB de internet.
+- **🔫 Radar de pelota en vivo**: armá al lanzar, pará en la puerta y leé km/h con mejor/promedio y niveles PRO/ÉLITE/CLUB/BASE sobre puertas de 3 m, 9 m y 18 m.
+- **⚡ Test de tiempo de reacción**: pad de estímulo a prueba de salidas anticipadas (demora 0,8–2,2 s, ventana 80–1200 ms) con promedio/mejor/nota en el Entrenador de Reflejos.
+- **⫲ Telestrator dividido 2.0**: cargá los videos A y B lado a lado con trazos independientes y sincronización en un toque.
+- **Mantiene todo lo de v9.4/v9.5**: el escudo anti-hack, la ergonomía de cancha, el kit del borde del atleta, ⭐ Mis Fijas y la bóveda `.vos` firmada.
 
 ## ❤️ Apoyá VolleyOS
 
