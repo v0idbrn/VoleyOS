@@ -69,6 +69,24 @@ import {
   type ScoutSession,
   type ZonePreset,
 } from "@/lib/live-scouting-engine";
+import {
+  RADAR_GATES,
+  REACTION_MAX_MS,
+  fireReaction,
+  missReaction,
+  newRadarSession,
+  newReactionDrill,
+  radarStats,
+  reactionDelayMs,
+  reactionSummary,
+  recordRadarShot,
+  speedTier,
+  startReaction,
+  tapReaction,
+  undoRadarShot,
+  type RadarSession,
+  type ReactionDrill as ReactionDrillState,
+} from "@/lib/ball-radar-engine";
 import { loadPickupAwards, nextServeStreak, rememberPlayerNames, serveCapHit, serveCapMessage, type ServeCapLimit } from "@/lib/casual-engines";
 import {
   FAN_QUESTIONS,
@@ -3530,12 +3548,33 @@ export function ServeRadarStation({ meta, locale, onSave }: StationProps) {
   const [targetX, setTargetX] = useState(7.5);
   const [targetY, setTargetY] = useState(6.5);
   const [flight, setFlight] = useState(700);
+  // v10.0.0 live radar: arm at release, stop at the gate → km/h per pass.
+  const [gateM, setGateM] = useState(9);
+  const [radar, setRadar] = useState<RadarSession>(newRadarSession);
+  const [armedAt, setArmedAt] = useState<number | null>(null);
+  const toggleRadar = (): void => {
+    if (armedAt === null) {
+      setArmedAt(performance.now());
+      return;
+    }
+    const elapsed = performance.now() - armedAt;
+    setRadar((previous) => recordRadarShot(previous, { distanceM: gateM, timeMs: elapsed }));
+    setArmedAt(null);
+  };
+  const radarReport = radarStats(radar);
+  const radarTierLabel = (tier: ReturnType<typeof speedTier>): string =>
+    t(
+      locale,
+      tier === "pro" ? "🥇 PRO" : tier === "elite" ? "🥈 ÉLITE" : tier === "club" ? "🥉 CLUB" : "🔵 BASE",
+      tier === "pro" ? "🥇 PRO" : tier === "elite" ? "🥈 ELITE" : tier === "club" ? "🥉 CLUB" : "🔵 BASE",
+      tier === "pro" ? "🥇 PRO" : tier === "elite" ? "🥈 ÉLITE" : tier === "club" ? "🥉 CLUBE" : "🔵 BASE",
+    );
   const report = useMemo(
     () => serveRadar({ originXm: 0, originYm: 0, targetXm: targetX, targetYm: targetY, flightTimeMs: flight }),
     [flight, targetX, targetY],
   );
   return (
-    <StationShell meta={meta} locale={locale} rows={1} onSave={onSave} onExample={() => { setTargetX(9); setTargetY(7); setFlight(400); }}>
+    <StationShell meta={meta} locale={locale} rows={1} onSave={onSave} onExample={() => { setTargetX(9); setTargetY(7); setFlight(400); setRadar(newRadarSession()); setArmedAt(null); }}>
       <div className="grid grid-cols-3 gap-2">
         <Metric label="km/h" value={report.initialSpeedKmh.toString()} tone="text-volt" />
         <Metric label={t(locale, "Margen", "Margin", "Margem")} value={`${report.reactionMarginMs} ms`} tone="text-emerald" />
@@ -3556,6 +3595,50 @@ export function ServeRadarStation({ meta, locale, onSave }: StationProps) {
         </label>
       </div>
       <p className="mt-2 rounded-lg bg-white/5 px-2 py-1 text-xs font-bold text-volt">{report.classification.replaceAll("_", " ")}</p>
+      <p className={LABEL}>🔫 {t(locale, "Radar en vivo (km/h)", "Live radar (km/h)", "Radar ao vivo (km/h)")}</p>
+      <div className="mt-1 flex flex-wrap gap-1">
+        {RADAR_GATES.map((gate) => (
+          <button
+            key={gate.id}
+            type="button"
+            data-testid={`radar-gate-${gate.id}`}
+            className={gateM === gate.distanceM ? `${BTN} border-volt text-volt` : BTN}
+            onClick={() => setGateM(gate.distanceM)}
+          >
+            {gate.distanceM} m
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        data-testid="radar-arm"
+        aria-pressed={armedAt !== null}
+        className={`${BTN} mt-2 w-full ${armedAt !== null ? "border-crimson bg-crimson/15 text-crimson" : "border-volt text-volt"}`}
+        onClick={toggleRadar}
+      >
+        {armedAt !== null
+          ? `⏹ ${t(locale, "PARAR y medir", "STOP and measure", "PARAR e medir")}`
+          : `🎯 ${t(locale, "ARRANCAR (tap al pasar la bola)", "START (tap as the ball passes)", "COMEÇAR (toque ao passar a bola)")}`}
+      </button>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <Metric label="km/h" value={radarReport.lastKmh !== null ? radarReport.lastKmh.toFixed(1) : "—"} tone="text-volt" />
+        <Metric label={t(locale, "Máx", "Best", "Melhor")} value={radarReport.count > 0 ? radarReport.bestKmh.toFixed(1) : "—"} tone="text-emerald" />
+        <Metric label={t(locale, "Prom", "Avg", "Méd")} value={radarReport.count > 0 ? radarReport.avgKmh.toFixed(1) : "—"} />
+      </div>
+      {radarReport.count > 0 ? (
+        <p data-testid="radar-tier" className="mt-1 rounded-lg bg-white/5 px-2 py-1 text-xs font-bold text-volt">
+          {radarReport.bestKmh.toFixed(1)} km/h · {radarTierLabel(speedTier(radarReport.bestKmh))} · {radarReport.count} ×
+        </p>
+      ) : null}
+      <button
+        type="button"
+        data-testid="radar-undo"
+        className={`${BTN} mt-1`}
+        disabled={radarReport.count === 0}
+        onClick={() => setRadar((previous) => undoRadarShot(previous))}
+      >
+        ↶ {t(locale, "Deshacer medida", "Undo shot", "Desfazer medida")}
+      </button>
       <p className="mt-1 text-[10px] text-white/60">{report.message}</p>
     </StationShell>
   );
@@ -3959,6 +4042,12 @@ const CLOCK_TICKS = Array.from({ length: 12 }, (_, index) => index);
 
 export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  // v10.0.0 split-screen 2.0: a second pane with its own video and strokes.
+  const [videoBUrl, setVideoBUrl] = useState<string | null>(null);
+  const [strokesB, setStrokesB] = useState<TelestrationPoint[][]>([]);
+  const [drawingB, setDrawingB] = useState<TelestrationPoint[] | null>(null);
+  const [split, setSplit] = useState(false);
+  const videoRefB = useRef<HTMLVideoElement>(null);
   const [strokes, setStrokes] = useState<TelestrationPoint[][]>([]);
   const [drawing, setDrawing] = useState<TelestrationPoint[] | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -3975,6 +4064,7 @@ export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) 
   );
 
   useEffect(() => () => { if (videoUrl) URL.revokeObjectURL(videoUrl); }, [videoUrl]);
+  useEffect(() => () => { if (videoBUrl) URL.revokeObjectURL(videoBUrl); }, [videoBUrl]);
 
   const pointFrom = (event: ReactPointerEvent<SVGSVGElement>): TelestrationPoint => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -3987,6 +4077,27 @@ export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) 
   const finish = (): void => {
     if (drawing && drawing.length >= 2) setStrokes((previous) => [...previous, drawing]);
     setDrawing(null);
+  };
+
+  const finishB = (): void => {
+    if (drawingB && drawingB.length >= 2) setStrokesB((previous) => [...previous, drawingB]);
+    setDrawingB(null);
+  };
+
+  /** Sync A/B: align B's playhead to A, then play (or pause) both together. */
+  const syncToggle = async (): Promise<void> => {
+    const paneA = videoRef.current;
+    const paneB = videoRefB.current;
+    if (!paneA) return;
+    if (paneA.paused) {
+      if (paneB) paneB.currentTime = paneA.currentTime;
+      const plays: Promise<void>[] = [paneA.play()];
+      if (paneB) plays.push(paneB.play());
+      await Promise.allSettled(plays);
+    } else {
+      paneA.pause();
+      paneB?.pause();
+    }
   };
 
   const flight =
@@ -4008,6 +4119,7 @@ export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) 
   return (
     <StationShell meta={meta} locale={locale} rows={6} onSave={onSave} onExample={() => {
         setStrokes([]);
+        setStrokesB([]);
         setTakeoffT(null);
         setLandingT(null);
         setSavedMsg(null);
@@ -4025,6 +4137,25 @@ export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) 
         }}
         className="mb-2 w-full text-[10px]"
       />
+      {split ? (
+        <input
+          type="file"
+          accept="video/*"
+          aria-label={t(locale, "Video B", "Video B", "Video B")}
+          data-testid="video-b-input"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            setVideoBUrl((previous) => {
+              if (previous) URL.revokeObjectURL(previous);
+              return URL.createObjectURL(file);
+            });
+            setStrokesB([]);
+          }}
+          className="mb-2 w-full text-[10px]"
+        />
+      ) : null}
+      <div className={split ? "grid grid-cols-2 gap-1" : ""}>
       <div className="relative aspect-video overflow-hidden rounded-xl border border-white/10 bg-black">
         {videoUrl ? <video ref={videoRef} src={videoUrl} controls playsInline className="h-full w-full object-contain" /> : (
           <p className="grid h-full place-items-center px-4 text-center text-[11px] text-white/45">
@@ -4158,6 +4289,56 @@ export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) 
           </div>
         ) : null}
       </div>
+      {split ? (
+        <div data-testid="pane-b" className="relative aspect-video overflow-hidden rounded-xl border border-white/10 bg-black">
+          {videoBUrl ? (
+            <video ref={videoRefB} src={videoBUrl} controls playsInline className="h-full w-full object-contain" />
+          ) : (
+            <p className="grid h-full place-items-center px-4 text-center text-[11px] text-white/45">
+              {t(locale, "Cargá el video B (la otra jugada).", "Load video B (the other play).", "Carregue o video B (a outra jogada).")}
+            </p>
+          )}
+          <svg
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            data-testid="pane-b-canvas"
+            className="absolute inset-0 h-full w-full touch-none"
+            onPointerDown={(event) => {
+              event.currentTarget.setPointerCapture(event.pointerId);
+              setDrawingB([pointFrom(event)]);
+            }}
+            onPointerMove={(event) => {
+              if (!drawingB) return;
+              // Capture eagerly: currentTarget is null once the event dispatch ends.
+              const next = pointFrom(event);
+              setDrawingB((previous) => (previous ? [...previous, next] : previous));
+            }}
+            onPointerUp={finishB}
+            onPointerCancel={finishB}
+          >
+            {strokesB.map((stroke, index) => (
+              <polyline
+                key={`stroke-b-${index}`}
+                points={stroke.map((point) => `${point.x},${point.y}`).join(" ")}
+                fill="none"
+                stroke="#e11d48"
+                strokeWidth="0.8"
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+            {drawingB ? (
+              <polyline
+                points={drawingB.map((point) => `${point.x},${point.y}`).join(" ")}
+                fill="none"
+                stroke="#c8ff00"
+                strokeWidth="0.8"
+                vectorEffect="non-scaling-stroke"
+              />
+            ) : null}
+          </svg>
+        </div>
+      ) : null}
+      </div>
       <div className="mt-2 flex flex-wrap gap-1">
         <button
           type="button"
@@ -4236,8 +4417,16 @@ export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) 
         </div>
       ) : null}
       <div className="mt-2 flex flex-wrap gap-1">
-        <button type="button" className={BTN} onClick={() => setStrokes([])}>{t(locale, "Borrar trazos", "Clear strokes", "Apagar tracos")}</button>
-        <span className={BTN}>{strokes.length} {t(locale, "trazos", "strokes", "tracos")}</span>
+        <button type="button" className={BTN} onClick={() => { setStrokes([]); setStrokesB([]); }}>{t(locale, "Borrar trazos", "Clear strokes", "Apagar tracos")}</button>
+        <span className={BTN}>{strokes.length + strokesB.length} {t(locale, "trazos", "strokes", "tracos")}</span>
+        <button type="button" data-testid="split-toggle" aria-pressed={split} className={split ? `${BTN} border-volt text-volt` : BTN} onClick={() => setSplit((value) => !value)}>
+          ⫲ {t(locale, "Pantalla dividida", "Split screen", "Tela dividida")}
+        </button>
+        {split ? (
+          <button type="button" data-testid="split-sync" className={BTN} onClick={() => void syncToggle()}>
+            ⏯ {t(locale, "Sincronizar A/B", "Sync A/B", "Sincronizar A/B")}
+          </button>
+        ) : null}
         <button
           type="button"
           data-testid="contact-clock-toggle"
@@ -4423,6 +4612,94 @@ export function ShotHeatmapStation({ meta, locale, onSave }: StationProps) {
   );
 }
 
+/** v10.0.0 — interactive reaction-time drill feeding the scoreReflex report. */
+function ReactionDrill({ locale }: { locale: Locale }) {
+  const [drill, setDrill] = useState<ReactionDrillState>(newReactionDrill);
+  const timersRef = useRef<{ stimulus?: number; miss?: number }>({});
+
+  const clearTimers = (): void => {
+    if (timersRef.current.stimulus) window.clearTimeout(timersRef.current.stimulus);
+    if (timersRef.current.miss) window.clearTimeout(timersRef.current.miss);
+    timersRef.current = {};
+  };
+
+  useEffect(() => clearTimers, []);
+
+  const arm = (): void => {
+    clearTimers();
+    const delay = reactionDelayMs();
+    setDrill((previous) => startReaction(previous, Date.now(), delay));
+    timersRef.current.stimulus = window.setTimeout(() => {
+      setDrill((previous) => fireReaction(previous, Date.now()));
+    }, delay);
+    timersRef.current.miss = window.setTimeout(() => {
+      setDrill((previous) => missReaction(previous));
+    }, delay + REACTION_MAX_MS + 200);
+  };
+
+  const tap = (): void => {
+    if (drill.status === "idle" || drill.status === "result") {
+      arm();
+      return;
+    }
+    clearTimers();
+    setDrill((previous) => tapReaction(previous, Date.now()));
+  };
+
+  const summary = reactionSummary(drill.times);
+
+  return (
+    <div className="mt-2 rounded-xl border border-white/10 bg-white/5 p-2">
+      <p className={LABEL}>⚡ {t(locale, "Test de tiempo de reacción", "Reaction time test", "Teste de tempo de reação")}</p>
+      <button
+        type="button"
+        data-testid="reaction-pad"
+        className={`mt-1 h-24 w-full rounded-xl border text-lg font-black uppercase tracking-wider transition ${
+          drill.status === "stimulus"
+            ? "border-volt bg-volt text-obsidian"
+            : drill.status === "waiting"
+              ? "border-amber-300/60 bg-amber-300/10 text-amber-200"
+              : "border-white/15 bg-obsidian text-white"
+        }`}
+        onClick={tap}
+      >
+        {drill.status === "stimulus"
+          ? t(locale, "¡TOCÁ!", "TAP!", "TOQUE!")
+          : drill.status === "waiting"
+            ? t(locale, "Esperá el estímulo…", "Wait for the stimulus…", "Espere o estímulo…")
+            : t(locale, "Tocá para arrancar", "Tap to start", "Toque para começar")}
+      </button>
+      <p data-testid="reaction-status" className="mt-1 text-[11px] text-white/70">
+        {drill.flag === "jumped"
+          ? t(locale, "🚨 Saliste antes de tiempo (falsa salida).", "🚨 You jumped the gun (false start).", "🚨 Você saiu antes (largada errada).")
+          : drill.flag === "early" && drill.lastMs !== null
+            ? t(locale, `⚡ Demasiado rápido: ${drill.lastMs} ms — descontado (mín. 80 ms).`, `⚡ Too fast: ${drill.lastMs} ms — discounted (80 ms min).`, `⚡ Rápido demais: ${drill.lastMs} ms — descontado (mín. 80 ms).`)
+            : drill.flag === "late"
+              ? t(locale, "🐢 Fuera de tiempo (máx. 1200 ms).", "🐢 Out of time (1200 ms max).", "🐢 Fora do tempo (máx. 1200 ms).")
+              : drill.flag === "ok" && drill.lastMs !== null
+                ? t(locale, `✅ ${drill.lastMs} ms registrados.`, `✅ ${drill.lastMs} ms logged.`, `✅ ${drill.lastMs} ms registrados.`)
+                : t(locale, `${drill.times.length} medidas · el estímulo llega entre 0,8 y 2,2 s.`, `${drill.times.length} reads · stimulus arrives in 0.8–2.2 s.`, `${drill.times.length} medidas · o estímulo chega entre 0,8 e 2,2 s.`)}
+      </p>
+      {summary ? (
+        <p data-testid="reaction-summary" className="mt-1 rounded-lg bg-white/5 px-2 py-1 text-[11px] font-bold text-volt">
+          {drill.times.length} × · {t(locale, "Promedio", "Mean", "Média")} {summary.meanMs} ms · {t(locale, "Mejor", "Best", "Melhor")} {summary.bestMs} ms · {summary.rating}
+        </p>
+      ) : null}
+      <button
+        type="button"
+        data-testid="reaction-reset"
+        className={`${BTN} mt-1`}
+        onClick={() => {
+          clearTimers();
+          setDrill(newReactionDrill());
+        }}
+      >
+        🔄 {t(locale, "Reiniciar", "Reset", "Reiniciar")}
+      </button>
+    </div>
+  );
+}
+
 export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
   const [report, setReport] = useState<Record<string, unknown> | null>(null);
   useEffect(() => {
@@ -4471,6 +4748,7 @@ export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
         </button>
       ) : null}
       {meta.slug === "peripheral-reflex" ? <BlindCourtCoach locale={locale} /> : null}
+      {meta.slug === "peripheral-reflex" ? <ReactionDrill locale={locale} /> : null}
       {meta.slug === "injury-prehab" ? <IsometricTendonTimer locale={locale} /> : null}
       {report ? (
         <div className="grid gap-1 text-[11px]">
