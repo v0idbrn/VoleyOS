@@ -92,7 +92,70 @@ export interface CustomerLicense {
 
 export type LicenseCheck =
   | { ok: true; license: CustomerLicense }
-  | { ok: false; reason: "malformed" | "signature" | "device_mismatch" | "expired" | "no_key" };
+  | {
+      ok: false;
+      reason: "malformed" | "signature" | "device_mismatch" | "expired" | "no_key" | "clock_rollback";
+    };
+
+/* ------------------------------------------------ anti-time-travel guard */
+
+export const CLOCK_HIGHWATER_KEY = "voleyos_clock_highwater_v1";
+/** A rollback is only tampering when it jumps back more than 5 minutes. */
+export const CLOCK_ROLLBACK_SLACK_MS = 300_000;
+
+/* ------------------------------------------------ anti-time-travel guard */
+
+/**
+ * Monotonic high-water clock guard (anti-time-travel). Returns the new
+ * high-water epoch ms, or `-1` when the device clock was rolled back more
+ * than `CLOCK_ROLLBACK_SLACK_MS` below the highest time ever observed —
+ * the classic trick to revalidate an expired 7d/30d/1y licence.
+ *
+ * Mirrors the Android `voleyos_clock_guard` SharedPreferences guard through
+ * the `VoleyOSBridge` when running inside the APK, and always maintains the
+ * same high-water mark in localStorage for the web build.
+ */
+export function updateMonotonicClock(currentClientEpochMs: number): number {
+  if (!Number.isFinite(currentClientEpochMs)) return -1;
+  const store = storage();
+  let highWater = 0;
+  if (store) {
+    const raw = store.getItem(CLOCK_HIGHWATER_KEY);
+    const parsed = raw === null ? Number.NaN : Number(raw);
+    if (Number.isFinite(parsed) && parsed > 0) highWater = parsed;
+  }
+  const bridge = (
+    globalThis as {
+      VoleyOSBridge?: { updateAndCheckMonotonicClock?: (currentClientEpochMs: number) => number };
+    }
+  ).VoleyOSBridge;
+  if (typeof bridge?.updateAndCheckMonotonicClock === "function") {
+    try {
+      const native = bridge.updateAndCheckMonotonicClock(currentClientEpochMs);
+      if (typeof native === "number" && Number.isFinite(native)) {
+        if (native < 0) return -1;
+        highWater = Math.max(highWater, native);
+      }
+    } catch {
+      // Bridge unavailable: the localStorage mirror still guards the web build.
+    }
+  }
+  if (currentClientEpochMs + CLOCK_ROLLBACK_SLACK_MS < highWater) return -1;
+  const next = Math.max(highWater, currentClientEpochMs);
+  if (store) {
+    try {
+      store.setItem(CLOCK_HIGHWATER_KEY, String(next));
+    } catch {
+      /* storage unavailable */
+    }
+  }
+  return next;
+}
+
+/** True when the observed time rolled back past the 5-minute tolerance. */
+export function clockRolledBack(currentClientEpochMs: number): boolean {
+  return updateMonotonicClock(currentClientEpochMs) < 0;
+}
 
 /**
  * Stable per-install device id: the Android bridge ANDROID_ID fingerprint
@@ -206,8 +269,13 @@ export async function verifyCustomerLicense(
   const currentDevice = (options.deviceId ?? getDeviceInstallId()).toUpperCase();
   if (device !== currentDevice) return { ok: false, reason: "device_mismatch" };
 
-  if (expiry !== "LIFE" && expiry < todayStamp(options.now ?? new Date())) {
-    return { ok: false, reason: "expired" };
+  const observed = (options.now ?? new Date()).getTime();
+  if (expiry !== "LIFE") {
+    // Time-limited licence: a rolled-back system clock must reject instantly.
+    if (clockRolledBack(observed)) return { ok: false, reason: "clock_rollback" };
+    if (expiry < todayStamp(options.now ?? new Date())) return { ok: false, reason: "expired" };
+  } else {
+    updateMonotonicClock(observed);
   }
   return { ok: true, license: { deviceId: device, tier, expiry, holder } };
 }

@@ -80,7 +80,14 @@ export function MonetizationModal({ locale, onClose, onActivated }: Monetization
           ? t(locale, "❌ Licencia de otro dispositivo", "❌ Licence from another device", "❌ Licença de outro dispositivo")
           : check.reason === "expired"
             ? t(locale, "❌ Licencia vencida", "❌ Licence expired", "❌ Licença expirada")
-            : t(locale, "❌ Código inválido", "❌ Invalid code", "❌ Código inválido"),
+            : check.reason === "clock_rollback"
+              ? t(
+                  locale,
+                  "❌ Reloj del sistema alterado (retroceso horario detectado). Corregí la fecha y hora automática del dispositivo.",
+                  "❌ System clock altered (rollback detected). Turn on automatic date & time.",
+                  "❌ Relógio do sistema alterado (retrocesso detectado). Ative data e hora automáticas.",
+                )
+              : t(locale, "❌ Código inválido", "❌ Invalid code", "❌ Código inválido"),
       );
       return;
     }

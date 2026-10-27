@@ -27,7 +27,14 @@ import { CasualPlayerSuite, type SuiteSection } from "@/components/CasualPlayerS
 import { LiveCastModal } from "@/components/LiveCastModal";
 import { ModuleErrorBoundary } from "@/components/ModuleErrorBoundary";
 import { createHostSecret, createRoomId, parseRoomParams } from "@/lib/live-cast-engine";
-import { applyVosBackup, downloadVosBackup, verifyVosBackup } from "@/lib/backup-vos";
+import {
+  applyVosBackup,
+  decryptVosBackup,
+  downloadEncryptedVosBackup,
+  downloadVosBackup,
+  verifyVosBackup,
+  VOS_ENC_FORMAT,
+} from "@/lib/backup-vos";
 import { loadFlowRoster } from "@/lib/season-vault";
 import { acwrSample } from "@/lib/samples";
 
@@ -301,6 +308,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [castOpen, setCastOpen] = useState(false);
   const [castJoinRoom, setCastJoinRoom] = useState<string | null>(null);
   const [vosMsg, setVosMsg] = useState<string | null>(null);
+  const [vosPassword, setVosPassword] = useState("");
   const castRoomRef = useRef<string>("");
   const castSecretRef = useRef<string>("");
   if (!castRoomRef.current) castRoomRef.current = createRoomId();
@@ -330,7 +338,21 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
         reader.onload = () => resolve(String(reader.result ?? ""));
         reader.readAsText(file);
       });
-      const result = verifyVosBackup(text);
+      const trimmed = text.trim();
+      let result = verifyVosBackup(trimmed);
+      if (!result.ok && trimmed.includes(VOS_ENC_FORMAT)) {
+        // v10 AES-256-GCM envelope: decrypt with the password typed in Settings.
+        const decrypted = await decryptVosBackup(trimmed, vosPassword);
+        if (!decrypted.ok) {
+          setVosMsg(
+            decrypted.reason === "passphrase"
+              ? t(locale, "❌ Contraseña incorrecta.", "❌ Wrong password.", "❌ Senha incorreta.")
+              : t(locale, "❌ Copia inválida o corrupta.", "❌ Invalid or corrupt backup.", "❌ Cópia inválida ou corrompida."),
+          );
+          return;
+        }
+        result = verifyVosBackup(decrypted.plaintext);
+      }
       if (!result.ok) {
         setVosMsg(t(locale, "❌ Copia inválida o corrupta.", "❌ Invalid or corrupt backup.", "❌ Cópia inválida ou corrompida."));
         return;
@@ -1473,12 +1495,41 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                     <span>📥 {t(locale, "Restaurar desde archivo .vos", "Restore from .vos file", "Restaurar de arquivo .vos")}</span>
                     <input
                       type="file"
-                      accept=".vos,application/json"
+                      accept=".vos,.enc,application/json"
                       data-testid="vos-import"
                       className="hidden"
                       onChange={(event) => void restoreVosFile(event)}
                     />
                   </label>
+                  <label className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-panel px-4 py-2.5">
+                    <span className="text-[11px] font-semibold text-white/60">
+                      🔒 {t(locale, "Contraseña AES-256 (opcional)", "AES-256 password (optional)", "Senha AES-256 (opcional)")}
+                    </span>
+                    <input
+                      type="password"
+                      data-testid="vos-password"
+                      value={vosPassword}
+                      onChange={(event) => setVosPassword(event.target.value)}
+                      className="w-40 rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[12px] text-white outline-none focus:border-volt"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    data-testid="vos-export-encrypted"
+                    disabled={vosPassword.trim().length === 0}
+                    onClick={() => {
+                      void downloadEncryptedVosBackup(vosPassword).then((name) => {
+                        setVosMsg(
+                          name
+                            ? t(locale, `🔐 ${name} cifrada.`, `🔐 ${name} encrypted.`, `🔐 ${name} criptografada.`)
+                            : t(locale, "❌ No se pudo cifrar.", "❌ Encryption failed.", "❌ Falha ao criptografar."),
+                        );
+                      });
+                    }}
+                    className="tap w-full rounded-xl border border-white/10 bg-panel px-4 py-3 text-left text-[13px] font-semibold disabled:opacity-40"
+                  >
+                    🔐 {t(locale, "Exportar cifrado (.vos.enc)", "Export encrypted (.vos.enc)", "Exportar criptografado (.vos.enc)")}
+                  </button>
                   {vosMsg ? (
                     <p data-testid="vos-msg" role="status" className="text-[10px] text-emerald">
                       {vosMsg}

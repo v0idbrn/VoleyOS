@@ -1,6 +1,6 @@
 import { t } from "@/lib/i18n";
 import { type Locale, type ScoreboardState } from "@/lib/local-engines";
-import { safeJsonParse } from "@/lib/security-shield";
+import { safeJsonParse, sha256Hex } from "@/lib/security-shield";
 import type { OrganizerRoster } from "@/lib/casual-engines";
 
 export const SEASON_KEY = "voleyos_season_history_v1";
@@ -25,6 +25,67 @@ export interface SeasonMatch {
   setScores: SeasonSet[];
   winner: "A" | "B";
   mvp?: string;
+  /** v10 tamper-evident Merkle link: sha256(prev|id|home|away|timestamp). */
+  chainHash?: string;
+}
+
+/** Genesis link of the season hash chain (verifier knows where to start). */
+export const CHAIN_GENESIS = "VoleyOS/season/genesis";
+
+/**
+ * Computes the Merkle link for ONE match over its immutable material:
+ * `sha256(prevChainHash + "|" + matchId + "|" + homeScore + "|" + awayScore + "|" + timestamp)`.
+ */
+export function seasonChainHash(prevChainHash: string, match: SeasonMatch): string {
+  return sha256Hex(
+    `${prevChainHash}|${match.id}|${match.setsA}|${match.setsB}|${match.date}`,
+  );
+}
+
+export interface SeasonAudit {
+  ok: boolean;
+  total: number;
+  /** Storage index (0-based, newest first) of the first broken link. */
+  brokenAt: number | null;
+  head: string;
+}
+
+/**
+ * Walks the stored history (newest first → chain runs backwards through
+ * `chainHash`) and proves that no archived score was edited or reordered:
+ * any mutated match changes its own link AND every downstream link.
+ */
+export function auditSeason(history: SeasonMatch[]): SeasonAudit {
+  // Chain is linked oldest → newest, so verify from the oldest entry forward.
+  const ordered = [...history].reverse();
+  let prev = CHAIN_GENESIS;
+  let brokenAt: number | null = null;
+  for (const match of ordered) {
+    const expected = seasonChainHash(prev, match);
+    if (match.chainHash !== undefined && match.chainHash !== expected) {
+      brokenAt = history.indexOf(match);
+      break;
+    }
+    prev = match.chainHash ?? expected;
+  }
+  return { ok: brokenAt === null, total: history.length, brokenAt, head: prev };
+}
+
+/**
+ * Re-seals the full chain over history in STORAGE order (newest first, as
+ * `loadSeason` returns it): internally the walk runs oldest → newest so the
+ * new head always links onto the previous head. Legacy v9.x rows without a
+ * `chainHash` get sealed; existing valid links are preserved.
+ */
+export function sealSeason(history: SeasonMatch[]): SeasonMatch[] {
+  const ordered = [...history].reverse(); // storage newest-first → oldest-first
+  let prev = CHAIN_GENESIS;
+  const sealed = ordered.map((match) => {
+    const chainHash = seasonChainHash(prev, match);
+    prev = chainHash;
+    return match.chainHash === chainHash ? match : { ...match, chainHash };
+  });
+  return sealed.reverse(); // back to storage order (newest first)
 }
 
 /** Deterministic identity so a finished match is never stored twice. */
@@ -44,7 +105,8 @@ function isMatch(value: unknown): value is SeasonMatch {
     typeof match.setsA === "number" &&
     typeof match.setsB === "number" &&
     (match.winner === "A" || match.winner === "B") &&
-    Array.isArray(match.setScores)
+    Array.isArray(match.setScores) &&
+    (match.chainHash === undefined || typeof match.chainHash === "string")
   );
 }
 
@@ -69,9 +131,12 @@ export function persistSeason(history: SeasonMatch[]): SeasonMatch[] {
   return history;
 }
 
-/** Appends (or refreshes) a match, newest first, deduped by deterministic id. */
+/** Appends (or refreshes) a match, newest first, deduped by deterministic id.
+ *  Re-seals the whole chain oldest → newest so a refresh (dedupe by id) can
+ *  never leave a dangling downstream link. */
 export function saveSeasonMatch(match: SeasonMatch): SeasonMatch[] {
-  return persistSeason([match, ...loadSeason().filter((entry) => entry.id !== match.id)]);
+  const existing = loadSeason().filter((entry) => entry.id !== match.id);
+  return persistSeason(sealSeason([match, ...existing]));
 }
 
 export function clearSeason(): void {

@@ -76,6 +76,33 @@ public class MainActivity extends Activity {
         }
 
         /**
+         * v10 anti-time-travel: monotonic high-water clock guard.
+         *
+         * Persists `high_water_epoch_ms` in the `voleyos_clock_guard` prefs
+         * file. Returns -1L (TAMPER DETECTED) when the caller reports a time
+         * more than 5 minutes BELOW the highest time ever seen — the classic
+         * rollback used to revalidate an expired 7d/30d/1y licence. Otherwise
+         * advances the high-water mark and returns it.
+         */
+        @JavascriptInterface
+        public long updateAndCheckMonotonicClock(long currentClientEpochMs) {
+            try {
+                SharedPreferences prefs =
+                        context.getSharedPreferences("voleyos_clock_guard", Context.MODE_PRIVATE);
+                long highWaterEpochMs = prefs.getLong("high_water_epoch_ms", 0L);
+                if (currentClientEpochMs + 300000L < highWaterEpochMs) {
+                    return -1L;
+                }
+                long next = Math.max(highWaterEpochMs, currentClientEpochMs);
+                prefs.edit().putLong("high_water_epoch_ms", next).apply();
+                return next;
+            } catch (Exception e) {
+                // Never brick the WebView: treat unreadable prefs as no guard.
+                return currentClientEpochMs;
+            }
+        }
+
+        /**
          * Persists the live match snapshot for the home screen widget and
          * refreshes every pinned widget immediately.
          */
