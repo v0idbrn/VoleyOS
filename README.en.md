@@ -2,7 +2,7 @@
 
 [English](README.md) · [Español](README.es.md) · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v9.4.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v9.5.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Modules](https://img.shields.io/badge/modules-61-FF3B5C?style=for-the-badge&color=EAB308)](#encyclopedia-of-the-61-modules)
 [![Offline](https://img.shields.io/badge/100%25-offline--first-FF3B5C?style=for-the-badge&color=EAB308)](#why-volleyos-exists)
 [![Android](https://img.shields.io/badge/Android%20APK-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -14,15 +14,17 @@
 
 Signed universal APK built by GitHub Actions on every `v*` tag. Android 7.0+ (minSdk 24), trilingual, offline-first, no accounts and no telemetry. F-Droid ready.
 
-## 🆕 What's new in v9.4.0 — Market-Leading Polish, Anti-Hack Shield & Crash-Proof Vault
+## 🆕 What's new in v9.5.0 — The Athlete's Edge
 
-- **🛡️ Hardened app shield**: WebView security hardening, an anti-pollution input sanitizer, dual-slot atomic storage — a corrupt write can never wipe your data again — and a global error boundary.
-- **🏎️ Court ergonomics**: Pocket Lock mode, differentiated haptic patterns per event, a WakeLock OLED battery saver and Outdoor Sun mode for glare-readable screens.
-- **👥 Unified player memory**: shared directory chips pre-fill the 🍻 Picadito suite, the bench rotator and the Cancha roster template — one tap instead of retyping names anywhere in the app.
-- **🖼️ PNG everywhere**: the chalkboard, match poster and player card now share as `.PNG` images at 1080 px straight into any chat — not just SVG.
-- **⭐ Mis Fijas quick bar**: pinned modules sit in a persistent bar at the top of Home, one tap away from any tab.
-- **📦 Signed `.vos` backup vault**: one checksum-verified file packs teams, players, 🏆 Mi Temporada, pins and licences; restore everything on a new phone from Ajustes.
-- **Keeps everything from v9.3.0**: the 3-mode live broadcast, the 0 MB court-hotspot scoreboard, the `VOS1:` WhatsApp-Free pulse, the cloud QR room and the scorer battery handover.
+- **👟 Real court textures**: sneaker squeak, Mikasa spike thump and net-cord snap synthesised live in WebAudio and layered onto kills and aces in every match.
+- **🎵 Acoustic approach metronome**: 1st/2nd/3rd-tempo step-plant rhythms (0/220/310 · 480 … ms) plus a 🔁 repeat-every-5s loop for hands-free approach practice in the Biomechanics lab.
+- **🎧 Blind Court Mode**: leave the phone on the bench and react to randomised voice, whistle and squeak defensive callouts in the Reflex Trainer.
+- **🛫 Video flight-time jump lab**: mark takeoff and landing frame-by-frame in the Telestrator for exact h = ⅛gt² height, take-off speed and hang-time rating, saved to your jump profile with a history sparkline.
+- **🕚 Hora 11 vs 12 protractor**: a draggable shoulder clock over the video with the 10:30–11:15 power zone and the 12:00–01:00 impingement zone.
+- **👤 1st-person rotation guide**: track your role across R1–R6 with Volt Gold highlighting, FIVB neighbour constraint lines and a "where to stand / where to run" action card, K1/K2 aware.
+- **⏱️ Isometric tendon timer**: the clinical 5×45s wall-sit / 90s rest patellar protocol with countdown ticks and phase whistles, hands-free in the Jumper's Knee module.
+- **⚡ Career VolleyCard**: sync JMP/ATK/DEF/IQ/OVR from your saved jump record, Mi Temporada results and pickup awards, with a level-up arpeggio when OVR rises.
+- **Keeps everything from v9.4.0**: the anti-hack shield, court ergonomics, unified player chips, PNG sharing, ⭐ Mis Fijas and the signed `.vos` vault.
 
 ## ❤️ Support VolleyOS
 

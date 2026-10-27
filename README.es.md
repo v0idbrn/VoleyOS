@@ -2,7 +2,7 @@
 
 [English](README.md) · **Español** · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v9.4.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v9.5.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Módulos](https://img.shields.io/badge/módulos-61-FF3B5C?style=for-the-badge&color=EAB308)](#enciclopedia-de-los-61-módulos)
 [![Offline](https://img.shields.io/badge/100%25-offline--primero-FF3B5C?style=for-the-badge&color=EAB308)](#por-qué-existe-volleyos)
 [![Android](https://img.shields.io/badge/APK%20Android-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -14,15 +14,17 @@
 
 APK universal firmado, construido por GitHub Actions en cada tag `v*`. Android 7.0+ (minSdk 24), trilingüe, offline primero, sin cuentas y sin telemetría. Listo para F-Droid.
 
-## 🆕 Novedades de v9.4.0 — Pulido de Mercado, Escudo Anti-Hack y Bóveda a Prueba de Fallos
+## 🆕 Novedades de v9.5.0 — El borde del atleta
 
-- **🛡️ App blindada**: endurecimiento de la WebView, saneador anti-pollution de entradas, almacenamiento atómico de doble ranura — una escritura corrupta ya no puede borrar tus datos — y un error boundary global.
-- **🏎️ Ergonomía de cancha**: modo Bolsillo Bloqueado, vibraciones diferenciadas por evento, ahorro de batería OLED con WakeLock y modo Sol de Afuera para pantallas con brillo.
-- **👥 Memoria unificada de jugadores**: los chips del directorio rellenan la suite 🍻 Picadito, el rotador del banco y la plantilla de la Cancha con un toque, en toda la app.
-- **🖼️ PNG en todas partes**: el chalkboard, el póster de partido y la tarjeta de jugador se comparten como imagen `.PNG` de 1080 px directo a cualquier chat — no solo SVG.
-- **⭐ Barra Mis Fijas**: tus módulos fijados quedan en una barra persistente arriba del Inicio, a un toque desde cualquier pestaña.
-- **📦 Bóveda de respaldo `.vos`**: un solo archivo con checksum verifica equipos, jugadores, 🏆 Mi Temporada, fijas y licencias; restaurá todo en un celular nuevo desde Ajustes.
-- **Mantiene todo lo de v9.3.0**: la transmisión en 3 modos, el marcador por hotspot con 0 MB, el pulso WhatsApp Gratis `VOS1:`, la sala QR en la nube y el relevo del anotador.
+- **👟 Texturas reales de cancha**: chirrido de zapatilla, remate Mikasa y red en vivo sintetizados en WebAudio y sumados a cada kill y cada ace.
+- **🎵 Metrónomo acústico de aproximación**: ritmos de plantear el paso para 1/2/3 tempo (0/220/310 · 480 … ms) con 🔁 repetición cada 5s para practicar sin manos en la laboratorio de biomecánica.
+- **🎧 Modo Ciego**: dejá el celular en el banco y reaccioná a llamadas de defensa aleatorias con voz, silbato y chirridos en el Entrenador de Reflejos.
+- **🛫 Laboratorio de salto por tiempo de vuelo**: marcá despegue y aterrizaje cuadro por cuadro en el Telestrator para altura exacta h = ⅛gt², velocidad de impulso y rating de vuelo, guardado en tu perfil con histórico.
+- **🕚 Protractor Hora 11 vs 12**: reloj de hombro arrastrable sobre el video con la zona potente 10:30–11:15 y la zona de pinzamiento 12:00–01:00.
+- **👤 Guía de rotación en 1ra persona**: seguí tu rol en R1–R6 con resaltado Volt Gold, líneas de restricción FIVB vecina y tarjeta de "dónde pararse / dónde correr", consciente de K1/K2.
+- **⏱️ Temporizador isométrico de tendón**: el protocolo clínico de pared 5×45s / 90s de descanso con marcas de cuenta regresiva y silbatos de fase, sin manos en el módulo Rodilla del Saltador.
+- **⚡ VolleyCard de carrera**: sincronizá JMP/ATK/DEF/IQ/OVR desde tu récord de salto guardado, resultados de Mi Temporada y premios de picadito, con arpegio de subida cuando sube OVR.
+- **Mantiene todo lo de v9.4.0**: el escudo anti-hack, ergonomía de cancha, chips unificados de jugador, compartir PNG, ⭐ Mis Fijas y la bóveda `.vos` firmada.
 
 ## ❤️ Apoyá VolleyOS
 
