@@ -13,7 +13,7 @@ import {
   playSetWinFanfare,
   saveCrowdAmbience,
 } from "@/lib/sound-effects";
-import { announceScoreTTS, persistLiveScoreboard, readLiveScoreboard, triggerCourtHaptics } from "@/lib/court-ux";
+import { announceScoreTTS, isMatchActive, persistLiveScoreboard, readLiveScoreboard, triggerCourtHaptics } from "@/lib/court-ux";
 import { clearClonedScoreboard, createQrFrames, emptyIngest, ingestQrFrame, readClonedScoreboard, renderQrSvg, storeClonedScoreboard, type IngestResult, type QrFrame } from "@/lib/qr-transfer";
 import { localizeReactTree } from "@/lib/engine-l10n";
 import { COPY, t } from "@/lib/i18n";
@@ -611,6 +611,11 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const seqRef = useRef(0);
   if (!roomRef.current) roomRef.current = createRoomId();
   if (!secretRef.current) secretRef.current = createHostSecret();
+  // v9.4 physical-court ergonomics: pocket lock, outdoor sun mode, OLED saver.
+  const [pocketLock, setPocketLock] = useState(() => window.localStorage.getItem("volleyos.pocketLock") === "1");
+  const [sunMode, setSunMode] = useState(() => window.localStorage.getItem("volleyos.sunMode") === "1");
+  const [oledDim, setOledDim] = useState(false);
+  const holdTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     setTeams(loadTeams());
@@ -757,6 +762,28 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     }
   };
 
+  /** v9.4 morse haptics: native patterns on device, navigator.vibrate on the web. */
+  const nativeHaptic = (pattern: "home_point" | "away_point" | "set_point" | "set_win"): void => {
+    try {
+      const bridge = (window as Window & { VoleyOSBridge?: { triggerHapticPattern?: (patternType: string) => void } }).VoleyOSBridge;
+      if (bridge?.triggerHapticPattern) {
+        bridge.triggerHapticPattern(pattern);
+        return;
+      }
+    } catch {
+      /* web build: fall through to the vibration API */
+    }
+    triggerCourtHaptics(
+      pattern === "set_win"
+        ? [450]
+        : pattern === "set_point"
+          ? [80, 50, 80]
+          : pattern === "away_point"
+            ? [40, 60, 40]
+            : 30,
+    );
+  };
+
   const point = (team: "A" | "B"): void => {
     try {
       const wasOnServe = state.serving === team;
@@ -798,7 +825,9 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
             : ""
         }`,
       );
-      triggerCourtHaptics(pressurePoint(result.state) ? [80, 50, 80, 50, 140] : 30);
+      if (result.setFinished || result.matchFinished) nativeHaptic("set_win");
+      else if (pressurePoint(result.state)) nativeHaptic("set_point");
+      else nativeHaptic(team === "A" ? "home_point" : "away_point");
       announcePoint(result.state);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Error");
@@ -913,6 +942,53 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [locale]);
+
+  const togglePocketLock = (): void => {
+    const next = !pocketLock;
+    setPocketLock(next);
+    window.localStorage.setItem("volleyos.pocketLock", next ? "1" : "0");
+    triggerCourtHaptics(20);
+    setMessage(
+      next
+        ? t(locale, "🔒 Modo bolsillo: solo el volumen puntúa.", "Pocket mode: only volume keys score.", "Modo bolso: só o volume pontua.")
+        : t(locale, "🔓 Modo bolsillo apagado.", "Pocket mode off.", "Modo bolso desligado."),
+    );
+  };
+
+  const toggleSunMode = (): void => {
+    const next = !sunMode;
+    setSunMode(next);
+    window.localStorage.setItem("volleyos.sunMode", next ? "1" : "0");
+    triggerCourtHaptics(16);
+  };
+
+  // v9.4 OLED table saver: FLAG_KEEP_SCREEN_ON during a live match, released
+  // the moment the board goes idle.
+  useEffect(() => {
+    const bridge = (window as Window & { VoleyOSBridge?: { setKeepScreenAwake?: (keep: boolean) => void } }).VoleyOSBridge;
+    const live = state.status === "live" && isMatchActive(state);
+    bridge?.setKeepScreenAwake?.(live);
+    if (!live) setOledDim(false);
+    return () => bridge?.setKeepScreenAwake?.(false);
+  }, [state]);
+
+  // v9.4: dim non-essential chrome after 30s of stillness; any touch revives it.
+  useEffect(() => {
+    let timer: number | null = null;
+    const wake = (): void => {
+      setOledDim(false);
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => setOledDim(true), 30_000);
+    };
+    wake();
+    window.addEventListener("pointerdown", wake);
+    window.addEventListener("keydown", wake);
+    return () => {
+      if (timer !== null) window.clearTimeout(timer);
+      window.removeEventListener("pointerdown", wake);
+      window.removeEventListener("keydown", wake);
+    };
+  }, []);
 
   const swapped = state.isCourtSwapped === true;
   const left = swapped
@@ -1079,7 +1155,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           ) : null}
         </div>
       ) : null}
-      <div data-hardware-volume-score={hardwareMode ? "true" : "false"} className="relative rounded-xl">
+      <div data-testid="score-card" data-hardware-volume-score={hardwareMode ? "true" : "false"} className={`relative rounded-xl${sunMode ? " vos-sun" : ""}${oledDim ? " vos-oled-dim" : ""}`}>
       <button
         type="button"
         aria-pressed={hardwareMode}
@@ -1102,7 +1178,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           <span>Set {state.setNumber} / {state.bestOf} {state.matchFormat === "short15" ? "(15)" : state.setNumber === state.bestOf || state.isDecider ? "(15 TB)" : "(25)"}</span>
           <span>{state.status === "finished" ? "FINAL" : `${state.streak} ${t(locale, "en racha", "run", "em sequência")}`}</span>
         </div>
-        <div className="mt-2 grid grid-cols-2 gap-2 text-center">
+        <div className="vos-oled-keep mt-2 grid grid-cols-2 gap-2 text-center">
           <div className={`rounded-lg py-2 ${left.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
             <p className="truncate text-xs font-bold">{left.name}</p>
             <p data-testid={swapped ? "score-b" : "score-a"} className="text-4xl font-black tabular-nums">{left.score}</p>
@@ -1195,6 +1271,24 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           >
             💬 {t(locale, "Pulso WhatsApp Gratis", "Free WhatsApp Pulse", "Pulso WhatsApp Grátis")}
           </button>
+          <button
+            type="button"
+            data-testid="pocket-lock-toggle"
+            aria-pressed={pocketLock}
+            onClick={togglePocketLock}
+            className={pocketLock ? `${BTN} border-volt text-volt` : BTN}
+          >
+            🔒 {t(locale, "Bolsillo", "Pocket", "Bolso")}: {pocketLock ? "ON" : "OFF"}
+          </button>
+          <button
+            type="button"
+            data-testid="sun-mode-toggle"
+            aria-pressed={sunMode}
+            onClick={toggleSunMode}
+            className={sunMode ? `${BTN} border-amber-300 text-amber-200` : BTN}
+          >
+            ☀️ {t(locale, "Modo Sol", "Sun Mode", "Modo Sol")}: {sunMode ? "ON" : "OFF"}
+          </button>
         </div>
       </div>
       <button
@@ -1245,6 +1339,47 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           </div>
         </div>
       ) : null}
+        {pocketLock ? (
+          <div data-testid="pocket-shield" className="absolute inset-0 z-40 grid place-items-center rounded-xl bg-obsidian/90 p-4 text-center">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-wider text-volt">
+                🔒 {t(locale, "Modo Bolsillo activo", "Pocket mode on", "Modo Bolso ativo")}
+              </p>
+              <p className="mt-1 text-[10px] text-white/60">
+                {t(locale, "Solo botones de volumen puntúan: Vol+ local · Vol- visita.", "Only volume keys score: Vol+ home · Vol- away.", "Só teclas de volume pontuam: Vol+ casa · Vol- visita.")}
+              </p>
+              <button
+                type="button"
+                data-testid="pocket-unlock"
+                onPointerDown={() => {
+                  if (holdTimerRef.current) window.clearTimeout(holdTimerRef.current);
+                  holdTimerRef.current = window.setTimeout(() => {
+                    holdTimerRef.current = null;
+                    setPocketLock(false);
+                    window.localStorage.setItem("volleyos.pocketLock", "0");
+                    setMessage(t(locale, "🔓 Bolsillo desbloqueado.", "Pocket unlocked.", "Bolso desbloqueado."));
+                    triggerCourtHaptics([30, 30]);
+                  }, 2000);
+                }}
+                onPointerUp={() => {
+                  if (holdTimerRef.current) {
+                    window.clearTimeout(holdTimerRef.current);
+                    holdTimerRef.current = null;
+                  }
+                }}
+                onPointerLeave={() => {
+                  if (holdTimerRef.current) {
+                    window.clearTimeout(holdTimerRef.current);
+                    holdTimerRef.current = null;
+                  }
+                }}
+                className="tap mt-3 rounded-lg border border-volt/50 bg-volt/10 px-3 py-2 text-[10px] font-black text-volt"
+              >
+                🔓 {t(locale, "Mantener 2s para desbloquear", "Hold 2s to unlock", "Segure 2s para desbloquear")}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
       <BenchRotator locale={locale} />
       {castOpen ? (

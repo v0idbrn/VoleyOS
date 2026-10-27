@@ -297,3 +297,39 @@ html.solar :focus-visible {
     opacity: 0;
   }
 }
+
+/* v9.4: outdoor sun mode — pure daylight scoreboard for open courts */
+.vos-sun {
+  background: #ffffff !important;
+  border: 3px solid #000000 !important;
+}
+.vos-sun div,
+.vos-sun p,
+.vos-sun span {
+  color: #000000 !important;
+}
+.vos-sun div {
+  background-color: transparent !important;
+}
+.vos-sun [data-testid="score-a"],
+.vos-sun [data-testid="score-b"] {
+  font-size: 3.25rem !important;
+  font-weight: 900 !important;
+}
+.vos-sun button {
+  color: #000000 !important;
+  background-color: #f3f4f6 !important;
+  border-color: #000000 !important;
+  font-weight: 800 !important;
+}
+
+/* v9.4: OLED table saver — dim the chrome after 30s, keep the giant score */
+.vos-oled-dim * {
+  opacity: 0.3;
+  transition: opacity 1s ease;
+}
+.vos-oled-dim .vos-oled-keep,
+.vos-oled-dim .vos-oled-keep * {
+  opacity: 1;
+  transition: opacity 1s ease;
+}

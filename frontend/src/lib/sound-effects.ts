@@ -66,6 +66,32 @@ function resume(audio: AudioContext): void {
   void audio.resume().catch(() => undefined);
 }
 
+let autoResumeInstalled = false;
+
+/**
+ * v9.4 — an incoming call or a locked screen must never leave the referee
+ * whistle silent: any user gesture revives the shared AudioContext.
+ */
+export function installAudioAutoResume(): boolean {
+  if (autoResumeInstalled || typeof window === "undefined" || typeof window.addEventListener !== "function") {
+    return false;
+  }
+  autoResumeInstalled = true;
+  const revive = (): void => {
+    try {
+      const audio = audioContext();
+      if (audio) resume(audio);
+    } catch {
+      /* gesture without audio support: nothing to revive */
+    }
+  };
+  window.addEventListener("pointerdown", revive, { passive: true });
+  window.addEventListener("keydown", revive);
+  return true;
+}
+
+installAudioAutoResume();
+
 /** Dual detuned oscillators + 48 Hz FM pea modulation + 2800 Hz high-pass + breath attack. */
 export function playWhistle(kind: WhistleKind = "short", volume = 0.6): boolean {
   if (!enabled) return false;

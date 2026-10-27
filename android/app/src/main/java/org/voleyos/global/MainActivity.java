@@ -5,7 +5,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.provider.Settings;
 import android.view.View;
 import android.view.Window;
@@ -96,6 +99,71 @@ public class MainActivity extends Activity {
             } catch (Exception ignored) {
                 // The widget must never take the WebView down.
             }
+        }
+
+        /**
+         * v9.4 morse haptics: distinct physical patterns per court event so a
+         * scorer in Pocket Lock feels home / away / set-point / set-win apart.
+         */
+        @JavascriptInterface
+        public void triggerHapticPattern(String patternType) {
+            try {
+                Vibrator vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+                if (vibrator == null || !vibrator.hasVibrator()) return;
+                String type = patternType == null ? "" : patternType;
+                switch (type) {
+                    case "home_point":
+                        vibrateOnce(vibrator, 50);
+                        break;
+                    case "away_point":
+                        vibrateWave(vibrator, new long[]{0, 40, 60, 40});
+                        break;
+                    case "set_point":
+                        vibrateWave(vibrator, new long[]{0, 80, 50, 80, 50, 80});
+                        break;
+                    case "set_win":
+                        vibrateOnce(vibrator, 450);
+                        break;
+                    default:
+                        vibrateOnce(vibrator, 30);
+                        break;
+                }
+            } catch (Exception ignored) {
+                // Haptics must never take the WebView down.
+            }
+        }
+
+        private static void vibrateOnce(Vibrator vibrator, long milliseconds) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(milliseconds, VibrationEffect.DEFAULT_AMPLITUDE));
+            } else {
+                vibrator.vibrate(milliseconds);
+            }
+        }
+
+        private static void vibrateWave(Vibrator vibrator, long[] pattern) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1));
+            } else {
+                vibrator.vibrate(pattern, -1);
+            }
+        }
+
+        /**
+         * v9.4 OLED table saver: FLAG_KEEP_SCREEN_ON while the scorer is in a
+         * live match, released the moment the match goes idle.
+         */
+        @JavascriptInterface
+        public void setKeepScreenAwake(boolean keepAwake) {
+            final Activity activity = context instanceof Activity ? (Activity) context : null;
+            if (activity == null) return;
+            activity.runOnUiThread(() -> {
+                if (keepAwake) {
+                    activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                } else {
+                    activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                }
+            });
         }
 
         /** Active non-loopback IPv4 of this phone (hotspot: 192.168.43.1 / 192.168.137.1). */
