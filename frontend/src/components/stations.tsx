@@ -11,10 +11,12 @@ import {
   loadCrowdAmbience,
   playApproachCadence,
   playBuzzer,
+  playLevelUpArpeggio,
   playPicaditoCue,
   playScorePop,
   playSetWinFanfare,
   playSneakerSqueak,
+  playWarmupTick,
   saveCrowdAmbience,
 } from "@/lib/sound-effects";
 import { announceScoreTTS, isMatchActive, persistLiveScoreboard, readLiveScoreboard, triggerCourtHaptics } from "@/lib/court-ux";
@@ -25,11 +27,13 @@ import { BenchRotator, FlowWizard, PlayerChips } from "@/components/CasualPlayer
 import { LiveCastModal } from "@/components/LiveCastModal";
 import { sharePng } from "@/lib/png-exporter";
 import {
+  careerCardStats,
   flightTimeJump,
   loadAthleteRecords,
   recordsSparkline,
   saveAthleteRecord,
   type AthleteJumpRecord,
+  type CareerCardStats,
 } from "@/lib/athlete-records";
 import {
   buildPacket,
@@ -40,9 +44,9 @@ import {
   pushLocalLiveServer,
   type CastMode,
 } from "@/lib/live-cast-engine";
-import { saveSeasonMatch, seasonMatchFromState } from "@/lib/season-vault";
+import { loadSeason, saveSeasonMatch, seasonMatchFromState, seasonStats } from "@/lib/season-vault";
 import { syncWidgetSnapshot } from "@/lib/widget-bridge";
-import { nextServeStreak, rememberPlayerNames, serveCapHit, serveCapMessage, type ServeCapLimit } from "@/lib/casual-engines";
+import { loadPickupAwards, nextServeStreak, rememberPlayerNames, serveCapHit, serveCapMessage, type ServeCapLimit } from "@/lib/casual-engines";
 import {
   FAN_QUESTIONS,
   REFEREE_GESTURES,
@@ -68,6 +72,9 @@ import {
   computeSetterIQ,
   decideVar,
   defaultPositions,
+  roleZones,
+  zoneNeighbors,
+  type RotationRole,
   exportCapsule,
   fanReport,
   heatmap,
@@ -401,10 +408,61 @@ const HEAT_CLASS: Record<HeatCell["heat"], string> = {
   volcano: "bg-imperial",
 };
 
+const ROLE_LABELS: Record<RotationRole, Record<Locale, string>> = {
+  all: { es: "Todos", en: "All", pt: "Todos" },
+  S: { es: "Armador (S)", en: "Setter (S)", pt: "Levantador (S)" },
+  OH1: { es: "Punta Delantero (OH1)", en: "Outside Front (OH1)", pt: "Ponta Da Frente (OH1)" },
+  OH2: { es: "Punta Zaguero (OH2)", en: "Outside Back (OH2)", pt: "Ponta De Trás (OH2)" },
+  MB: { es: "Central (MB)", en: "Middle (MB)", pt: "Central (MB)" },
+  OPP: { es: "Opuesto (OPP)", en: "Opposite (OPP)", pt: "Oposto (OPP)" },
+  L: { es: "Líbero (L)", en: "Libero (L)", pt: "Líbero (L)" },
+};
+
+const DUTY_LINES: Record<RotationRole, Record<Locale, string>> = {
+  all: { es: "", en: "", pt: "" },
+  S: {
+    es: "Armá desde tu zona; recibí solo si la pelota viene directo a vos.",
+    en: "Set from your zone; pass only if the ball comes straight to you.",
+    pt: "Levante da sua zona; receba só se a bola vier direto em você.",
+  },
+  OH1: {
+    es: "Recibí en K1 y atacá por el 4; en K2 salí por la banda.",
+    en: "Pass in K1 and attack out of 4; in K2 go wide.",
+    pt: "Receba no K1 e ataque pelo 4; no K2 saia pela ponta.",
+  },
+  OH2: {
+    es: "Cubrí el 6 en recepción y atacá por el pipe.",
+    en: "Cover 6 in reception and hit the pipe.",
+    pt: "Cubra o 6 na recepção e ataque pelo pipe.",
+  },
+  MB: {
+    es: "Bloqueá en el eje y salí a finta; en K1 dejá la recepción al líbero.",
+    en: "Block in the middle and run the quick; leave reception to the libero.",
+    pt: "Bloqueie no eixo e saia de finta; no K1 deixe a recepção ao líbero.",
+  },
+  OPP: {
+    es: "Sacá en K2 y atacá por el 2; en K1 cubrí el 1.",
+    en: "Serve in K2 and attack out of 2; in K1 cover 1.",
+    pt: "Sirva no K2 e ataque pelo 2; no K1 cubra o 1.",
+  },
+  L: {
+    es: "Reemplazá al central en recepción: sin bloqueo ni saque.",
+    en: "Replace the middle in reception: no blocks or serves.",
+    pt: "Substitua o central na recepção: sem bloqueio ou saque.",
+  },
+};
+
 export function RotationStation({ meta, locale, onSave }: StationProps) {
   const [rotation, setRotation] = useState(1);
   const [points, setPoints] = useState<ZonePoint[]>(() => defaultPositions(1));
   const [report, setReport] = useState(() => validateOverlap(defaultPositions(1)));
+  const [trackedRole, setTrackedRole] = useState<RotationRole>("all");
+  const [servePhase, setServePhase] = useState<"K1" | "K2">("K1");
+
+  const trackedZones = roleZones(trackedRole, rotation);
+  const primaryZone = trackedZones[0] ?? null;
+  const trackedNeighbors = primaryZone === null ? [] : zoneNeighbors(primaryZone);
+  const trackedPoint = primaryZone === null ? null : points.find((point) => point.zone === primaryZone) ?? null;
 
   const applyRotation = (value: number): void => {
     const base = defaultPositions(value);
@@ -441,6 +499,48 @@ export function RotationStation({ meta, locale, onSave }: StationProps) {
           </button>
         ))}
       </div>
+      <div className="mt-2 flex flex-wrap items-center gap-1">
+        <span className={LABEL}>👤 {t(locale, "Seguir Mi Puesto", "Track My Position", "Acompanhar Meu Posto")}</span>
+        {(Object.keys(ROLE_LABELS) as RotationRole[]).map((role) => (
+          <button
+            key={role}
+            type="button"
+            data-testid={`role-${role}`}
+            aria-pressed={trackedRole === role}
+            className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${
+              trackedRole === role ? "border-volt bg-volt/20 text-volt" : "border-white/10 text-white/55"
+            }`}
+            onClick={() => setTrackedRole(role)}
+          >
+            {ROLE_LABELS[role][locale]}
+          </button>
+        ))}
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-1">
+        <span className={LABEL}>{t(locale, "Fase", "Phase", "Fase")}</span>
+        <button
+          type="button"
+          data-testid="phase-k1"
+          aria-pressed={servePhase === "K1"}
+          className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${
+            servePhase === "K1" ? "border-volt bg-volt/20 text-volt" : "border-white/10 text-white/55"
+          }`}
+          onClick={() => setServePhase("K1")}
+        >
+          🛡️ {t(locale, "Recibiendo Saque (K1)", "Receiving Serve (K1)", "Recebendo Saque (K1)")}
+        </button>
+        <button
+          type="button"
+          data-testid="phase-k2"
+          aria-pressed={servePhase === "K2"}
+          className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${
+            servePhase === "K2" ? "border-volt bg-volt/20 text-volt" : "border-white/10 text-white/55"
+          }`}
+          onClick={() => setServePhase("K2")}
+        >
+          🚀 {t(locale, "Sacando Nosotros (K2)", "We Serve (K2)", "Nós Sacamos (K2)")}
+        </button>
+      </div>
       <svg viewBox="0 0 900 700" className="mt-2 w-full rounded-xl border border-white/10 bg-[#0b1a13]" role="img" aria-label={t(locale, "Cancha 9x9 con posiciones 5-1", "9x9 court with 5-1 positions", "Quadra 9x9 com posições 5-1")}>
         <rect x="0" y="0" width="900" height="700" fill="#0b1a13" />
         <line x1="0" y1="4" x2="900" y2="4" stroke="#F59E0B" strokeWidth="5" />
@@ -450,13 +550,50 @@ export function RotationStation({ meta, locale, onSave }: StationProps) {
           const fault = report.faults.find((item) => item.offender === zone.zone);
           return (
             <g key={zone.zone}>
-              <circle cx={zone.x} cy={zone.y} r={34} fill={fault ? "#DC2626" : "#E11D48"} stroke="#fff" strokeOpacity={0.5} />
-              <text x={zone.x} y={zone.y + 5} textAnchor="middle" fontSize="20" fontWeight="800" fill="#fff">
+              <circle
+                cx={zone.x}
+                cy={zone.y}
+                r={34}
+                fill={trackedZones.includes(zone.zone) ? "#c8ff00" : fault ? "#DC2626" : "#E11D48"}
+                stroke="#fff"
+                strokeOpacity={trackedZones.includes(zone.zone) ? 1 : 0.5}
+                data-testid={trackedZones.includes(zone.zone) ? `tracked-zone-${zone.zone}` : undefined}
+              />
+              <text
+                x={zone.x}
+                y={zone.y + 5}
+                textAnchor="middle"
+                fontSize="20"
+                fontWeight="800"
+                fill={trackedZones.includes(zone.zone) ? "#0b1a13" : "#fff"}
+              >
                 {zone.zone}
               </text>
             </g>
           );
         })}
+        {trackedNeighbors.map((neighbor) => {
+          const matePoint = points.find((point) => point.zone === neighbor.mate);
+          if (!trackedPoint || !matePoint) return null;
+          return (
+            <line
+              key={`${neighbor.side}-${neighbor.mate}`}
+              data-testid={`constraint-line-${neighbor.side}-${neighbor.mate}`}
+              x1={trackedPoint.x}
+              y1={trackedPoint.y}
+              x2={matePoint.x}
+              y2={matePoint.y}
+              stroke={neighbor.side === "behind" || neighbor.side === "ahead" ? "#F59E0B" : "#c8ff00"}
+              strokeWidth="4"
+              strokeDasharray="10 8"
+            />
+          );
+        })}
+        {trackedPoint && primaryZone !== null ? (
+          <text x={trackedPoint.x} y={trackedPoint.y - 48} textAnchor="middle" fontSize="20" fontWeight="900" fill="#c8ff00">
+            {ROLE_LABELS[trackedRole][locale]}
+          </text>
+        ) : null}
       </svg>
       <div className="mt-2 text-xs">
         {report.valid ? (
@@ -471,6 +608,57 @@ export function RotationStation({ meta, locale, onSave }: StationProps) {
           </ul>
         )}
       </div>
+      {trackedRole !== "all" ? (
+        <div data-testid="role-card" className="mt-2 space-y-1 rounded-xl border border-volt/40 bg-volt/5 p-2 text-[11px]">
+          <p className="font-bold text-volt">👤 {ROLE_LABELS[trackedRole][locale]}</p>
+          <p>
+            📍 <strong>{t(locale, "Dónde pararte antes del silbato", "Where to stand before the whistle", "Onde ficar antes do apito")}</strong>{" "}
+            {trackedRole === "L"
+              ? t(locale, "El líbero no rota: entra por recepción sin pisar a los delanteros.", "The libero does not rotate: enter for reception without crossing the fronts.", "O líbero não gira: entra na recepção sem cruzar os da frente.")
+              : t(
+                  locale,
+                  `Zona ${primaryZone} en la rotación ${rotation}`,
+                  `Zone ${primaryZone} in rotation ${rotation}`,
+                  `Zona ${primaryZone} na rotação ${rotation}`,
+                )}
+          </p>
+          <ul data-testid="role-constraints" className="space-y-0.5 text-[10px] text-white/70">
+            {trackedNeighbors.map((neighbor) => (
+              <li key={`${neighbor.side}-${neighbor.mate}`}>
+                {neighbor.side === "behind"
+                  ? t(locale, `⬆️ No pasar adelante de #${neighbor.mate}`, `⬆️ Do not move in front of #${neighbor.mate}`, `⬆️ Não passe à frente de #${neighbor.mate}`)
+                  : neighbor.side === "ahead"
+                    ? t(locale, `⬇️ No quedarte atrás de #${neighbor.mate}`, `⬇️ Do not fall behind #${neighbor.mate}`, `⬇️ Não fique atrás de #${neighbor.mate}`)
+                    : neighbor.side === "left"
+                      ? t(locale, `↔️ No cruzar a la izquierda de #${neighbor.mate}`, `↔️ Do not cross to the left of #${neighbor.mate}`, `↔️ Não cruze para a esquerda de #${neighbor.mate}`)
+                      : t(locale, `↔️ No cruzar a la derecha de #${neighbor.mate}`, `↔️ Do not cross to the right of #${neighbor.mate}`, `↔️ Não cruze para a direita de #${neighbor.mate}`)}
+              </li>
+            ))}
+          </ul>
+          <p>
+            🔄 <strong>{t(locale, "Por dónde correr al enroque apenas golpean el saque", "Where to run on the switch as soon as they serve", "Por onde correr na troca assim que sacarem")}</strong>{" "}
+            {trackedRole === "L"
+              ? t(locale, "Entrá por el central en recepción y salí apenas pase el balón.", "Enter for the middle on reception and leave once the ball passes.", "Entre pelo central na recepção e saia assim que a bola passar.")
+              : servePhase === "K1"
+                ? t(
+                    locale,
+                    `Apenas saquen ellos, corré de la zona ${primaryZone} a tu posición de enroque.`,
+                    `As soon as they serve, run from zone ${primaryZone} to your switch position.`,
+                    `Assim que sacarem, corra da zona ${primaryZone} para a sua posição de troca.`,
+                  )
+                : t(
+                    locale,
+                    `Sacá desde la zona ${primaryZone} y volvé a tu base antes del pase K1.`,
+                    `Serve from zone ${primaryZone} and return to base before the K1 pass.`,
+                    `Sirva da zona ${primaryZone} e volte à base antes do passe K1.`,
+                  )}
+          </p>
+          <p>
+            🎯 <strong>{t(locale, "Tu responsabilidad de recepción/ataque", "Your reception/attack duty", "Sua responsabilidade de recepção/ataque")}</strong>{" "}
+            {DUTY_LINES[trackedRole][locale]}
+          </p>
+        </div>
+      ) : null}
     </StationShell>
   );
 }
@@ -1764,6 +1952,9 @@ export function VolleycardStation({ meta, locale, onSave }: StationProps) {
   const [height, setHeight] = useState(190);
   const [reach, setReach] = useState(250);
   const [jump, setJump] = useState(78);
+  const [career, setCareer] = useState<CareerCardStats | null>(null);
+  const [careerMsg, setCareerMsg] = useState<string | null>(null);
+  const lastOvrRef = useRef<number | null>(null);
   const attributes: SixAttributes = { attack: 92, reception: 84, serve: 79, block: 71, defense: 76, setting: 55 };
   const card = useMemo(() => {
     try {
@@ -1772,6 +1963,29 @@ export function VolleycardStation({ meta, locale, onSave }: StationProps) {
       return null;
     }
   }, [height, reach, jump]);
+
+  const syncCareer = (): void => {
+    const records = loadAthleteRecords();
+    const bestJumpCm = records.reduce((best, record) => Math.max(best, record.heightCm), 0);
+    const team = seasonStats(loadSeason()).winRates[0] ?? null;
+    const next = careerCardStats({
+      bestJumpCm: bestJumpCm > 0 ? bestJumpCm : null,
+      matchesPlayed: team?.played ?? 0,
+      matchesWon: team?.wins ?? 0,
+      pickupAwards: loadPickupAwards(),
+    });
+    if (bestJumpCm > 0) setJump(Math.round(bestJumpCm));
+    const previous = lastOvrRef.current;
+    const leveledUp = previous !== null && next.ovr > previous;
+    lastOvrRef.current = next.ovr;
+    setCareer(next);
+    setCareerMsg(
+      leveledUp
+        ? t(locale, "⬆️ ¡OVR subió! Nivel desbloqueado.", "⬆️ OVR went up! Level unlocked.", "⬆️ OVR subiu! Nível desbloqueado.")
+        : t(locale, "⚡ Tarjeta sincronizada con tus récords.", "⚡ Card synced with your records.", "⚡ Cartão sincronizado com seus recordes."),
+    );
+    if (leveledUp) playLevelUpArpeggio();
+  };
 
   const shareCard = (): void => {
     if (!card) return;
@@ -1811,6 +2025,26 @@ export function VolleycardStation({ meta, locale, onSave }: StationProps) {
       ) : (
         <p className="mt-2 text-[11px] text-crimson">{t(locale, "Revisá altura/reach (reach ≥ altura).", "Check height/reach (reach ≥ height).", "Verifique altura/reach (reach ≥ altura).")}</p>
       )}
+      <button type="button" data-testid="sync-career" className={`${BTN} mt-2 w-full`} onClick={syncCareer}>
+        ⚡ {t(locale, "Sincronizar con Mis Récords Reales", "Sync with My Real Records", "Sincronizar com Meus Recordes Reais")}
+      </button>
+      {career ? (
+        <div data-testid="career-stats" className="mt-2 grid grid-cols-5 gap-1 text-center">
+          {([["JMP", career.jmp], ["ATK", career.atk], ["DEF", career.def], ["IQ", career.iq], ["OVR", career.ovr]] as const).map(
+            ([label, value]) => (
+              <div key={label} className="rounded-lg border border-white/10 bg-obsidian/60 px-1 py-1">
+                <p className="text-[9px] text-white/40">{label}</p>
+                <p className={`text-sm font-black ${label === "OVR" ? "text-volt" : "text-white/85"}`}>{value}</p>
+              </div>
+            ),
+          )}
+        </div>
+      ) : null}
+      {careerMsg ? (
+        <p className="mt-1 text-[10px] text-emerald" data-testid="career-msg">
+          {careerMsg}
+        </p>
+      ) : null}
     </StationShell>
   );
 }
@@ -3992,6 +4226,7 @@ export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
         </button>
       ) : null}
       {meta.slug === "peripheral-reflex" ? <BlindCourtCoach locale={locale} /> : null}
+      {meta.slug === "injury-prehab" ? <IsometricTendonTimer locale={locale} /> : null}
       {report ? (
         <div className="grid gap-1 text-[11px]">
           {Object.entries(report).filter(([key]) => key !== "svg" && key !== "rallies" && key !== "selected").map(([key, value]) => (
@@ -4094,6 +4329,120 @@ export function BlindCourtCoach({ locale }: { locale: Locale }) {
           {cue}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+const TENDON_HOLD_SECONDS = 45;
+const TENDON_REST_SECONDS = 90;
+const TENDON_SETS = 5;
+
+/**
+ * v9.5 clinical pre-match patellar tendinopathy protocol:
+ * 5 × 45s isometric wall-sit holds with 90s rest, hands-free via
+ * warmup ticks on the last five seconds and whistles on every phase.
+ */
+export function IsometricTendonTimer({ locale }: { locale: Locale }) {
+  const [phase, setPhase] = useState<"idle" | "hold" | "rest" | "paused" | "done">("idle");
+  const [remaining, setRemaining] = useState(TENDON_HOLD_SECONDS);
+  const [set, setSet] = useState(1);
+  const pausedFromRef = useRef<"hold" | "rest">("hold");
+
+  useEffect(() => {
+    if (phase !== "hold" && phase !== "rest") return;
+    const id = window.setInterval(() => setRemaining((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(id);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "hold" && phase !== "rest") return;
+    if (remaining > 0 && remaining <= 5) playWarmupTick(remaining === 1);
+    if (remaining > 0) return;
+    if (phase === "hold") {
+      if (set >= TENDON_SETS) {
+        playWhistle("double");
+        setPhase("done");
+      } else {
+        playWhistle("long");
+        setPhase("rest");
+        setRemaining(TENDON_REST_SECONDS);
+      }
+    } else {
+      playWhistle("short");
+      setSet((value) => value + 1);
+      setPhase("hold");
+      setRemaining(TENDON_HOLD_SECONDS);
+    }
+  }, [phase, remaining, set]);
+
+  const start = (): void => {
+    if (phase === "idle" || phase === "done") {
+      setSet(1);
+      setRemaining(TENDON_HOLD_SECONDS);
+      playWhistle("short");
+      setPhase("hold");
+    } else if (phase === "paused") {
+      playWhistle("short");
+      setPhase(pausedFromRef.current);
+    }
+  };
+
+  const pause = (): void => {
+    pausedFromRef.current = phase === "rest" ? "rest" : "hold";
+    setPhase("paused");
+  };
+
+  const reset = (): void => {
+    setPhase("idle");
+    setSet(1);
+    setRemaining(TENDON_HOLD_SECONDS);
+  };
+
+  const minutes = Math.floor(remaining / 60);
+  const seconds = String(remaining % 60).padStart(2, "0");
+
+  return (
+    <div className="mt-3 rounded-xl border border-emerald/40 bg-emerald/5 p-2 text-center">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-white/60">
+        ⏱️ {t(locale, "Reloj Isométrico de Tendón (5 × 45s Sentadilla Isométrica / 90s Pausa)", "Isometric Tendon Timer (5 × 45s Wall Sit / 90s Rest)", "Relógio Isométrico de Tendão (5 × 45s Agachamento / 90s Pausa)")}
+      </p>
+      <p data-testid="tendon-clock" className="mt-1 text-4xl font-black text-emerald">
+        {minutes}:{seconds}
+      </p>
+      <p data-testid="tendon-phase" className="text-[11px] text-white/70">
+        {phase === "idle"
+          ? t(locale, "Listo para la serie 1", "Ready for set 1", "Pronto para a série 1")
+          : phase === "hold"
+            ? t(locale, "Sentadilla isométrica: mantene 45s", "Isometric wall sit: hold 45s", "Agachamento isométrico: segure 45s")
+            : phase === "rest"
+              ? t(locale, "Pausa activa 90s", "Active rest 90s", "Pausa ativa 90s")
+              : phase === "paused"
+                ? t(locale, "En pausa", "Paused", "Pausado")
+                : t(locale, "¡Protocolo completo! (5×45s)", "Protocol complete! (5×45s)", "Protocolo completo! (5×45s)")}
+      </p>
+      <p data-testid="tendon-set" className="text-[10px] text-white/50">
+        {t(locale, `Serie ${set} de ${TENDON_SETS}`, `Set ${set} of ${TENDON_SETS}`, `Série ${set} de ${TENDON_SETS}`)}
+      </p>
+      <div className="mt-2 flex flex-wrap justify-center gap-1">
+        {phase === "idle" || phase === "paused" || phase === "done" ? (
+          <button type="button" data-testid="tendon-start" className={BTN} onClick={start}>
+            {phase === "paused"
+              ? `▶ ${t(locale, "Reanudar", "Resume", "Retomar")}`
+              : phase === "done"
+                ? `↺ ${t(locale, "Otra vez", "Again", "De novo")}`
+                : `▶ ${t(locale, "Empezar", "Start", "Começar")}`}
+          </button>
+        ) : (
+          <button type="button" data-testid="tendon-pause" className={BTN} onClick={pause}>
+            ⏸ {t(locale, "Pausa", "Pause", "Pausa")}
+          </button>
+        )}
+        {phase !== "idle" ? (
+          <button type="button" data-testid="tendon-reset" className={BTN} onClick={reset}>
+            ↺ {t(locale, "Reiniciar", "Reset", "Reiniciar")}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

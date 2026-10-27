@@ -4868,3 +4868,68 @@ export function buildScoresheet(input: ScoresheetInput): ScoresheetReport {
     message: `Acta A4 con ${input.sets.length} sets y ${totalPoints} puntos.`,
   };
 }
+
+/* ------------------------------------------- v9.5 1st-person rotation IQ */
+
+export type RotationRole = "all" | "S" | "OH1" | "OH2" | "MB" | "OPP" | "L";
+
+/** Rotation-1 home zones of the 5-1 base (both middles tracked as MB). */
+export const ROLE_HOME_ZONES: Record<Exclude<RotationRole, "all" | "L">, readonly number[]> = {
+  S: [1],
+  OPP: [2],
+  OH1: [4],
+  OH2: [6],
+  MB: [3, 5],
+};
+
+/**
+ * Zones a role occupies in a given rotation. Rotations advance clockwise
+ * (1 -> 6 -> 5 -> 4 -> 3 -> 2 -> 1); the libero and "all" never rotate.
+ */
+export function roleZones(role: RotationRole, rotation: number): number[] {
+  if (rotation < 1 || rotation > 6) throw new Error("rotation must be 1..6");
+  if (role === "all" || role === "L") return [];
+  const home = ROLE_HOME_ZONES[role];
+  return home.map((zone) => ((((zone - 1 - (rotation - 1)) % 6) + 6) % 6) + 1);
+}
+
+export interface ZoneNeighbor {
+  /**
+   * "behind"/"ahead": the vertical FIVB 7.4 couple the player must respect.
+   * "left"/"right": the side the player must NOT cross (FIVB 7.4.2).
+   */
+  side: "behind" | "ahead" | "left" | "right";
+  /** Zone number of the neighbouring player. */
+  mate: number;
+}
+
+const VERTICAL_NEIGHBORS: Record<number, ZoneNeighbor> = {
+  5: { side: "behind", mate: 4 },
+  6: { side: "behind", mate: 3 },
+  1: { side: "behind", mate: 2 },
+  4: { side: "ahead", mate: 5 },
+  3: { side: "ahead", mate: 6 },
+  2: { side: "ahead", mate: 1 },
+};
+
+const HORIZONTAL_NEIGHBORS: Record<number, ZoneNeighbor[]> = {
+  4: [{ side: "right", mate: 3 }],
+  3: [
+    { side: "left", mate: 4 },
+    { side: "right", mate: 2 },
+  ],
+  2: [{ side: "left", mate: 3 }],
+  5: [{ side: "right", mate: 6 }],
+  6: [
+    { side: "left", mate: 5 },
+    { side: "right", mate: 1 },
+  ],
+  1: [{ side: "left", mate: 6 }],
+};
+
+/** Positional-fault neighbour constraints for a zone (vertical pair + row sides). */
+export function zoneNeighbors(zone: number): ZoneNeighbor[] {
+  const vertical = VERTICAL_NEIGHBORS[zone];
+  if (!vertical) throw new Error("zone must be 1..6");
+  return [vertical, ...(HORIZONTAL_NEIGHBORS[zone] ?? [])];
+}

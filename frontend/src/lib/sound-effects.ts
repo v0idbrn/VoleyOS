@@ -632,3 +632,31 @@ export function playApproachCadence(tempo: ApproachTempo, volume = 0.5): boolean
   chime.stop(contactAt + 0.25);
   return true;
 }
+
+export const LEVEL_UP_ARPEGGIO_SPEC = { freqsHz: [523, 659, 784, 1047], noteMs: 90 } as const;
+
+/** Rising 4-note arpeggio when the career VolleyCard levels its OVR up. */
+export function playLevelUpArpeggio(volume = 0.5): boolean {
+  if (!enabled) return false;
+  const audio = audioContext();
+  if (!audio) return false;
+  resume(audio);
+  let cursor = audio.currentTime;
+  LEVEL_UP_ARPEGGIO_SPEC.freqsHz.forEach((freq, index) => {
+    const duration = LEVEL_UP_ARPEGGIO_SPEC.noteMs / 1000;
+    const osc = audio.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.value = freq;
+    const gain = audio.createGain();
+    const peak = index === LEVEL_UP_ARPEGGIO_SPEC.freqsHz.length - 1 ? volume : volume * 0.75;
+    gain.gain.setValueAtTime(0, cursor);
+    gain.gain.linearRampToValueAtTime(peak, cursor + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.001, cursor + duration);
+    osc.connect(gain);
+    gain.connect(audio.destination);
+    osc.start(cursor);
+    osc.stop(cursor + duration);
+    cursor += duration * 0.8;
+  });
+  return true;
+}

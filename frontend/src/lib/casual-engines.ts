@@ -957,3 +957,28 @@ export function clearPlayerDirectory(): string[] {
   }
   return [];
 }
+
+/* v9.5: pickup awards earned (a champion poster marks a completed ceremony)
+ * feeding the career VolleyCard sync. */
+export const PICKUP_AWARDS_KEY = "voleyos_pickup_awards_v1";
+
+export function loadPickupAwards(): number {
+  try {
+    if (typeof window === "undefined") return 0;
+    const raw = window.localStorage.getItem(PICKUP_AWARDS_KEY);
+    const value = raw === null ? Number.NaN : Number(raw);
+    return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function recordPickupAward(): number {
+  const next = loadPickupAwards() + 1;
+  try {
+    if (typeof window !== "undefined") window.localStorage.setItem(PICKUP_AWARDS_KEY, String(next));
+  } catch {
+    /* storage unavailable: the return value still advances */
+  }
+  return next;
+}

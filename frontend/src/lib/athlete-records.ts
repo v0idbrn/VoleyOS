@@ -107,3 +107,33 @@ export function recordsSparkline(records: AthleteJumpRecord[], width = 120, heig
     })
     .join(" ");
 }
+
+/* ------------------------------------------- v9.5 career VolleyCard sync */
+
+export interface CareerInputs {
+  bestJumpCm: number | null;
+  matchesPlayed: number;
+  matchesWon: number;
+  pickupAwards: number;
+}
+
+export interface CareerCardStats {
+  jmp: number;
+  atk: number;
+  def: number;
+  iq: number;
+  ovr: number;
+}
+
+const clamp99 = (value: number): number => Math.max(0, Math.min(99, Math.round(value)));
+
+/** Live JMP/ATK/DEF/IQ/OVR (0-99) derived from the athlete's real record book. */
+export function careerCardStats(input: CareerInputs): CareerCardStats {
+  const jump = input.bestJumpCm ?? 0;
+  const jmp = clamp99(jump * 1.2);
+  const atk = clamp99(jump * 0.7 + input.pickupAwards * 4 + 20);
+  const def = input.matchesPlayed > 0 ? clamp99(35 + (60 * input.matchesWon) / input.matchesPlayed) : 35;
+  const iq = clamp99(30 + input.matchesPlayed * 1.5 + input.pickupAwards * 3);
+  const ovr = Math.round((jmp + atk + def + iq) / 4);
+  return { jmp, atk, def, iq, ovr };
+}

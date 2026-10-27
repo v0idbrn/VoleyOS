@@ -18,6 +18,7 @@ import {
   benchSwapMessage,
   buildOrganizer,
   buildPrizePoster,
+  recordPickupAward,
   loadPlayerDirectory,
   capacityLabel,
   dropPlayer,
@@ -865,6 +866,7 @@ function PrizePanel({ locale, roster }: SuitePanelProps) {
     );
     setError(null);
     setNotice(null);
+    recordPickupAward();
     triggerCourtHaptics(25);
     window.dispatchEvent(new CustomEvent("voleyos:support-moment", { detail: "export" }));
   };

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   ATHLETE_RECORDS_CAP,
   ATHLETE_RECORDS_KEY,
+  careerCardStats,
   clearAthleteRecords,
   flightTimeJump,
   loadAthleteRecords,
@@ -72,6 +73,34 @@ describe("personal jump record book", () => {
     expect(loadAthleteRecords()).toEqual([]);
     expect(clearAthleteRecords()).toEqual([]);
     expect(loadAthleteRecords()).toEqual([]);
+  });
+
+  it("rates an empty career at the floor", () => {
+    expect(careerCardStats({ bestJumpCm: null, matchesPlayed: 0, matchesWon: 0, pickupAwards: 0 })).toEqual({
+      jmp: 0,
+      atk: 20,
+      def: 35,
+      iq: 30,
+      ovr: 21,
+    });
+  });
+
+  it("rewards jump height, wins and pickup awards", () => {
+    expect(careerCardStats({ bestJumpCm: 58, matchesPlayed: 2, matchesWon: 1, pickupAwards: 3 })).toEqual({
+      jmp: 70,
+      atk: 73,
+      def: 65,
+      iq: 42,
+      ovr: 63,
+    });
+  });
+
+  it("clamps every career stat into the 0..99 band", () => {
+    const stats = careerCardStats({ bestJumpCm: 400, matchesPlayed: 100, matchesWon: 100, pickupAwards: 50 });
+    expect(stats).toEqual({ jmp: 99, atk: 99, def: 95, iq: 99, ovr: 98 });
+    expect(stats.jmp).toBeLessThanOrEqual(99);
+    expect(stats.atk).toBeLessThanOrEqual(99);
+    expect(stats.iq).toBeLessThanOrEqual(99);
   });
 
   it("draws a sparkline over the recorded heights", () => {
