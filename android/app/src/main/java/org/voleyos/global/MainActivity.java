@@ -15,10 +15,24 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Enumeration;
 import java.util.Locale;
 
 public class MainActivity extends Activity {
+    /** Pure-SDK live scoreboard port: http://<hotspot-ip>:8765/state */
+    private static final int LIVE_PORT = 8765;
+
     private WebView webView;
     /** Tab requested by the home widget / launcher shortcut before the page is ready. */
     private String pendingTab;
@@ -26,6 +40,9 @@ public class MainActivity extends Activity {
     /** Exposed to JavaScript as VoleyOSBridge. */
     public static class VosleyOSBridge {
         private final Context context;
+        /** Latest signed match packet (JSON) served to every spectator on the hotspot. */
+        private volatile String latestLiveJson = "{\"status\":\"idle\"}";
+        private volatile ServerSocket liveServer;
 
         VosleyOSBridge(Context context) {
             this.context = context;
@@ -78,6 +95,173 @@ public class MainActivity extends Activity {
                 // The widget must never take the WebView down.
             }
         }
+
+        /** Active non-loopback IPv4 of this phone (hotspot: 192.168.43.1 / 192.168.137.1). */
+        private InetAddress findLocalIpv4() {
+            try {
+                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+                while (interfaces != null && interfaces.hasMoreElements()) {
+                    NetworkInterface nif = interfaces.nextElement();
+                    if (nif == null || !nif.isUp() || nif.isLoopback()) continue;
+                    Enumeration<InetAddress> addresses = nif.getInetAddresses();
+                    while (addresses.hasMoreElements()) {
+                        InetAddress address = addresses.nextElement();
+                        if (address instanceof Inet4Address && !address.isLoopbackAddress()) {
+                            return address;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+                // No interfaces readable; the caller falls back to "".
+            }
+            return null;
+        }
+
+        /** `http://<LAN_IP>:8765`, or "" when the phone has no usable IPv4 yet. */
+        private String baseUrl() {
+            InetAddress ip = findLocalIpv4();
+            if (ip == null) return "";
+            return "http://" + ip.getHostAddress() + ":" + LIVE_PORT;
+        }
+
+        /**
+         * Boots the zero-data spectator server (once) and returns its base URL
+         * so the app can render the QR. Any friend on this Wi-Fi hotspot opens
+         * it with 0 bytes of internet.
+         */
+        @JavascriptInterface
+        public String startLocalHotspotServer() {
+            synchronized (this) {
+                ServerSocket server = liveServer;
+                if (server == null || server.isClosed()) {
+                    final ServerSocket created;
+                    try {
+                        created = new ServerSocket(LIVE_PORT);
+                    } catch (IOException e) {
+                        return "";
+                    }
+                    liveServer = created;
+                    Thread worker = new Thread(() -> serveLoop(created), "vos-live-server");
+                    worker.setDaemon(true);
+                    worker.start();
+                }
+            }
+            return baseUrl();
+        }
+
+        /** Called by the app every time a point, set or side switch changes. */
+        @JavascriptInterface
+        public void updateLocalLiveServer(String jsonPayload) {
+            if (jsonPayload == null) return;
+            String trimmed = jsonPayload.trim();
+            if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+                latestLiveJson = trimmed;
+            }
+        }
+
+        private void serveLoop(ServerSocket server) {
+            while (!server.isClosed()) {
+                try (Socket client = server.accept()) {
+                    client.setSoTimeout(4000);
+                    handle(client);
+                } catch (IOException ignored) {
+                    // One dropped spectator must not kill the server.
+                }
+            }
+        }
+
+        private void handle(Socket client) throws IOException {
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8));
+            String requestLine = reader.readLine();
+            if (requestLine == null) return;
+            String[] parts = requestLine.split(" ");
+            String path = parts.length > 1 ? parts[1] : "/";
+            int query = path.indexOf('?');
+            if (query >= 0) path = path.substring(0, query);
+
+            byte[] body;
+            String type;
+            if (path.equals("/state")) {
+                body = latestLiveJson.getBytes(StandardCharsets.UTF_8);
+                type = "application/json; charset=utf-8";
+            } else {
+                body = SPECTATOR_HTML.getBytes(StandardCharsets.UTF_8);
+                type = "text/html; charset=utf-8";
+            }
+
+            OutputStream out = client.getOutputStream();
+            String head = "HTTP/1.1 200 OK\r\n"
+                    + "Content-Type: " + type + "\r\n"
+                    + "Content-Length: " + body.length + "\r\n"
+                    + "Access-Control-Allow-Origin: *\r\n"
+                    + "Cache-Control: no-store\r\n"
+                    + "Connection: close\r\n"
+                    + "\r\n";
+            out.write(head.getBytes(StandardCharsets.UTF_8));
+            out.write(body);
+            out.flush();
+        }
+
+        /**
+         * Self-contained VoleyOS Live spectator giant scoreboard. Polls /state
+         * every 400ms, renders team colors, huge digits, sets won, the serving
+         * ball and WebAudio whistle/buzzer cues on score changes — no internet
+         * needed, only the coach's Wi-Fi hotspot.
+         */
+        private static final String SPECTATOR_HTML =
+                "<!doctype html><html lang='es'><head><meta charset='utf-8'>"
+                        + "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+                        + "<title>VoleyOS Live</title><style>"
+                        + "html,body{margin:0;height:100%;background:#07070c;color:#fff;font-family:system-ui,-apple-system,sans-serif;overflow:hidden}"
+                        + "#wrap{display:flex;flex-direction:column;height:100%;box-sizing:border-box;padding:2vmin 3vmin}"
+                        + "#hdr{display:flex;justify-content:space-between;align-items:center;font-size:3vmin;letter-spacing:.25em;color:#eab308;font-weight:800}"
+                        + "#board{flex:1;display:grid;grid-template-columns:1fr auto 1fr;gap:2vmin;align-items:center;min-height:0}"
+                        + ".team{display:flex;flex-direction:column;align-items:center;gap:1vmin;min-width:0}"
+                        + ".name{font-size:5.4vmin;font-weight:900;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}"
+                        + ".score{font-size:30vmin;font-weight:900;line-height:.92;font-variant-numeric:tabular-nums}"
+                        + ".serve{font-size:7vmin;min-height:7vmin}"
+                        + "#mid{text-align:center;display:flex;flex-direction:column;gap:2vmin}"
+                        + "#sets{font-size:7vmin;font-weight:800;color:#eab308}"
+                        + "#evt{font-size:3vmin;color:#94a3b8;max-width:34vmin}"
+                        + "#foot{text-align:center;font-size:2.7vmin;color:#64748b;padding-bottom:1vmin}"
+                        + "#badge{position:fixed;top:2vmin;right:3vmin;background:#ff3b5c;border-radius:99px;padding:.7vmin 2.4vmin;font-size:2.6vmin;font-weight:900;letter-spacing:.1em;animation:blink 1.6s infinite}"
+                        + "@keyframes blink{0%,100%{opacity:1}50%{opacity:.55}}"
+                        + "</style></head><body><div id='wrap'>"
+                        + "<div id='hdr'><span id='room'>VoleyOS LIVE</span><span id='mode'></span></div>"
+                        + "<div id='board'>"
+                        + "<div class='team'><div class='name' id='an'>A</div>"
+                        + "<div class='score' id='as'>0</div><div class='serve' id='aserve'></div></div>"
+                        + "<div id='mid'><div id='sets'>0 - 0</div><div id='evt'></div></div>"
+                        + "<div class='team'><div class='name' id='bn'>B</div>"
+                        + "<div class='score' id='bs'>0</div><div class='serve' id='bserve'></div></div>"
+                        + "</div>"
+                        + "<div id='foot'>Conectado al Wi-Fi de la cancha · 0 MB de datos</div>"
+                        + "</div><div id='badge'>EN VIVO</div><script>\n"
+                        + "(function(){\n"
+                        + "var lastTotal=-1,lastSets=-1,ctx=null;\n"
+                        + "function tone(f,d,type){try{if(!ctx){var A=window.AudioContext||window.webkitAudioContext;if(!A)return;ctx=new A();}var o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.value=f;g.gain.value=.12;o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+d);}catch(e){}}\n"
+                        + "function whistle(){tone(1900,.16,'square');setTimeout(function(){tone(2400,.2,'square');},150);}\n"
+                        + "function buzzer(){tone(150,.45,'sawtooth');}\n"
+                        + "function el(id){return document.getElementById(id);}\n"
+                        + "function render(p){\n"
+                        + "el('an').textContent=p.homeName||'A';el('bn').textContent=p.awayName||'B';\n"
+                        + "var a=el('as'),b=el('bs');a.textContent=p.homeScore;b.textContent=p.awayScore;\n"
+                        + "a.style.color=p.homeColor||'#ff3b5c';b.style.color=p.awayColor||'#0ea5e9';\n"
+                        + "el('room').textContent=p.roomId||'VoleyOS LIVE';\n"
+                        + "el('mode').textContent=(p.mode||'').toUpperCase();\n"
+                        + "el('sets').textContent=(p.homeSets||0)+' - '+(p.awaySets||0);\n"
+                        + "el('evt').textContent=p.lastEvent||'';\n"
+                        + "el('aserve').textContent=p.servingSide==='A'?'\uD83C\uDFD2':'';\n"
+                        + "el('bserve').textContent=p.servingSide==='B'?'\uD83C\uDFD2':'';\n"
+                        + "var total=(p.homeScore||0)+(p.awayScore||0),sets=(p.homeSets||0)+(p.awaySets||0);\n"
+                        + "if(lastTotal>=0&&total>lastTotal){sets>lastSets?buzzer():whistle();}\n"
+                        + "lastTotal=total;lastSets=sets;\n"
+                        + "}\n"
+                        + "function tick(){fetch('/state',{cache:'no-store'}).then(function(r){return r.json();}).then(function(p){if(p&&typeof p.homeScore==='number'){render(p);}}).catch(function(){});}\n"
+                        + "setInterval(tick,400);tick();\n"
+                        + "})();\n"
+                        + "</script></body></html>";
     }
 
     /** Widget and shortcut targets are ours, but sanitize before evaluating JS anyway. */
