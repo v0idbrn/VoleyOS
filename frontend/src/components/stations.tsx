@@ -46,6 +46,29 @@ import {
 } from "@/lib/live-cast-engine";
 import { loadSeason, saveSeasonMatch, seasonMatchFromState, seasonStats } from "@/lib/season-vault";
 import { syncWidgetSnapshot } from "@/lib/widget-bridge";
+import {
+  K1_BLEED_THRESHOLD,
+  SCOUT_ACTIONS,
+  ZONE_PRESETS,
+  amendLastScoutTag,
+  bleedingAlertMessage,
+  bleedingRotation,
+  clearLiveScoutShots,
+  loadLiveScoutShots,
+  loadScoutSession,
+  recordScoutPoint,
+  redoScoutPoint,
+  resetScoutSession,
+  rotationStats,
+  saveLiveScoutShots,
+  saveScoutSession,
+  sessionShots,
+  tagLastScoutPoint,
+  undoScoutPoint,
+  type ScoutAction,
+  type ScoutSession,
+  type ZonePreset,
+} from "@/lib/live-scouting-engine";
 import { loadPickupAwards, nextServeStreak, rememberPlayerNames, serveCapHit, serveCapMessage, type ServeCapLimit } from "@/lib/casual-engines";
 import {
   FAN_QUESTIONS,
@@ -887,6 +910,15 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [sunMode, setSunMode] = useState(() => window.localStorage.getItem("volleyos.sunMode") === "1");
   const [oledDim, setOledDim] = useState(false);
   const holdTimerRef = useRef<number | null>(null);
+  // v10.0.0 live micro-scout: one record per scored point + a 2.5s tag bar.
+  const [scout, setScout] = useState<ScoutSession>(() => loadScoutSession());
+  const [scoutBar, setScoutBar] = useState(false);
+  const [boxOpen, setBoxOpen] = useState(false);
+  const [pendingZone, setPendingZone] = useState<{ originZone: number; targetZone: number } | null>(null);
+  const [pendingScorer, setPendingScorer] = useState<string | null>(null);
+  const scoutTimerRef = useRef<number | null>(null);
+  const lineupARef = useRef<number[]>([...state.lineupA]);
+  const lineupBRef = useRef<number[]>([...state.lineupB]);
 
   useEffect(() => {
     setTeams(loadTeams());
@@ -945,6 +977,78 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     };
   }, [state, castActive, cloudRelay]);
 
+  const flashScoutBar = (): void => {
+    setScoutBar(true);
+    if (scoutTimerRef.current) window.clearTimeout(scoutTimerRef.current);
+    scoutTimerRef.current = window.setTimeout(() => setScoutBar(false), 2500);
+  };
+
+  /** Rotation (R1–R6) of a lineup relative to the order it started the match. */
+  const rotationOf = (lineup: number[], ref: { current: number[] }): number => {
+    const index = ref.current.indexOf(lineup[0] ?? -1);
+    if (index < 0) {
+      // A roster swap replaced the lineup wholesale: restart the count.
+      ref.current = [...lineup];
+      return 1;
+    }
+    return index + 1;
+  };
+
+  const recordScout = (preState: ScoreboardState, team: "A" | "B", rotated: boolean): void => {
+    setScout((previous) =>
+      recordScoutPoint(previous, {
+        setNumber: preState.setNumber,
+        scoredBy: team,
+        servingBefore: preState.serving,
+        sideOut: rotated,
+        rotationA: rotationOf(preState.lineupA, lineupARef),
+        rotationB: rotationOf(preState.lineupB, lineupBRef),
+      }),
+    );
+    setPendingZone(null);
+    setPendingScorer(null);
+    flashScoutBar();
+  };
+
+  const scoutActionLabel = (action: ScoutAction): string =>
+    action === "attack"
+      ? t(locale, "💥 Ataque", "💥 Attack", "💥 Ataque")
+      : action === "block"
+        ? t(locale, "🧱 Bloqueo", "🧱 Block", "🧱 Bloqueio")
+        : action === "ace"
+          ? t(locale, "🎯 Ace", "🎯 Ace", "🎯 Ace")
+          : action === "set"
+            ? t(locale, "🎩 Toque", "🎩 Tip", "🎩 Toque")
+            : t(locale, "❌ Error Rival", "❌ Opponent Error", "❌ Erro do Rival");
+
+  const scoutZoneLabel = (id: ZonePreset["id"]): string =>
+    id === "z4z5"
+      ? "Z4 → Z5"
+      : id === "z2z1"
+        ? "Z2 → Z1"
+        : id === "z3short"
+          ? t(locale, "Z3 Corta", "Z3 Quick", "Z3 Curta")
+          : "Pipe Z6";
+
+  const scoutPlayers = (state.rosterA?.players ?? []).slice(0, 6);
+
+  useEffect(() => {
+    saveScoutSession(scout);
+    saveLiveScoutShots(sessionShots(scout));
+  }, [scout]);
+
+  // A fresh 0-0 match re-anchors R1 for both lineups and drops stale scouting.
+  const freshMatch =
+    state.setNumber === 1 && state.setsA === 0 && state.setsB === 0 && state.scoreA === 0 && state.scoreB === 0;
+  useEffect(() => {
+    if (!freshMatch) return;
+    lineupARef.current = [...state.lineupA];
+    lineupBRef.current = [...state.lineupB];
+    setScout((previous) => (previous.events.length > 0 || previous.undone.length > 0 ? resetScoutSession() : previous));
+  }, [freshMatch, state.lineupA, state.lineupB]);
+
+  const scoutAlert = bleedingRotation(scout, "A");
+
   const flashUndoPill = (): void => {
     setUndoPill(true);
     if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
@@ -961,6 +1065,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     return () => {
       if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
       if (burstTimerRef.current) window.clearTimeout(burstTimerRef.current);
+      if (scoutTimerRef.current) window.clearTimeout(scoutTimerRef.current);
     };
   }, []);
 
@@ -1089,6 +1194,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       }
       setHistory(commitScoreboard(history, result.state));
       flashUndoPill();
+      recordScout(state, team, result.rotated);
       if (result.matchFinished) flashBurst("match");
       else if (result.setFinished) flashBurst("set");
       if (result.matchFinished) saveSeasonMatch(seasonMatchFromState(result.state, preset));
@@ -1150,6 +1256,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
 
   const undo = (): void => {
     setHistory((previous) => undoScoreboard(previous));
+    setScout((previous) => undoScoutPoint(previous));
     setMessage(t(locale, "Jugada deshecha.", "Play undone.", "Jogada desfeita."));
     triggerCourtHaptics(18);
   };
@@ -1173,6 +1280,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       else if (detail === "VOLUME_DOWN") point("B");
       else if (detail === "VOLUME_LONG_UNDO") {
         setHistory((previous) => undoScoreboard(undoScoreboard(previous)));
+        setScout((previous) => undoScoutPoint(previous, 2));
         setMessage(t(locale, "Dos puntos deshechos desde volumen.", "Two points undone from volume.", "Dois pontos desfeitos pelo volume."));
         triggerCourtHaptics([40, 30, 40]);
       }
@@ -1183,6 +1291,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
 
   const redo = (): void => {
     setHistory((previous) => redoScoreboard(previous));
+    setScout((previous) => redoScoutPoint(previous));
     setMessage(t(locale, "Jugada rehecha.", "Play redone.", "Jogada refeita."));
   };
 
@@ -1195,6 +1304,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       if (key === "a" || key === "l") {
         event.preventDefault();
         const team = key === "a" ? "A" : "B";
+        recordScout(state, team, awardIndoorPoint(state, team).rotated);
         setHistory((previous) => {
           const result = awardIndoorPoint(previous.present, team);
           return commitScoreboard(previous, result.state);
@@ -1202,6 +1312,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       } else if (key === "z") {
         event.preventDefault();
         setHistory((previous) => undoScoreboard(previous));
+        setScout((previous) => undoScoutPoint(previous));
       } else if (key === "w") {
         event.preventDefault();
         playWhistle("short");
@@ -1596,6 +1707,55 @@ ${name}` : name))} testId="cancha-player-chips" />
         </div>
       ) : null}
       <p className="mt-2 text-[11px] text-white/60">{message}</p>
+      {scoutAlert ? (
+        <p
+          data-testid="tactical-alert"
+          className="mt-2 rounded-lg border border-crimson/50 bg-crimson/10 p-2 text-[11px] font-semibold leading-snug text-white"
+        >
+          {bleedingAlertMessage(scoutAlert, locale)}
+        </p>
+      ) : null}
+      <button
+        type="button"
+        data-testid="box-score-toggle"
+        aria-expanded={boxOpen}
+        onClick={() => setBoxOpen((open) => !open)}
+        className={`${BTN} mt-2 w-full`}
+      >
+        📊 {t(locale, "Box Score & Eficiencia por Rotación (R1–R6)", "Box Score & Rotation Efficiency (R1–R6)", "Box Score & Eficiência por Rotação (R1–R6)")} {boxOpen ? "▾" : "▸"}
+      </button>
+      {boxOpen ? (
+        <div data-testid="box-score" className="mt-2 space-y-2 rounded-xl border border-white/10 bg-obsidian/80 p-2">
+          {([["A", state.teamA], ["B", state.teamB]] as const).map(([side, teamName]) => (
+            <div key={side}>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-white/50">{teamName}</p>
+              <div className="mt-1 grid grid-cols-6 gap-1 text-center text-[9px] font-bold uppercase text-white/40">
+                <span>R</span>
+                <span>K1</span>
+                <span>K2</span>
+                <span>{t(locale, "Efic.", "Eff", "Eficiência")}</span>
+                <span>K/E</span>
+                <span>AC/BL</span>
+              </div>
+              {rotationStats(scout, side).map((row) => (
+                <div
+                  key={row.rotation}
+                  className="mt-1 grid grid-cols-6 gap-1 text-center text-[10px] font-semibold tabular-nums text-white/80"
+                >
+                  <span className={row.sideOutAttempts >= 3 && row.k1Pct < K1_BLEED_THRESHOLD ? "font-black text-crimson" : "text-white/50"}>
+                    R{row.rotation}
+                  </span>
+                  <span>{row.k1Pct}%</span>
+                  <span>{row.k2Pct}%</span>
+                  <span>{row.efficiency}</span>
+                  <span>{row.kills}/{row.errors}</span>
+                  <span>{row.aces}/{row.blocks}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-2 grid grid-cols-6 gap-1 text-center text-[10px]">
         {state.lineupA.map((player, index) => (
           <div key={`zone-${index + 1}`} className={`rounded ${index === 0 ? "bg-volt/20 text-volt" : "bg-white/5"}`}>
@@ -1684,6 +1844,87 @@ ${name}` : name))} testId="cancha-player-chips" />
         >
           ↶ {t(locale, "Deshacer último punto", "Undo last point", "Desfazer último ponto")}
         </button>
+      ) : null}
+      {scoutBar ? (
+        <div
+          data-testid="micro-scout"
+          className="fixed bottom-36 left-1/2 z-40 w-[min(94vw,26rem)] -translate-x-1/2 rounded-2xl border border-white/15 bg-obsidian/95 p-2 shadow-2xl backdrop-blur"
+        >
+          <div className="mb-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-white/50">
+            <span>🥊 {t(locale, "Etiquetá el punto", "Tag the point", "Marque o ponto")}</span>
+            <span className="text-volt">2.5s</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {SCOUT_ACTIONS.map((action) => (
+              <button
+                key={action}
+                type="button"
+                data-testid={`scout-action-${action}`}
+                onClick={() => {
+                  setScout((previous) =>
+                    tagLastScoutPoint(previous, {
+                      action,
+                      originZone: pendingZone?.originZone ?? null,
+                      targetZone: pendingZone?.targetZone ?? null,
+                      scorer: pendingScorer,
+                    }),
+                  );
+                  flashScoutBar();
+                }}
+                className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-bold text-white transition hover:border-volt hover:text-volt"
+              >
+                {scoutActionLabel(action)}
+              </button>
+            ))}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {ZONE_PRESETS.map((preset) => {
+              const active = pendingZone?.originZone === preset.originZone && pendingZone?.targetZone === preset.targetZone;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  data-testid={`scout-zone-${preset.id}`}
+                  onClick={() => {
+                    setPendingZone({ originZone: preset.originZone, targetZone: preset.targetZone });
+                    setScout((previous) =>
+                      amendLastScoutTag(previous, { originZone: preset.originZone, targetZone: preset.targetZone }),
+                    );
+                    flashScoutBar();
+                  }}
+                  className={`rounded-lg px-2 py-1 text-[10px] font-bold transition ${
+                    active ? "border border-volt bg-volt/15 text-volt" : "border border-white/15 bg-white/5 text-white/70"
+                  }`}
+                >
+                  {scoutZoneLabel(preset.id)}
+                </button>
+              );
+            })}
+          </div>
+          {scoutPlayers.length > 0 ? (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {scoutPlayers.map((player) => (
+                <button
+                  key={player.number}
+                  type="button"
+                  data-testid={`scout-scorer-${player.number}`}
+                  onClick={() => {
+                    setPendingScorer(player.name);
+                    setScout((previous) => amendLastScoutTag(previous, { scorer: player.name }));
+                    flashScoutBar();
+                  }}
+                  className={`rounded-full px-2 py-1 text-[9px] font-bold transition ${
+                    pendingScorer === player.name
+                      ? "border border-volt bg-volt/15 text-volt"
+                      : "border border-white/15 bg-white/5 text-white/70"
+                  }`}
+                >
+                  ☝ {player.name.split(" ")[0]}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
       ) : null}
       {burst ? (
         <div data-testid="set-burst" aria-hidden className="pointer-events-none fixed inset-0 z-40 overflow-hidden">
@@ -4130,7 +4371,11 @@ const HEATMAP_SAMPLE = [
 ];
 
 export function ShotHeatmapStation({ meta, locale, onSave }: StationProps) {
-  const [shots, setShots] = useState(HEATMAP_SAMPLE);
+  const [shots, setShots] = useState<{ x: number; y: number; result: ShotResult }[]>(() => {
+    // v10.0.0: tagged attacks from ⏱️ Cancha flow in with zero double typing.
+    const tagged = loadLiveScoutShots();
+    return tagged.length > 0 ? tagged : HEATMAP_SAMPLE;
+  });
   const [result, setResult] = useState<ShotResult>("kill");
   const report = useMemo(
     () => (shots.length > 0
@@ -4148,7 +4393,7 @@ export function ShotHeatmapStation({ meta, locale, onSave }: StationProps) {
           <option value="blocked">Blocked</option>
           <option value="in_play">In play</option>
         </select>
-        <button type="button" className={BTN} onClick={() => setShots([])}>{t(locale, "Limpiar", "Clear", "Limpar")}</button>
+        <button type="button" className={BTN} onClick={() => { setShots([]); clearLiveScoutShots(); }}>{t(locale, "Limpiar", "Clear", "Limpar")}</button>
         <button type="button" className={BTN} onClick={() => setShots(HEATMAP_SAMPLE)}>{t(locale, "Ejemplo", "Example", "Exemplo")}</button>
       </div>
       <div className="grid grid-cols-3 gap-1">

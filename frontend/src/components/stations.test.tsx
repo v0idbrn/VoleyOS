@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BiomechanicsStation, ScoreboardStation, ScoutingStation } from "./stations";
@@ -95,6 +95,47 @@ describe("scouting voice", () => {
     fireEvent.click(targetPlus);
     fireEvent.click(screen.getByRole("button", { name: /^Result:/ }));
     expect(screen.getAllByText(/Kill|In play/).length).toBeGreaterThan(0);
+  });
+});
+
+describe("v10.0.0 live micro-scout", () => {
+  beforeEach(() => window.localStorage.clear());
+  afterEach(() => cleanup());
+
+  it("flashes the 1-tap tagger after a point and keeps it alive across taps", async () => {
+    renderScoreboard();
+    expect(screen.queryByTestId("micro-scout")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "+ Tiburones [A]" }));
+    await waitFor(() => expect(screen.getByTestId("micro-scout")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("scout-zone-z4z5"));
+    fireEvent.click(screen.getByTestId("scout-action-attack"));
+    // Every tap restarts the 2.5s life so zone and scorer chips can follow.
+    expect(screen.getByTestId("micro-scout")).toBeTruthy();
+    expect(screen.getByTestId("scout-action-attack")).toBeTruthy();
+    expect(screen.getByTestId("scout-zone-z4z5")).toBeTruthy();
+  });
+
+  it("opens the R1–R6 box score drawer from the Cancha station", () => {
+    renderScoreboard();
+    expect(screen.queryByTestId("box-score")).toBeNull();
+    fireEvent.click(screen.getByTestId("box-score-toggle"));
+    const box = screen.getByTestId("box-score");
+    expect(within(box).getAllByText("R1").length).toBeGreaterThanOrEqual(2);
+    expect(within(box).getAllByText("Tiburones").length).toBe(1);
+    expect(within(box).getAllByText("Cóndores").length).toBe(1);
+  });
+
+  it("raises the tactical alert when a rotation bleeds side-outs", async () => {
+    renderScoreboard();
+    // A serves, B steals the rally (A now receives) and then holds three
+    // straight receives: R1 side-out collapses to 0 of 3 → alert.
+    for (let index = 0; index < 4; index += 1) {
+      fireEvent.click(screen.getByRole("button", { name: "+ Cóndores [L]" }));
+    }
+    await waitFor(() => expect(screen.getByTestId("tactical-alert")).toBeTruthy());
+    const alert = screen.getByTestId("tactical-alert").textContent ?? "";
+    expect(alert).toContain("R1");
+    expect(alert).toContain("K1");
   });
 });
 
