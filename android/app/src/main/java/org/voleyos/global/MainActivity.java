@@ -48,6 +48,8 @@ public class MainActivity extends Activity {
         /** Latest signed match packet (JSON) served to every spectator on the hotspot. */
         private volatile String latestLiveJson = "{\"status\":\"idle\"}";
         private volatile ServerSocket liveServer;
+        /** v10.0.0 — 4-digit bench PIN gating /state ("" = open, legacy). */
+        private volatile String livePin = "";
 
         VosleyOSBridge(Context context) {
             this.context = context;
@@ -256,6 +258,15 @@ public class MainActivity extends Activity {
             }
         }
 
+        /**
+         * v10.0.0 — PIN bench mesh: arms (or clears with "") the 4-digit PIN
+         * that bench screens must present as ?pin=NNNN when reading /state.
+         */
+        @JavascriptInterface
+        public void setLocalLivePin(String pin) {
+            livePin = pin == null ? "" : pin.trim();
+        }
+
         private void serveLoop(ServerSocket server) {
             while (!server.isClosed()) {
                 try (Socket client = server.accept()) {
@@ -276,13 +287,19 @@ public class MainActivity extends Activity {
                 return;
             }
             String[] parts = requestLine.split(" ");
-            String path = parts.length > 1 ? parts[1] : "/";
-            int query = path.indexOf('?');
-            if (query >= 0) path = path.substring(0, query);
+            String target = parts.length > 1 ? parts[1] : "/";
+            int query = target.indexOf('?');
+            String path = query >= 0 ? target.substring(0, query) : target;
+            String queryString = query >= 0 ? target.substring(query + 1) : "";
 
             byte[] body;
             String type;
             if (path.equals("/state")) {
+                // v10.0.0 bench mesh: refuse reads without the owner's PIN.
+                if (!livePin.isEmpty() && !livePin.equals(queryParam(queryString, "pin"))) {
+                    writeError(client, "403 Forbidden");
+                    return;
+                }
                 body = latestLiveJson.getBytes(StandardCharsets.UTF_8);
                 type = "application/json; charset=utf-8";
             } else {
@@ -315,6 +332,18 @@ public class MainActivity extends Activity {
             }
             if (buffer.size() == 0) return null;
             return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+        }
+
+        /** Exact ?name=value from a query string (bench PINs are digits only). */
+        private static String queryParam(String query, String name) {
+            if (query == null || query.isEmpty()) return null;
+            for (String pair : query.split("&")) {
+                int eq = pair.indexOf('=');
+                if (eq > 0 && pair.substring(0, eq).equals(name)) {
+                    return pair.substring(eq + 1);
+                }
+            }
+            return null;
         }
 
         private static void writeError(Socket client, String status) throws IOException {
@@ -385,7 +414,8 @@ public class MainActivity extends Activity {
                         + "if(lastTotal>=0&&total>lastTotal){sets>lastSets?buzzer():whistle();}\n"
                         + "lastTotal=total;lastSets=sets;\n"
                         + "}\n"
-                        + "function tick(){fetch('/state',{cache:'no-store'}).then(function(r){return r.json();}).then(function(p){if(p&&typeof p.homeScore==='number'){render(p);}}).catch(function(){});}\n"
+                        + "var pin=(location.search.match(/[?&]pin=([0-9]{4})/)||[])[1]||'';\n"
+                        + "function tick(){fetch('/state'+(pin?'?pin='+encodeURIComponent(pin):''),{cache:'no-store'}).then(function(r){return r.json();}).then(function(p){if(p&&typeof p.homeScore==='number'){render(p);}}).catch(function(){});}\n"
                         + "setInterval(tick,400);tick();\n"
                         + "})();\n"
                         + "</script></body></html>";

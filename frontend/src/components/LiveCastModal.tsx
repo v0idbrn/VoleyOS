@@ -5,10 +5,13 @@ import { useEffect, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
 import {
   buildPacket,
+  createBenchJoinUrl,
+  createBenchPin,
   createHandoverUrl,
   createSpectatorUrl,
   decodeWhatsAppFreePulse,
   encodeWhatsAppFreePulse,
+  setLocalLivePin,
   startLocalHotspotServer,
   subscribeLiveRoom,
   type LiveMatchPacket,
@@ -112,6 +115,7 @@ export function LiveCastModal({
 }: LiveCastModalProps) {
   const [tab, setTab] = useState<CastTab>(initialJoin ? 3 : initialTab);
   const [serverUrl, setServerUrl] = useState<string | null>(null);
+  const [benchPin, setBenchPin] = useState<string | null>(null);
   const [hotspotError, setHotspotError] = useState(false);
   const [pulse, setPulse] = useState("");
   const [pasteText, setPasteText] = useState("");
@@ -174,9 +178,11 @@ export function LiveCastModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, state, roomId, hostSecret, castMode]);
 
+  const benchUrl = serverUrl && benchPin ? createBenchJoinUrl(serverUrl, benchPin) : null;
+
   /* Render the QR for whatever URL the active tab shows. */
   const qrTarget =
-    tab === 1 ? serverUrl : tab === 3 ? cloudUrl : tab === 4 ? handoverUrl : null;
+    tab === 1 ? (benchUrl ?? serverUrl) : tab === 3 ? cloudUrl : tab === 4 ? handoverUrl : null;
   useEffect(() => {
     if (!qrTarget) {
       setQr(null);
@@ -214,6 +220,10 @@ export function LiveCastModal({
   const startHotspot = (): void => {
     const url = startLocalHotspotServer();
     if (url) {
+      // v10.0.0 bench mesh: arm a fresh 4-digit PIN before spectators arrive.
+      const pin = createBenchPin();
+      setLocalLivePin(pin);
+      setBenchPin(pin);
       setServerUrl(url);
       setHotspotError(false);
       onActiveChange?.(true);
@@ -340,8 +350,17 @@ export function LiveCastModal({
               </button>
               {serverUrl ? (
                 <div className="space-y-1 text-center">
-                  <div data-testid="hotspot-qr" className="mx-auto w-fit overflow-hidden rounded-lg bg-white p-1.5 [&_svg]:h-36 [&_svg]:w-36" dangerouslySetInnerHTML={{ __html: qr?.target === serverUrl ? qr.svg : "" }} />
+                  <div data-testid="hotspot-qr" className="mx-auto w-fit overflow-hidden rounded-lg bg-white p-1.5 [&_svg]:h-36 [&_svg]:w-36" dangerouslySetInnerHTML={{ __html: qr?.target === (benchUrl ?? serverUrl) ? qr.svg : "" }} />
                   <p data-testid="hotspot-url" className="break-all font-mono text-[10px] text-volt">{serverUrl}</p>
+                  {benchPin ? (
+                    <p data-testid="bench-pin" className="text-[10px] text-white/70">
+                      🔑 {t3(locale, "PIN de la banca", "Bench PIN", "PIN do banco")}:{" "}
+                      <span className="font-mono text-base font-black text-volt">{benchPin}</span>
+                    </p>
+                  ) : null}
+                  {benchUrl ? (
+                    <p data-testid="bench-url" className="break-all font-mono text-[9px] text-white/50">{benchUrl}</p>
+                  ) : null}
                   <button type="button" className={`${BTN} border border-white/15 bg-white/5`} onClick={() => void copyUrl(serverUrl)}>
                     {copied ? t3(locale, "✓ Copiado", "✓ Copied", "✓ Copiado") : t3(locale, "📋 Copiar URL", "📋 Copy URL", "📋 Copiar URL")}
                   </button>

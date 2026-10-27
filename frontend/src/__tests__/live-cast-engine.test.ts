@@ -4,6 +4,8 @@ import {
   LAN_PORT,
   PAGES_ORIGIN,
   buildPacket,
+  createBenchJoinUrl,
+  createBenchPin,
   createHandoverUrl,
   createHostSecret,
   createRoomId,
@@ -11,12 +13,16 @@ import {
   decodeWhatsAppFreePulse,
   derivePubHash,
   encodeWhatsAppFreePulse,
+  isValidBenchPin,
   localServerBase,
   ntfyTopic,
   parseRoomParams,
+  pollBenchState,
   pollLocalState,
   publishLiveUpdate,
+  setLocalLivePin,
   signPacket,
+  startBenchMesh,
   startLocalHotspotServer,
   pushLocalLiveServer,
   subscribeLiveRoom,
@@ -218,5 +224,73 @@ describe("Mode C — cloud SSE relay, spectator URL and battery handover", () =>
     expect(params.pubHash).toBeNull();
     expect(params.snapshot).toBeNull();
     expect(params.hostSecret).toBeNull();
+  });
+});
+
+describe("Mode B+ — PIN bench mesh on :8765 (v10.0.0)", () => {
+  it("mints and validates 4-digit bench pins", () => {
+    expect(createBenchPin(() => 0)).toBe("0000");
+    expect(createBenchPin(() => 0.9999)).toBe("9999");
+    expect(createBenchPin()).toMatch(/^\d{4}$/u);
+    expect(isValidBenchPin("4321")).toBe(true);
+    expect(isValidBenchPin("432")).toBe(false);
+    expect(isValidBenchPin("43a1")).toBe(false);
+  });
+
+  it("builds the bench join URL on the hotspot origin", () => {
+    expect(createBenchJoinUrl("http://192.168.43.1:8765/", "4321")).toBe("http://192.168.43.1:8765/?pin=4321");
+    expect(createBenchJoinUrl("http://192.168.137.1:8765", "0007")).toBe("http://192.168.137.1:8765/?pin=0007");
+  });
+
+  it("arms the PIN in the native server and no-ops on the web", () => {
+    const pushed: string[] = [];
+    (window as Window & { VoleyOSBridge?: unknown }).VoleyOSBridge = {
+      setLocalLivePin: (pin: string) => pushed.push(pin),
+    };
+    expect(setLocalLivePin("4321")).toBe(true);
+    expect(pushed).toEqual(["4321"]);
+    delete (window as Window & { VoleyOSBridge?: unknown }).VoleyOSBridge;
+    expect(setLocalLivePin("4321")).toBe(false);
+  });
+
+  it("polls /state?pin= and distinguishes denied from offline", async () => {
+    const packet = await samplePacket();
+    const okFetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => packet }));
+    const ok = await pollBenchState("http://192.168.43.1:8765", "4321", okFetch);
+    expect(ok.status).toBe("ok");
+    expect(ok.packet).toEqual(packet);
+    expect(okFetch).toHaveBeenCalledWith("http://192.168.43.1:8765/state?pin=4321");
+
+    const deniedFetch = vi.fn(async () => ({ ok: false, status: 403, json: async () => ({}) }));
+    expect((await pollBenchState("http://192.168.43.1:8765", "0000", deniedFetch)).status).toBe("denied");
+
+    const boom = vi.fn(async () => {
+      throw new Error("offline");
+    });
+    expect((await pollBenchState("http://192.168.43.1:8765", "4321", boom)).status).toBe("offline");
+  });
+
+  it("runs the bench mesh loop every 400ms until stopped", async () => {
+    const packet = await samplePacket();
+    vi.useFakeTimers();
+    try {
+      const received: LiveMatchPacket[] = [];
+      const statuses: string[] = [];
+      const stop = startBenchMesh({
+        base: "http://192.168.43.1:8765",
+        pin: "4321",
+        onPacket: (next) => received.push(next),
+        onStatus: (status) => statuses.push(status),
+        fetchImpl: async () => ({ ok: true, status: 200, json: async () => packet }),
+      });
+      await vi.advanceTimersByTimeAsync(400);
+      expect(received).toEqual([packet]);
+      expect(statuses).toEqual(["ok"]);
+      stop();
+      await vi.advanceTimersByTimeAsync(800);
+      expect(received).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

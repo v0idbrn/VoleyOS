@@ -319,6 +319,7 @@ export async function decodeWhatsAppFreePulse(text: string): Promise<LiveMatchPa
 interface LocalBridge {
   startLocalHotspotServer?: () => string;
   updateLocalLiveServer?: (jsonPayload: string) => void;
+  setLocalLivePin?: (pin: string) => void;
 }
 
 function localBridge(): LocalBridge | null {
@@ -350,7 +351,7 @@ export function pushLocalLiveServer(packet: LiveMatchPacket): boolean {
   }
 }
 
-type FetchLike = (input: string, init?: { signal?: AbortSignal }) => Promise<{ ok: boolean; json: () => Promise<unknown> }>;
+type FetchLike = (input: string, init?: { signal?: AbortSignal }) => Promise<{ ok: boolean; status?: number; json: () => Promise<unknown> }>;
 
 function isPacket(value: unknown): value is LiveMatchPacket {
   if (typeof value !== "object" || value === null) return false;
@@ -384,6 +385,87 @@ export function startSpectatorPoll(
       if (packet) onPacket(packet);
     });
   }, interval);
+  return () => globalThis.clearInterval(timer);
+}
+
+/* ------------------------------------------------------------------ */
+/* Mode B+ — PIN bench mesh on :8765 (v10.0.0)                         */
+/* ------------------------------------------------------------------ */
+
+/** 4-digit PIN gating `/state` + the giant bench scoreboard (0000–9999). */
+export function createBenchPin(random: () => number = Math.random): string {
+  const value = Math.floor(random() * 10000);
+  if (!Number.isFinite(value) || value < 0 || value > 9999) return "1901";
+  return String(value).padStart(4, "0");
+}
+
+export function isValidBenchPin(pin: string): boolean {
+  return /^\d{4}$/u.test(pin);
+}
+
+/** `http://<ip>:8765/?pin=NNNN` — the PIN-locked bench mesh entry QR. */
+export function createBenchJoinUrl(base: string, pin: string): string {
+  return `${base.replace(/\/$/u, "")}/?pin=${encodeURIComponent(pin)}`;
+}
+
+/** Arms (or clears with "") the PIN inside the native hotspot server. */
+export function setLocalLivePin(pin: string): boolean {
+  const bridge = localBridge();
+  if (!bridge?.setLocalLivePin) return false;
+  try {
+    bridge.setLocalLivePin(pin);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export type BenchPollStatus = "ok" | "denied" | "offline";
+
+export interface BenchPollResult {
+  status: BenchPollStatus;
+  packet: LiveMatchPacket | null;
+}
+
+/**
+ * PIN-aware GET of `/state?pin=NNNN`. 403 means the PIN was refused (the
+ * mesh owner rotated it); anything else that fails is plain offline.
+ */
+export async function pollBenchState(
+  base: string,
+  pin: string,
+  fetchImpl?: FetchLike,
+): Promise<BenchPollResult> {
+  const doFetch = fetchImpl ?? (typeof fetch === "function" ? (fetch as unknown as FetchLike) : null);
+  if (!doFetch) return { status: "offline", packet: null };
+  try {
+    const response = await doFetch(`${base.replace(/\/$/u, "")}/state?pin=${encodeURIComponent(pin)}`);
+    if (response.status === 403) return { status: "denied", packet: null };
+    if (!response.ok) return { status: "offline", packet: null };
+    const payload: unknown = await response.json();
+    return isPacket(payload) ? { status: "ok", packet: payload } : { status: "offline", packet: null };
+  } catch {
+    return { status: "offline", packet: null };
+  }
+}
+
+export interface BenchMeshOptions {
+  base: string;
+  pin: string;
+  onPacket: (packet: LiveMatchPacket) => void;
+  onStatus?: (status: BenchPollStatus) => void;
+  intervalMs?: number;
+  fetchImpl?: FetchLike;
+}
+
+/** 400ms PIN-gated spectator loop for bench screens. Returns a stop function. */
+export function startBenchMesh(options: BenchMeshOptions): () => void {
+  const timer = globalThis.setInterval(() => {
+    void pollBenchState(options.base, options.pin, options.fetchImpl).then((result) => {
+      if (result.packet) options.onPacket(result.packet);
+      options.onStatus?.(result.status);
+    });
+  }, options.intervalMs ?? 400);
   return () => globalThis.clearInterval(timer);
 }
 

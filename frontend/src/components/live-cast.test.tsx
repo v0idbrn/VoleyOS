@@ -14,6 +14,7 @@ import { newScoreboard, type ScoreboardState } from "@/lib/local-engines";
 interface TestBridge {
   startLocalHotspotServer?: () => string;
   updateLocalLiveServer?: (json: string) => void;
+  setLocalLivePin?: (pin: string) => void;
 }
 
 type BridgedWindow = Window & { VoleyOSBridge?: TestBridge };
@@ -42,9 +43,13 @@ function openModal(overrides: Partial<Parameters<typeof LiveCastModal>[0]> = {})
 }
 
 describe("LiveCastModal — 4 broadcast modes", () => {
+  let pinFn: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
+    pinFn = vi.fn();
     (window as BridgedWindow).VoleyOSBridge = {
       startLocalHotspotServer: () => "http://192.168.43.1:8765",
+      setLocalLivePin: pinFn,
     };
     window.localStorage.clear();
   });
@@ -66,6 +71,19 @@ describe("LiveCastModal — 4 broadcast modes", () => {
     );
     expect(onActive).toHaveBeenCalledWith(true);
     // The scannable QR renders for the LAN URL.
+    await waitFor(() => expect(screen.getByTestId("hotspot-qr").innerHTML).toContain("<svg"));
+  });
+
+  it("Mode 1: arms a fresh 4-digit bench PIN and shows the mesh join URL", async () => {
+    openModal();
+    fireEvent.click(screen.getByTestId("hotspot-start"));
+
+    await waitFor(() => expect(screen.getByTestId("bench-pin")).toBeInTheDocument());
+    const pin = /\d{4}/u.exec(screen.getByTestId("bench-pin").textContent ?? "")?.[0] ?? "";
+    expect(pin).toMatch(/^\d{4}$/u);
+    expect(pinFn).toHaveBeenCalledWith(pin);
+    expect(screen.getByTestId("bench-url").textContent).toBe(`http://192.168.43.1:8765/?pin=${pin}`);
+    // The QR now scans straight into the PIN-locked giant bench scoreboard.
     await waitFor(() => expect(screen.getByTestId("hotspot-qr").innerHTML).toContain("<svg"));
   });
 
