@@ -1,5 +1,6 @@
 import { t } from "@/lib/i18n";
 import { type Locale, type ScoreboardState } from "@/lib/local-engines";
+import { safeJsonParse } from "@/lib/security-shield";
 import type { OrganizerRoster } from "@/lib/casual-engines";
 
 export const SEASON_KEY = "voleyos_season_history_v1";
@@ -51,7 +52,7 @@ export function loadSeason(): SeasonMatch[] {
   try {
     const raw = window.localStorage.getItem(SEASON_KEY);
     if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = safeJsonParse(raw, null);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(isMatch);
   } catch {
@@ -269,7 +270,7 @@ export function loadFlowRoster(): OrganizerRoster | null {
   try {
     const raw = window.localStorage.getItem(FLOW_ROSTER_KEY);
     if (!raw) return null;
-    const value: unknown = JSON.parse(raw);
+    const value: unknown = safeJsonParse(raw, null);
     if (typeof value !== "object" || value === null) return null;
     const roster = value as Partial<OrganizerRoster>;
     if (!Array.isArray(roster.confirmed) || !Array.isArray(roster.waitlist)) return null;

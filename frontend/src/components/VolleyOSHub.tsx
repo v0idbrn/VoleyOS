@@ -25,6 +25,7 @@ import { STATIONS } from "@/components/stations";
 import { GymScreenModule } from "@/components/GymScreenModule";
 import { CasualPlayerSuite, type SuiteSection } from "@/components/CasualPlayerSuite";
 import { LiveCastModal } from "@/components/LiveCastModal";
+import { ModuleErrorBoundary } from "@/components/ModuleErrorBoundary";
 import { createHostSecret, createRoomId, parseRoomParams } from "@/lib/live-cast-engine";
 import { loadFlowRoster } from "@/lib/season-vault";
 import { acwrSample } from "@/lib/samples";
@@ -953,9 +954,19 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
             <div className="h-full overflow-y-auto no-scrollbar px-3 pb-28 pt-3">
               <div className="mx-auto w-full max-w-2xl">
                 {(() => {
-                  if (activeMeta.slug === "gym-screen") return <GymScreenModule locale={locale} onClose={closeModule} />;
+                  if (activeMeta.slug === "gym-screen") {
+                    return (
+                      <ModuleErrorBoundary locale={locale} resetKey={activeMeta.slug}>
+                        <GymScreenModule locale={locale} onClose={closeModule} />
+                      </ModuleErrorBoundary>
+                    );
+                  }
                   const Station = STATIONS[activeMeta.slug];
-                  return Station ? <Station meta={activeMeta} locale={locale} onSave={handleSave} /> : null;
+                  return (
+                    <ModuleErrorBoundary locale={locale} resetKey={activeMeta.slug}>
+                      {Station ? <Station meta={activeMeta} locale={locale} onSave={handleSave} /> : null}
+                    </ModuleErrorBoundary>
+                  );
                 })()}
               </div>
             </div>

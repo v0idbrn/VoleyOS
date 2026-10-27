@@ -4,20 +4,22 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
-import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -162,7 +164,7 @@ public class MainActivity extends Activity {
         private void serveLoop(ServerSocket server) {
             while (!server.isClosed()) {
                 try (Socket client = server.accept()) {
-                    client.setSoTimeout(4000);
+                    client.setSoTimeout(3000);
                     handle(client);
                 } catch (IOException ignored) {
                     // One dropped spectator must not kill the server.
@@ -171,10 +173,13 @@ public class MainActivity extends Activity {
         }
 
         private void handle(Socket client) throws IOException {
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8));
-            String requestLine = reader.readLine();
+            String requestLine = readRequestLine(client);
             if (requestLine == null) return;
+            // Read-only scoreboard: reject PUT/POST/DELETE before touching state.
+            if (!requestLine.startsWith("GET ")) {
+                writeError(client, "405 Method Not Allowed");
+                return;
+            }
             String[] parts = requestLine.split(" ");
             String path = parts.length > 1 ? parts[1] : "/";
             int query = path.indexOf('?');
@@ -198,6 +203,33 @@ public class MainActivity extends Activity {
                     + "Cache-Control: no-store\r\n"
                     + "Connection: close\r\n"
                     + "\r\n";
+            out.write(head.getBytes(StandardCharsets.UTF_8));
+            out.write(body);
+            out.flush();
+        }
+
+        /** Bounded request-line read (2048 bytes max) honoring the 3s timeout. */
+        private static String readRequestLine(Socket client) throws IOException {
+            InputStream in = client.getInputStream();
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream(128);
+            int read;
+            while ((read = in.read()) != -1) {
+                if (read == '\n') break;
+                if (buffer.size() >= 2048) throw new IOException("request line too long");
+                if (read != '\r') buffer.write(read);
+            }
+            if (buffer.size() == 0) return null;
+            return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+        }
+
+        private static void writeError(Socket client, String status) throws IOException {
+            byte[] body = status.getBytes(StandardCharsets.UTF_8);
+            String head = "HTTP/1.1 " + status + "\r\n"
+                    + "Content-Type: text/plain; charset=utf-8\r\n"
+                    + "Content-Length: " + body.length + "\r\n"
+                    + "Connection: close\r\n"
+                    + "\r\n";
+            OutputStream out = client.getOutputStream();
             out.write(head.getBytes(StandardCharsets.UTF_8));
             out.write(body);
             out.flush();
@@ -264,6 +296,23 @@ public class MainActivity extends Activity {
                         + "</script></body></html>";
     }
 
+    /**
+     * Only our own shell loads inside the WebView. Every external link
+     * (ko-fi.com, wa.me, github.com, ...) leaves for the system browser.
+     */
+    private boolean openExternally(String url) {
+        if (url == null) return true;
+        if (url.startsWith("file:///android_asset/") || url.startsWith("about:")) return false;
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        } catch (Exception ignored) {
+            // No browser installed: swallow, the WebView stays on the shell.
+        }
+        return true;
+    }
+
     /** Widget and shortcut targets are ours, but sanitize before evaluating JS anyway. */
     private static String sanitizeTab(String raw) {
         if (raw == null) return null;
@@ -310,12 +359,24 @@ public class MainActivity extends Activity {
         FrameLayout container = new FrameLayout(this);
         setContentView(container);
 
+        // chrome://inspect must never reach the shipped APK: nobody can attach
+        // a debugger to tamper with localStorage, licences or the host secret.
+        WebView.setWebContentsDebuggingEnabled(false);
         webView = new WebView(this);
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(true);
+        // The shell is file:///android_asset: page JS must never read or write
+        // arbitrary files through that origin.
+        settings.setAllowFileAccessFromFileURLs(false);
+        settings.setAllowUniversalAccessFromFileURLs(false);
         webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return openExternally(request.getUrl().toString());
+            }
+
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);

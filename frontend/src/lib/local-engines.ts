@@ -317,6 +317,8 @@ export interface SetHistoryEntry {
   scoreB: number;
 }
 
+import { safeJsonParse } from "@/lib/security-shield";
+
 export interface ScoreboardState {
   teamA: string;
   teamB: string;
@@ -1620,12 +1622,8 @@ export async function exportCapsule(title: string, data: JsonValue): Promise<Cap
 }
 
 export async function importCapsule(text: string): Promise<CapsuleReport> {
-  let envelope: JsonValue;
-  try {
-    envelope = JSON.parse(text) as JsonValue;
-  } catch {
-    throw new Error("capsule is not valid JSON");
-  }
+  const envelope = safeJsonParse<JsonValue | null>(text, null);
+  if (envelope === null && text.trim() !== "null") throw new Error("capsule is not valid JSON");
   if (envelope === null || typeof envelope !== "object" || Array.isArray(envelope)) {
     throw new Error("capsule must be a JSON object");
   }
@@ -2672,7 +2670,7 @@ export function loadTeams(): TeamRoster[] {
   try {
     const raw = window.localStorage.getItem(TEAMS_STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as TeamRoster[];
+    const parsed = safeJsonParse<TeamRoster[] | null>(raw, null);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];

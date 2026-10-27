@@ -7,6 +7,7 @@
 import QRCode from "qrcode";
 
 import type { ScoreboardState } from "@/lib/local-engines";
+import { safeJsonParse } from "@/lib/security-shield";
 
 export const QR_CLONE_KEY = "volleyos.clonedScoreboard";
 const PREFIX = "VOSQ1";
@@ -101,7 +102,7 @@ export async function ingestQrFrame(current: IngestResult, scanned: string): Pro
     const canonical = fromBase64(joined);
     const actual = await sha256Short(canonical);
     if (actual !== checksum) return { frames, total, complete: false, payload: null, error: "checksum mismatch" };
-    return { frames, total, complete: true, payload: JSON.parse(canonical) as unknown, error: null };
+    return { frames, total, complete: true, payload: safeJsonParse<unknown>(canonical, null), error: null };
   } catch {
     return { frames, total, complete: false, payload: null, error: "cannot decode payload" };
   }

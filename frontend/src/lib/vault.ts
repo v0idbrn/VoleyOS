@@ -1,3 +1,5 @@
+import { safeJsonParse } from "@/lib/security-shield";
+
 /**
  * Ephemeral vault: offline job previews stored in localStorage only.
  * Destroying it removes the payload and emits a signed-style UTC receipt.
@@ -35,7 +37,7 @@ export function loadVault(): VaultEntry[] {
   try {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = safeJsonParse(raw, null);
     return Array.isArray(parsed) ? parsed.filter(isEntry) : [];
   } catch {
     return [];

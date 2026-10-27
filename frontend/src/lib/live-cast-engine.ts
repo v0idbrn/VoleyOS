@@ -17,6 +17,7 @@
  */
 
 import type { ScoreboardState } from "@/lib/local-engines";
+import { safeJsonParse } from "@/lib/security-shield";
 
 export type CastMode = "picadito" | "rey" | "oficial";
 
@@ -304,7 +305,7 @@ export async function decodeWhatsAppFreePulse(text: string): Promise<LiveMatchPa
   const match = /VOS1:([A-Za-z0-9_-]+)/u.exec(text);
   if (!match || !match[1]) return null;
   try {
-    const raw: unknown = JSON.parse(fromBase64Url(match[1]));
+    const raw: unknown = safeJsonParse<unknown>(fromBase64Url(match[1]), null);
     return packetFromTuple(raw);
   } catch {
     return null;
@@ -450,12 +451,12 @@ interface LiveSubscribeOptions {
 
 function parseRelayMessage(raw: string): LiveMatchPacket | null {
   try {
-    const envelope: unknown = JSON.parse(raw);
+    const envelope: unknown = safeJsonParse<unknown>(raw, null);
     const body =
       typeof envelope === "object" && envelope !== null && "message" in envelope
         ? String((envelope as { message: unknown }).message)
         : raw;
-    const payload: unknown = JSON.parse(body);
+    const payload: unknown = safeJsonParse<unknown>(body, null);
     return isPacket(payload) ? payload : null;
   } catch {
     return null;
@@ -567,7 +568,7 @@ export function parseRoomParams(search: string): RoomParams {
   let snapshot: LiveMatchPacket | null = null;
   if (snap) {
     try {
-      const raw: unknown = JSON.parse(fromBase64Url(snap));
+      const raw: unknown = safeJsonParse<unknown>(fromBase64Url(snap), null);
       snapshot = packetFromTuple(raw);
     } catch {
       snapshot = null;
