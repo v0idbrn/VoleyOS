@@ -25,6 +25,13 @@ import { BenchRotator, FlowWizard, PlayerChips } from "@/components/CasualPlayer
 import { LiveCastModal } from "@/components/LiveCastModal";
 import { sharePng } from "@/lib/png-exporter";
 import {
+  flightTimeJump,
+  loadAthleteRecords,
+  recordsSparkline,
+  saveAthleteRecord,
+  type AthleteJumpRecord,
+} from "@/lib/athlete-records";
+import {
   buildPacket,
   createHostSecret,
   createRoomId,
@@ -3459,10 +3466,34 @@ export function QrSyncStation({ meta, locale, onSave }: StationProps) {
   );
 }
 
+/** Polar point on the 12-hour dial (hour 12 points up, clockwise). */
+const clockPolar = (hour: number, radius = 66): { x: number; y: number } => {
+  const angle = (((hour % 12) * 30 - 90) * Math.PI) / 180;
+  return { x: 100 + radius * Math.cos(angle), y: 100 + radius * Math.sin(angle) };
+};
+
+/** Arc between two dial hours for the protractor zones. */
+const clockArc = (radius: number, fromHour: number, toHour: number): string => {
+  const start = clockPolar(fromHour, radius);
+  const end = clockPolar(toHour, radius);
+  const large = (toHour - fromHour) * 30 > 180 ? 1 : 0;
+  return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${radius} ${radius} 0 ${large} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+};
+
+const CLOCK_TICKS = Array.from({ length: 12 }, (_, index) => index);
+
 export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [strokes, setStrokes] = useState<TelestrationPoint[][]>([]);
   const [drawing, setDrawing] = useState<TelestrationPoint[] | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const clockDragRef = useRef(false);
+  const [takeoffT, setTakeoffT] = useState<number | null>(null);
+  const [landingT, setLandingT] = useState<number | null>(null);
+  const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const [records, setRecords] = useState<AthleteJumpRecord[]>(() => loadAthleteRecords());
+  const [clockOn, setClockOn] = useState(false);
+  const [clockPos, setClockPos] = useState({ x: 50, y: 36 });
   const report = useMemo(
     () => (strokes.length > 0 ? analyzeTelestration({ frameWidth: 100, frameHeight: 100, strokes, scaleCmPerPx: 1 }) : null),
     [strokes],
@@ -3483,8 +3514,30 @@ export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) 
     setDrawing(null);
   };
 
+  const flight =
+    takeoffT !== null && landingT !== null && landingT > takeoffT ? flightTimeJump(landingT - takeoffT) : null;
+
+  const persistJump = (): void => {
+    if (!flight) return;
+    const next = saveAthleteRecord({
+      date: new Date().toISOString().slice(0, 10),
+      flightMs: Math.round(flight.flightSeconds * 1000),
+      heightCm: flight.heightCm,
+    });
+    setRecords(next);
+    setSavedMsg(
+      t(locale, "✅ Récord guardado en tu perfil.", "✅ Record saved to your profile.", "✄ Recorde salvo no seu perfil."),
+    );
+  };
+
   return (
-    <StationShell meta={meta} locale={locale} rows={6} onSave={onSave} onExample={() => setStrokes([])}>
+    <StationShell meta={meta} locale={locale} rows={6} onSave={onSave} onExample={() => {
+        setStrokes([]);
+        setTakeoffT(null);
+        setLandingT(null);
+        setSavedMsg(null);
+        setClockOn(false);
+      }}>
       <input
         type="file"
         accept="video/*"
@@ -3498,7 +3551,7 @@ export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) 
         className="mb-2 w-full text-[10px]"
       />
       <div className="relative aspect-video overflow-hidden rounded-xl border border-white/10 bg-black">
-        {videoUrl ? <video src={videoUrl} controls playsInline className="h-full w-full object-contain" /> : (
+        {videoUrl ? <video ref={videoRef} src={videoUrl} controls playsInline className="h-full w-full object-contain" /> : (
           <p className="grid h-full place-items-center px-4 text-center text-[11px] text-white/45">
             {t(locale, "Elegí un video de tu galería. Nada sale del teléfono.", "Pick a video from your gallery. Nothing leaves the phone.", "Escolha um video da galeria. Nada sai do telefone.")}
           </p>
@@ -3538,10 +3591,187 @@ export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) 
             />
           ) : null}
         </svg>
+        {clockOn ? (
+          <div
+            data-testid="contact-clock"
+            className="absolute touch-none"
+            style={{ left: `${clockPos.x}%`, top: `${clockPos.y}%`, transform: "translate(-50%, -50%)" }}
+            onPointerDown={(event) => {
+              event.currentTarget.setPointerCapture(event.pointerId);
+              clockDragRef.current = true;
+            }}
+            onPointerMove={(event) => {
+              if (!clockDragRef.current) return;
+              const rect = event.currentTarget.getBoundingClientRect();
+              setClockPos({
+                x: Math.max(8, Math.min(92, ((event.clientX - rect.left) / rect.width) * 100)),
+                y: Math.max(8, Math.min(92, ((event.clientY - rect.top) / rect.height) * 100)),
+              });
+            }}
+            onPointerUp={() => {
+              clockDragRef.current = false;
+            }}
+            onPointerCancel={() => {
+              clockDragRef.current = false;
+            }}
+          >
+            <svg
+              viewBox="0 0 200 200"
+              className="h-40 w-40 opacity-85"
+              role="img"
+              aria-label={t(locale, "Reloj de contacto Hora 11 vs 12", "Contact clock Hora 11 vs 12", "Relógio de contato Hora 11 vs 12")}
+            >
+              <circle cx="100" cy="100" r="84" fill="#0b0b0dcc" stroke="#ffffff55" strokeWidth="2" />
+              {CLOCK_TICKS.map((tick) => {
+                const outer = clockPolar(tick, 82);
+                const inner = clockPolar(tick, 74);
+                return (
+                  <line
+                    key={tick}
+                    x1={inner.x}
+                    y1={inner.y}
+                    x2={outer.x}
+                    y2={outer.y}
+                    stroke="#ffffff88"
+                    strokeWidth={tick % 3 === 0 ? 3 : 1.5}
+                  />
+                );
+              })}
+              <path
+                data-testid="zone-optimal"
+                d={clockArc(66, 10.5, 11.25)}
+                fill="none"
+                stroke="#22c55e"
+                strokeWidth="12"
+                strokeLinecap="round"
+              />
+              <path
+                data-testid="zone-impingement"
+                d={clockArc(66, 0, 1)}
+                fill="none"
+                stroke="#ef4444"
+                strokeWidth="12"
+                strokeLinecap="round"
+              />
+              <line
+                x1="100"
+                y1="100"
+                x2={clockPolar(11).x}
+                y2={clockPolar(11).y}
+                stroke="#c8ff00"
+                strokeWidth="3"
+              />
+              <line
+                x1="100"
+                y1="100"
+                x2={clockPolar(0).x}
+                y2={clockPolar(0).y}
+                stroke="#ffffff99"
+                strokeWidth="2"
+                strokeDasharray="5 5"
+              />
+              <circle cx="100" cy="100" r="5" fill="#ffffff" />
+            </svg>
+            <div className="pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded bg-black/85 px-1 py-0.5 text-[9px]">
+              <span className="text-emerald">
+                🟢 {t(locale, "10:30–11:15 potencia", "10:30–11:15 power", "10:30–11:15 potência")}
+              </span>{" "}·{" "}
+              <span className="text-crimson">
+                🔴 {t(locale, "12:00–01:00 hombro", "12:00–01:00 shoulder", "12:00–01:00 ombro")}
+              </span>
+            </div>
+          </div>
+        ) : null}
       </div>
+      <div className="mt-2 flex flex-wrap gap-1">
+        <button
+          type="button"
+          data-testid="mark-takeoff"
+          className={BTN}
+          onClick={() => setTakeoffT(videoRef.current?.currentTime ?? 0)}
+        >
+          🛫 1. {t(locale, "Marcar Despegue (t₁)", "Mark Takeoff (t₁)", "Marcar Decolagem (t₁)")}
+        </button>
+        <button
+          type="button"
+          data-testid="mark-landing"
+          className={BTN}
+          onClick={() => setLandingT(videoRef.current?.currentTime ?? 0)}
+        >
+          🛬 2. {t(locale, "Marcar Aterrizaje (t₂)", "Mark Landing (t₂)", "Marcar Aterrissagem (t₂)")}
+        </button>
+        {takeoffT !== null ? <span className={BTN}>t₁ {takeoffT.toFixed(2)}s</span> : null}
+        {landingT !== null ? <span className={BTN}>t₂ {landingT.toFixed(2)}s</span> : null}
+      </div>
+      {flight ? (
+        <div data-testid="flight-report" className="mt-2 rounded-xl border border-white/10 bg-white/5 p-2 text-[11px]">
+          <p className="font-bold text-volt">
+            📏 Δt {flight.flightSeconds.toFixed(2)}s · {flight.heightCm.toFixed(1)} cm · v₀ {flight.takeoffVelocityMs.toFixed(2)} m/s
+          </p>
+          <p className="text-white/60">
+            {t(
+              locale,
+              flight.rating === "warm"
+                ? "Aún calentando"
+                : flight.rating === "club"
+                  ? "Nivel club"
+                  : flight.rating === "explosive"
+                    ? "¡Explosivo!"
+                    : "¡Élite de salto!",
+              flight.rating === "warm"
+                ? "Still warming up"
+                : flight.rating === "club"
+                  ? "Club level"
+                  : flight.rating === "explosive"
+                    ? "Explosive!"
+                    : "Jump elite!",
+              flight.rating === "warm"
+                ? "Aquecendo ainda"
+                : flight.rating === "club"
+                  ? "Nível clube"
+                  : flight.rating === "explosive"
+                    ? "Explosivo!"
+                    : "Elite de salto!",
+            )}
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <button type="button" data-testid="save-jump" className={BTN} onClick={persistJump}>
+              💾 {t(locale, "Guardar Récord en Mi Perfil de Salto", "Save Record to My Jump Profile", "Salvar Recorde no Meu Perfil de Salto")}
+            </button>
+            {savedMsg ? (
+              <span role="status" className="text-[10px] text-emerald">
+                {savedMsg}
+              </span>
+            ) : null}
+          </div>
+          {records.length > 0 ? (
+            <svg
+              data-testid="jump-sparkline"
+              viewBox="0 0 120 28"
+              className="mt-1 h-7 w-full"
+              role="img"
+              aria-label={t(locale, "Historial de saltos", "Jump history", "Histórico de saltos")}
+            >
+              <polyline points={recordsSparkline(records)} fill="none" stroke="#c8ff00" strokeWidth="1.5" />
+            </svg>
+          ) : null}
+          <p className="text-[9px] text-white/40">
+            {records.length} {t(locale, "récords guardados", "saved records", "recordes salvos")}
+          </p>
+        </div>
+      ) : null}
       <div className="mt-2 flex flex-wrap gap-1">
         <button type="button" className={BTN} onClick={() => setStrokes([])}>{t(locale, "Borrar trazos", "Clear strokes", "Apagar tracos")}</button>
         <span className={BTN}>{strokes.length} {t(locale, "trazos", "strokes", "tracos")}</span>
+        <button
+          type="button"
+          data-testid="contact-clock-toggle"
+          aria-pressed={clockOn}
+          className={BTN}
+          onClick={() => setClockOn((on) => !on)}
+        >
+          🕚 {t(locale, "Reloj de Contacto (Hora 11 vs 12)", "Contact Clock (Hora 11 vs 12)", "Relógio de Contato (Hora 11 vs 12)")}
+        </button>
       </div>
       {report ? (
         <div className="mt-2 rounded-xl border border-white/10 p-2 text-[10px]">
