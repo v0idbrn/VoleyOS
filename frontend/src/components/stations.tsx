@@ -7,11 +7,14 @@ import jsQR from "jsqr";
 
 import { playArenaCue, playWhistle, type ArenaCue } from "@/lib/court-audio";
 import {
+  type ApproachTempo,
   loadCrowdAmbience,
+  playApproachCadence,
   playBuzzer,
   playPicaditoCue,
   playScorePop,
   playSetWinFanfare,
+  playSneakerSqueak,
   saveCrowdAmbience,
 } from "@/lib/sound-effects";
 import { announceScoreTTS, isMatchActive, persistLiveScoreboard, readLiveScoreboard, triggerCourtHaptics } from "@/lib/court-ux";
@@ -271,6 +274,17 @@ export function BiomechanicsStation({ meta, locale, onSave }: StationProps) {
     [],
   );
   const height = landing > takeoff ? verticalJumpCm(takeoff, landing) : null;
+  const [cadence, setCadence] = useState<ApproachTempo | null>(null);
+  const [cadenceLoop, setCadenceLoop] = useState(false);
+
+  // v9.5: hands-free approach rehearsal - replay the tempo every 5 seconds.
+  useEffect(() => {
+    if (!cadence || !cadenceLoop) return;
+    const id = window.setInterval(() => {
+      playApproachCadence(cadence);
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [cadence, cadenceLoop]);
 
   return (
     <StationShell
@@ -281,6 +295,8 @@ export function BiomechanicsStation({ meta, locale, onSave }: StationProps) {
       onExample={() => {
         setTakeoff(0);
         setLanding(540);
+        setCadence(null);
+        setCadenceLoop(false);
       }}
     >
       <div className="grid grid-cols-3 gap-2">
@@ -297,6 +313,64 @@ export function BiomechanicsStation({ meta, locale, onSave }: StationProps) {
           <span className={LABEL}>{t(locale, "Aterrizaje (ms)", "Landing (ms)", "Aterrissagem (ms)")}</span>
           <input className={INPUT} type="number" min={0} value={landing} onChange={(event) => setLanding(Number(event.target.value))} />
         </label>
+      </div>
+      <div className="mt-3 rounded-xl border border-white/10 bg-obsidian/60 p-2">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-white/50">
+          🎵 {t(locale, "Metronomo de aproximacion", "Approach metronome", "Metronomo de aproximacao")}
+        </p>
+        <div className="mt-1 flex flex-wrap gap-1">
+          {(["1st", "2nd", "3rd"] as const).map((tempo) => (
+            <button
+              key={tempo}
+              type="button"
+              data-testid={`cadence-${tempo}`}
+              aria-pressed={cadence === tempo}
+              className={`${BTN} ${cadence === tempo ? "border-volt text-volt" : ""}`}
+              onClick={() => {
+                setCadence(tempo);
+                playApproachCadence(tempo);
+              }}
+            >
+              {tempo === "1st"
+                ? `🏃 1st ${t(locale, "Quick / Central", "Quick / Central", "Quick / Central")}`
+                : tempo === "2nd"
+                  ? `🚀 2nd ${t(locale, "Shoot / Pipe", "Shoot / Pipe", "Shoot / Pipe")}`
+                  : `🎯 3rd ${t(locale, "Bola Alta", "High Ball", "Bola Alta")}`}
+            </button>
+          ))}
+          <button
+            type="button"
+            data-testid="cadence-loop"
+            aria-pressed={cadenceLoop}
+            className={BTN}
+            onClick={() => setCadenceLoop((on) => !on)}
+          >
+            🔁 {t(locale, "Repetir cada 5s", "Repeat every 5s", "Repetir a cada 5s")}
+          </button>
+          {cadence ? (
+            <button
+              type="button"
+              data-testid="cadence-stop"
+              className={BTN}
+              onClick={() => {
+                setCadence(null);
+                setCadenceLoop(false);
+              }}
+            >
+              ⏹ {t(locale, "Detener", "Stop", "Parar")}
+            </button>
+          ) : null}
+        </div>
+        {cadence ? (
+          <p data-testid="cadence-steps" className="mt-1 text-[10px] text-white/60">
+            {t(
+              locale,
+              `Izquierdo → Derecho-Izquierdo (planta) → ¡Despegue! → ¡Impacto Hora 11! · pasos ${APPROACH_CADENCE_LABEL[cadence]}`,
+              `Left → Right-Left (plant) → Takeoff! → Hora 11 contact! · steps ${APPROACH_CADENCE_LABEL[cadence]}`,
+              `Esquerdo → Direito-Esquerdo (apoio) → Salto! → Contato Hora 11! · passos ${APPROACH_CADENCE_LABEL[cadence]}`,
+            )}
+          </p>
+        ) : null}
       </div>
       <ul className="mt-3 space-y-1">
         {report.frames.map((frame) => (
@@ -3687,6 +3761,7 @@ export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
           ▶ {t(locale, "Sonar cue", "Play cue", "Tocar cue")}
         </button>
       ) : null}
+      {meta.slug === "peripheral-reflex" ? <BlindCourtCoach locale={locale} /> : null}
       {report ? (
         <div className="grid gap-1 text-[11px]">
           {Object.entries(report).filter(([key]) => key !== "svg" && key !== "rallies" && key !== "selected").map(([key, value]) => (
@@ -3702,6 +3777,97 @@ export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
     </StationShell>
   );
 }
+/** v9.5: ms offsets rendered under the metronome buttons. */
+const APPROACH_CADENCE_LABEL: Record<ApproachTempo, string> = {
+  "1st": "0/220/310 + 480 ms",
+  "2nd": "0/340/460 + 700 ms",
+  "3rd": "0/480/630 + 920 ms",
+};
+
+const BLIND_COURT_CUES: ReadonlyArray<Record<Locale, string>> = [
+  { es: "¡Toque corto en 2!", en: "Short tip in 2!", pt: "Toquinho no 2!" },
+  { es: "¡Diagonal larga a 5!", en: "Long diagonal to 5!", pt: "Diagonal longa no 5!" },
+  { es: "¡Paralela en 1!", en: "Line shot in 1!", pt: "Paralela no 1!" },
+  { es: "¡Pelota Libre, abrite!", en: "Loose ball, open up!", pt: "Bola solta, abre!" },
+  { es: "¡Bloqueo doble en 4!", en: "Double block on 4!", pt: "Bloqueio duplo no 4!" },
+];
+
+/**
+ * v9.5 "Cancha a Ciegas": the phone stays on the bench while randomized voice,
+ * whistle and sneaker-squeak cues train blind defensive reads.
+ */
+export function BlindCourtCoach({ locale }: { locale: Locale }) {
+  const [active, setActive] = useState(false);
+  const [cue, setCue] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+    const fire = (): void => {
+      const pick = BLIND_COURT_CUES[Math.floor(Math.random() * BLIND_COURT_CUES.length)] ?? BLIND_COURT_CUES[0];
+      if (!pick) return;
+      const phrase = pick[locale];
+      setCue(phrase);
+      playSneakerSqueak();
+      playWhistle("short");
+      try {
+        const synth = window.speechSynthesis;
+        const Utterance = window.SpeechSynthesisUtterance;
+        if (synth && Utterance) {
+          const utterance = new Utterance(phrase);
+          utterance.lang = locale === "es" ? "es-AR" : locale === "pt" ? "pt-BR" : "en-US";
+          utterance.rate = 1.05;
+          synth.speak(utterance);
+        }
+      } catch {
+        /* no TTS on this device: the whistle still fires */
+      }
+    };
+    fire();
+    const id = window.setInterval(fire, 4000);
+    return () => {
+      window.clearInterval(id);
+      try {
+        window.speechSynthesis?.cancel();
+      } catch {
+        /* speech already released */
+      }
+    };
+  }, [active, locale]);
+
+  return (
+    <div className="mt-3 rounded-xl border border-crimson/40 bg-crimson/5 p-2">
+      <button
+        type="button"
+        data-testid="blind-coach-toggle"
+        aria-pressed={active}
+        className={`${BTN} w-full`}
+        onClick={() => setActive((on) => !on)}
+      >
+        🎧 {t(
+          locale,
+          "Modo Cancha a Ciegas (Solo Audio + Voz)",
+          "Blind Court Mode (Audio + Voice Only)",
+          "Modo Quadra às Cegas (Só Áudio + Voz)",
+        )}
+        {active ? ` · ${t(locale, "ACTIVO", "LIVE", "ATIVO")}` : ""}
+      </button>
+      <p className="mt-1 text-[10px] text-white/55">
+        {t(
+          locale,
+          "Dejá el teléfono en el banco y reaccioná al aviso: 4s entre señales.",
+          "Leave the phone on the bench and react to the call: 4s between cues.",
+          "Deixe o telefone no banco e reaja ao aviso: 4s entre sinais.",
+        )}
+      </p>
+      {cue ? (
+        <p data-testid="blind-coach-cue" role="status" className="mt-1 text-[11px] font-bold text-volt">
+          {cue}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function GymScreenStation({ meta, locale, onSave }: StationProps) {
   return (
     <StationShell meta={meta} locale={locale} rows={1} onSave={onSave} onExample={() => undefined}>

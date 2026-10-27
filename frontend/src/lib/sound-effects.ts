@@ -332,6 +332,7 @@ export function playPicaditoCue(cue: PicaditoCue, volume = 0.5): boolean {
     gain.connect(audio.destination);
     osc.start(cursor);
     osc.stop(cursor + duration);
+    playMikasaSpikeThump(volume * 0.85);
     return true;
   }
 
@@ -350,6 +351,7 @@ export function playPicaditoCue(cue: PicaditoCue, volume = 0.5): boolean {
     osc.stop(cursor + duration);
     cursor += duration + 0.02;
   });
+  if (cue === "ace") playNetCordSnap(volume * 0.7);
   return true;
 }
 
@@ -451,5 +453,182 @@ export function playJudgeGavel(volume = 0.6): boolean {
     osc.start(at);
     osc.stop(at + duration);
   });
+  return true;
+}
+
+/* v9.5 — the Athlete's Edge: physical court textures + approach tempo. */
+
+/** High-Q bandpass rubber-on-hardwood grip chirp (saw sweep). */
+export const SNEAKER_SQUEAK_SPEC = {
+  bandpassQ: 18,
+  sweepHz: [2350, 3150, 2600],
+  durationMs: 140,
+} as const;
+
+/** Compressed leather impact: subby punch drop + bright slap transient. */
+export const MIKASA_THUMP_SPEC = {
+  punchHz: [135, 52],
+  slapHz: 900,
+  durationMs: 65,
+} as const;
+
+/** Nylon net-cord twang: 320 -> 190 Hz FM pluck. */
+export const NET_SNAP_SPEC = {
+  carrierHz: 320,
+  pluckHz: 190,
+  durationMs: 120,
+} as const;
+
+export type ApproachTempo = "1st" | "2nd" | "3rd";
+
+/** Step 1/2/3 plant offsets (ms) and the peak-contact chime for each tempo. */
+export const APPROACH_CADENCE_SPEC: Record<
+  ApproachTempo,
+  { stepsMs: readonly number[]; contactMs: number }
+> = {
+  "1st": { stepsMs: [0, 220, 310], contactMs: 480 },
+  "2nd": { stepsMs: [0, 340, 460], contactMs: 700 },
+  "3rd": { stepsMs: [0, 480, 630], contactMs: 920 },
+};
+
+export const APPROACH_CADENCE_STEPS_HZ = [660, 660, 520] as const;
+export const APPROACH_CONTACT_HZ = 1180;
+
+/** Q=18 bandpass saw sweep 2350 -> 3150 -> 2600 Hz over 140 ms. */
+export function playSneakerSqueak(volume = 0.5): boolean {
+  if (!enabled) return false;
+  const audio = audioContext();
+  if (!audio) return false;
+  resume(audio);
+  const start = audio.currentTime;
+  const duration = SNEAKER_SQUEAK_SPEC.durationMs / 1000;
+
+  const bandpass = audio.createBiquadFilter();
+  bandpass.type = "bandpass";
+  bandpass.frequency.value = SNEAKER_SQUEAK_SPEC.sweepHz[0] ?? SNEAKER_SQUEAK_SPEC.sweepHz[0];
+  bandpass.Q.value = SNEAKER_SQUEAK_SPEC.bandpassQ;
+  const gain = audio.createGain();
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(volume, start + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+  bandpass.connect(gain);
+  gain.connect(audio.destination);
+
+  const osc = audio.createOscillator();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(SNEAKER_SQUEAK_SPEC.sweepHz[0] ?? 2350, start);
+  osc.frequency.linearRampToValueAtTime(SNEAKER_SQUEAK_SPEC.sweepHz[1] ?? 3150, start + duration * 0.45);
+  osc.frequency.linearRampToValueAtTime(SNEAKER_SQUEAK_SPEC.sweepHz[2] ?? 2600, start + duration);
+  osc.connect(bandpass);
+  osc.start(start);
+  osc.stop(start + duration);
+  return true;
+}
+
+/** Hard-kill leather impact: 135 -> 52 Hz sine punch + 900 Hz slap over 65 ms. */
+export function playMikasaSpikeThump(volume = 0.5): boolean {
+  if (!enabled) return false;
+  const audio = audioContext();
+  if (!audio) return false;
+  resume(audio);
+  const start = audio.currentTime;
+  const duration = MIKASA_THUMP_SPEC.durationMs / 1000;
+
+  const punch = audio.createOscillator();
+  punch.type = "sine";
+  punch.frequency.setValueAtTime(MIKASA_THUMP_SPEC.punchHz[0] ?? 135, start);
+  punch.frequency.exponentialRampToValueAtTime(MIKASA_THUMP_SPEC.punchHz[1] ?? 52, start + duration);
+  const punchGain = audio.createGain();
+  punchGain.gain.setValueAtTime(volume, start);
+  punchGain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+  punch.connect(punchGain);
+  punchGain.connect(audio.destination);
+  punch.start(start);
+  punch.stop(start + duration);
+
+  const slap = audio.createOscillator();
+  slap.type = "sawtooth";
+  slap.frequency.value = MIKASA_THUMP_SPEC.slapHz;
+  const slapGain = audio.createGain();
+  slapGain.gain.setValueAtTime(volume * 0.35, start);
+  slapGain.gain.exponentialRampToValueAtTime(0.001, start + 0.03);
+  slap.connect(slapGain);
+  slapGain.connect(audio.destination);
+  slap.start(start);
+  slap.stop(start + 0.045);
+  return true;
+}
+
+/** Service-ace net-cord twang: 320 -> 190 Hz FM pluck over 120 ms. */
+export function playNetCordSnap(volume = 0.5): boolean {
+  if (!enabled) return false;
+  const audio = audioContext();
+  if (!audio) return false;
+  resume(audio);
+  const start = audio.currentTime;
+  const duration = NET_SNAP_SPEC.durationMs / 1000;
+
+  const carrier = audio.createOscillator();
+  carrier.type = "sine";
+  carrier.frequency.setValueAtTime(NET_SNAP_SPEC.carrierHz, start);
+  carrier.frequency.exponentialRampToValueAtTime(NET_SNAP_SPEC.pluckHz, start + duration);
+
+  // 2:1 FM partial decaying in 60 ms gives the nylon cable its bite.
+  const fm = audio.createOscillator();
+  fm.type = "sine";
+  fm.frequency.value = NET_SNAP_SPEC.carrierHz * 2;
+  const fmGain = audio.createGain();
+  fmGain.gain.setValueAtTime(120, start);
+  fmGain.gain.exponentialRampToValueAtTime(0.001, start + 0.06);
+  fm.connect(fmGain);
+  fmGain.connect(carrier.frequency);
+  fm.start(start);
+  fm.stop(start + duration);
+
+  const gain = audio.createGain();
+  gain.gain.setValueAtTime(volume, start);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+  carrier.connect(gain);
+  gain.connect(audio.destination);
+  carrier.start(start);
+  carrier.stop(start + duration);
+  return true;
+}
+
+/** 3-step approach rhythm: plant ticks at the tempo offsets + peak-contact chime. */
+export function playApproachCadence(tempo: ApproachTempo, volume = 0.5): boolean {
+  if (!enabled) return false;
+  const audio = audioContext();
+  if (!audio) return false;
+  resume(audio);
+  const start = audio.currentTime;
+  const spec = APPROACH_CADENCE_SPEC[tempo];
+
+  spec.stepsMs.forEach((offsetMs, index) => {
+    const at = start + offsetMs / 1000;
+    const osc = audio.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.value = APPROACH_CADENCE_STEPS_HZ[index] ?? 660;
+    const gain = audio.createGain();
+    gain.gain.setValueAtTime(volume, at);
+    gain.gain.exponentialRampToValueAtTime(0.001, at + 0.07);
+    osc.connect(gain);
+    gain.connect(audio.destination);
+    osc.start(at);
+    osc.stop(at + 0.07);
+  });
+
+  const contactAt = start + spec.contactMs / 1000;
+  const chime = audio.createOscillator();
+  chime.type = "sine";
+  chime.frequency.value = APPROACH_CONTACT_HZ;
+  const chimeGain = audio.createGain();
+  chimeGain.gain.setValueAtTime(0, contactAt);
+  chimeGain.gain.linearRampToValueAtTime(volume * 0.8, contactAt + 0.012);
+  chimeGain.gain.exponentialRampToValueAtTime(0.001, contactAt + 0.25);
+  chime.connect(chimeGain);
+  chimeGain.connect(audio.destination);
+  chime.start(contactAt);
+  chime.stop(contactAt + 0.25);
   return true;
 }
