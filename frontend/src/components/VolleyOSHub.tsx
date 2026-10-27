@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { LOCALE_NAMES, SHELL, t } from "@/lib/i18n";
-import { awardIndoorPoint, buildTarget, jumpLoad, paywallEnabled, swapCourt, type Locale, type Profile, type ScoreboardState } from "@/lib/local-engines";
+import { awardIndoorPoint, buildTarget, jumpLoad, newScoreboard, paywallEnabled, swapCourt, type Locale, type Profile, type ScoreboardState } from "@/lib/local-engines";
 import { clearCreatorUnlock, creatorUnlocked, matchesCreatorKey, persistCreatorToken } from "@/lib/creator-unlock";
 import { clearLicenseToken, unlockCreatorOnServer } from "@/lib/api-client";
 import { MODULES, MODULE_BY_SLUG, PROFILE_LABELS } from "@/lib/modules";
@@ -24,6 +24,8 @@ import { EphemeralVaultBar } from "@/components/EphemeralVaultBar";
 import { STATIONS } from "@/components/stations";
 import { GymScreenModule } from "@/components/GymScreenModule";
 import { CasualPlayerSuite, type SuiteSection } from "@/components/CasualPlayerSuite";
+import { LiveCastModal } from "@/components/LiveCastModal";
+import { createHostSecret, createRoomId, parseRoomParams } from "@/lib/live-cast-engine";
 import { loadFlowRoster } from "@/lib/season-vault";
 import { acwrSample } from "@/lib/samples";
 
@@ -293,9 +295,25 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [updateState, setUpdateState] = useState<UpdateCheck | null>(null);
   const [checking, setChecking] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  // v9.3.0 live broadcast: the Hub is also a spectator entry point (QR → ?room=).
+  const [castOpen, setCastOpen] = useState(false);
+  const [castJoinRoom, setCastJoinRoom] = useState<string | null>(null);
+  const castRoomRef = useRef<string>("");
+  const castSecretRef = useRef<string>("");
+  if (!castRoomRef.current) castRoomRef.current = createRoomId();
+  if (!castSecretRef.current) castSecretRef.current = createHostSecret();
   const target = buildTarget();
   const locked = paywallEnabled() && !creator;
   const activeMeta = activeSlug ? MODULE_BY_SLUG.get(activeSlug) : undefined;
+
+  // v9.3.0: a scanned spectator QR (?room=CANCHA-XXXX) opens the live view.
+  useEffect(() => {
+    const { roomId } = parseRoomParams(window.location.search);
+    if (roomId) {
+      setCastJoinRoom(roomId);
+      setCastOpen(true);
+    }
+  }, []);
 
   const visible = useMemo(() => {
     const needle = query.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -879,6 +897,15 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 className="tap grid h-10 w-10 place-items-center rounded-xl text-base text-white/70"
               >
                 🔊
+              </button>
+              <button
+                type="button"
+                aria-label={t(locale, "Transmitir en vivo", "Broadcast live", "Transmitir ao vivo")}
+                data-testid="hub-live-cast"
+                onClick={() => setCastOpen(true)}
+                className="tap grid h-10 w-10 place-items-center rounded-xl text-base text-white/70"
+              >
+                📡
               </button>
               <button
                 type="button"
@@ -1734,6 +1761,20 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
             </p>
           </div>
         </div>
+      ) : null}
+
+      {castOpen ? (
+        <LiveCastModal
+          locale={locale}
+          state={liveScore ?? readLiveScoreboard() ?? newScoreboard()}
+          roomId={castRoomRef.current}
+          hostSecret={castSecretRef.current}
+          initialJoin={castJoinRoom}
+          onClose={() => {
+            setCastOpen(false);
+            setCastJoinRoom(null);
+          }}
+        />
       ) : null}
     </main>
   );

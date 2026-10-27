@@ -18,6 +18,16 @@ import { clearClonedScoreboard, createQrFrames, emptyIngest, ingestQrFrame, read
 import { localizeReactTree } from "@/lib/engine-l10n";
 import { COPY, t } from "@/lib/i18n";
 import { BenchRotator, FlowWizard } from "@/components/CasualPlayerSuite";
+import { LiveCastModal } from "@/components/LiveCastModal";
+import {
+  buildPacket,
+  createHostSecret,
+  createRoomId,
+  encodeWhatsAppFreePulse,
+  publishLiveUpdate,
+  pushLocalLiveServer,
+  type CastMode,
+} from "@/lib/live-cast-engine";
 import { saveSeasonMatch, seasonMatchFromState } from "@/lib/season-vault";
 import { syncWidgetSnapshot } from "@/lib/widget-bridge";
 import { nextServeStreak, serveCapHit, serveCapMessage, type ServeCapLimit } from "@/lib/casual-engines";
@@ -592,6 +602,15 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const burstTimerRef = useRef<number | null>(null);
   const serveStreakRef = useRef(0);
   const prevPointRef = useRef<{ total: number; serving: ScoreboardState["serving"] } | null>(null);
+  // v9.3.0 live broadcast: one room + host secret per scorer session.
+  const [castOpen, setCastOpen] = useState(false);
+  const [castActive, setCastActive] = useState(false);
+  const [cloudRelay, setCloudRelay] = useState(false);
+  const roomRef = useRef<string>("");
+  const secretRef = useRef<string>("");
+  const seqRef = useRef(0);
+  if (!roomRef.current) roomRef.current = createRoomId();
+  if (!secretRef.current) secretRef.current = createHostSecret();
 
   useEffect(() => {
     setTeams(loadTeams());
@@ -621,6 +640,34 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       serveStreakRef.current = next;
     }
   }, [state, preset, serveCap, locale]);
+
+  // v9.3.0: every point/set/side change streams to the active transports — the
+  // pure-Java LAN server, local tabs, and (when armed) the ntfy cloud relay.
+  useEffect(() => {
+    if (!castActive) return;
+    let alive = true;
+    void (async () => {
+      try {
+        seqRef.current += 1;
+        const castMode: CastMode = state.matchFormat === "short15" ? "picadito" : "oficial";
+        const packet = await buildPacket(state, {
+          roomId: roomRef.current,
+          seq: seqRef.current,
+          mode: castMode,
+          hostSecret: secretRef.current,
+        });
+        if (!alive) return;
+        pushLocalLiveServer(packet);
+        const skipCloud = async (): Promise<{ ok: boolean }> => ({ ok: false });
+        await publishLiveUpdate(packet, cloudRelay ? undefined : skipCloud);
+      } catch {
+        /* the LAN server keeps serving even if every relay is offline */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [state, castActive, cloudRelay]);
 
   const flashUndoPill = (): void => {
     setUndoPill(true);
@@ -1109,6 +1156,45 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
             document.documentElement.classList.toggle("high-contrast", next);
             window.localStorage.setItem("volleyos.contrast", next ? "1" : "0");
           }}>[C] {t(locale, "Contraste", "Contrast", "Contraste")}</button>
+          <button
+            type="button"
+            data-testid="live-cast-open"
+            className={BTN}
+            onClick={() => setCastOpen(true)}
+          >
+            📡 {t(locale, "Transmitir en Vivo (QR)", "Broadcast Live (QR)", "Transmitir ao Vivo (QR)")}
+            {castActive ? (
+              <span data-testid="live-badge" className="ml-1.5 animate-pulse text-crimson">
+                🔴 EN VIVO
+              </span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            data-testid="whatsapp-pulse"
+            className={BTN}
+            onClick={() => {
+              void (async () => {
+                try {
+                  seqRef.current += 1;
+                  const castMode: CastMode = state.matchFormat === "short15" ? "picadito" : "oficial";
+                  const packet = await buildPacket(state, {
+                    roomId: roomRef.current,
+                    seq: seqRef.current,
+                    mode: castMode,
+                    hostSecret: secretRef.current,
+                  });
+                  const text = await encodeWhatsAppFreePulse(packet);
+                  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+                  setMessage(t(locale, "📲 Pulso enviado al grupo de WhatsApp.", "📲 Pulse sent to the WhatsApp group.", "📲 Pulso enviado ao grupo do WhatsApp."));
+                } catch {
+                  setMessage(t(locale, "❌ No se pudo armar el pulso WhatsApp.", "❌ Could not build the WhatsApp pulse.", "❌ Não foi possível montar o pulso do WhatsApp."));
+                }
+              })();
+            }}
+          >
+            💬 {t(locale, "Pulso WhatsApp Gratis", "Free WhatsApp Pulse", "Pulso WhatsApp Grátis")}
+          </button>
         </div>
       </div>
       <button
@@ -1161,6 +1247,17 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       ) : null}
       </div>
       <BenchRotator locale={locale} />
+      {castOpen ? (
+        <LiveCastModal
+          locale={locale}
+          state={state}
+          roomId={roomRef.current}
+          hostSecret={secretRef.current}
+          onClose={() => setCastOpen(false)}
+          onActiveChange={setCastActive}
+          onRelayChange={setCloudRelay}
+        />
+      ) : null}
       {undoPill ? (
         <button
           type="button"
