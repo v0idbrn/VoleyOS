@@ -1,0 +1,5 @@
+Built-in native QR scanner: read codes with the camera without leaving the app.
+Screen-to-screen PRO unlock: share or scan licenses instantly between phones.
+Unified match audio: whistles and cues now use the high-gain PCM engine.
+Every whistle and arena alert now sounds loud on any phone.
+Stability fixes and camera permission handling in the WebView viewer.

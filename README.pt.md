@@ -2,7 +2,7 @@
 
 [English](README.md) · [Español](README.es.md) · **Português**
 
-[![Version](https://img.shields.io/badge/version-v10.1.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v10.1.2-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Módulos](https://img.shields.io/badge/módulos-61-FF3B5C?style=for-the-badge&color=EAB308)](#enciclopédia-dos-61-módulos)
 [![Offline](https://img.shields.io/badge/100%25-offline--primeiro-FF3B5C?style=for-the-badge&color=EAB308)](#por-que-o-volleyos-existe)
 [![Android](https://img.shields.io/badge/APK%20Android-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -14,15 +14,14 @@
 
 APK universal assinado, construído pelo GitHub Actions a cada tag `v*`. Android 7.0+ (minSdk 24), trilíngue, offline primeiro, sem contas e sem telemetria. Pronto para F-Droid.
 
-## 🆕 Novidades da v10.1.0 — Edição pronta para a quadra
+## 🆕 Novidades da v10.1.2 — Edição pronta para a quadra
 
-- **⚡ Placar Simples / Pro**: uma chave de nível superior (nos ⚙️ Ajustes ou no próprio placar) deixa só a tela limpa e gigante — presets, box score, rotações e scouting fora — ou devolve todos os painéis. A escolha persiste e todas as abas existem nos dois modos.
-- **👥 Só Equipes**: placar apenas com times, escondendo scouting de jogadores, dorsais e box score em um toque.
-- **✏️ Correções na quadra**: ajuste um parcial, um tempo ou uma chamada corrigida e renomeie/pinte os times direto no placar — com o desfazer intacto.
-- **🔊 Áudio e voz universais**: apito e buzina Fox 40/FIVB em PCM para qualquer aparelho (RIFF WAV + WebAudio, AudioTrack nativo no Android) com locutor de voz em 4 níveis (TTS nativo → voz web parecida → qualquer voz → cadência formante) e teste de áudio em um toque.
-- **🔙 Guarda de voltar**: um back acidental do navegador ou do hardware não apaga uma partida em andamento — web e Android rebatem com aviso.
-- **📲 Compartilhar + offline afiado**: cartão Web Share nos Ajustes (fallback para a área de transferência), cache do service worker v10.1.0 com o ícone apple, manifesto com os 61 módulos e piso anti-zoom de 16px em telas sensíveis ao toque.
-- **Mantém tudo do v10.0.x**: cofre Olympus Titan, micro-scout ao vivo, overlay de TV e o ícone adaptativo obsidiana/carmesí.
+- **📷 Leitor QR de câmera integrado**: scanner nativo (câmera / enviar foto / colar da área de transferência / manual) que lê IDs de dispositivo, códigos de sala, URLs de hotspot e licenças em tela cheia no celular — sem lojas nem instalações extras.
+- **🔑 Desbloqueio PRO tela a tela**: mostre sua licença ou QR do dispositivo e deixe um amigo escanear para ativar PRO no celular dele na hora — sem servidor.
+- **🔈 Áudio unificado da quadra**: todos os apitos e cues do ginásio (monster block, super spike, sirene de ace, suspense do desafio, bola de set) passam pelo motor PCM de alto ganho + AudioTrack nativo, então os eventos automáticos soam tão altos quanto a barra manual.
+- **📋 Ponte nativa de área de transferência e downloads**: cada copia e exportador (.png/.csv/.svg/.vos/.xlsx) chega à área de transferência do Android e aos Downloads públicos sob a origem `file://` do APK, com um aviso honesto — sem falhas silenciosas.
+- **💬 Diálogos JS visíveis + permissões de câmera**: `alert`/`confirm`/`prompt` são renderizados nativamente e o WebView concede a câmera/microfone que o scanner precisa.
+- **Mantém tudo do v10.1.0/v10.0.x**: placar Simples/Pro, cofre Olympus Titan, micro-scout ao vivo, overlay de TV e o ícone adaptativo obsidiana/carmesí.
 
 ## 🆕 Novidades da v10.0.0 — Edição Olympus Titan
 

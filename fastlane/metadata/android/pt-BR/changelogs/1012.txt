@@ -1,0 +1,5 @@
+Leitor QR nativo integrado: leia códigos com a câmera sem sair do app.
+Desbloqueio PRO tela a tela: compartilhe ou escaneie licenças na hora.
+Áudio unificado do jogo: apitos e cues com o motor PCM de alto ganho.
+Todos os apitos e alertas do ginásio agora soam altos em qualquer celular.
+Correções de estabilidade e permissões de câmera no visualizador WebView.

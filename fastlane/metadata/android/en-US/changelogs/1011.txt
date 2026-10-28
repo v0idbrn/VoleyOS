@@ -1,0 +1,5 @@
+Full end-to-end audit: all 61 modules verified one by one, zero dead buttons.
+Native clipboard and download bridge inside the APK.
+JS dialogs (alert/confirm/prompt) now visible in WebView with camera permission handling.
+Device ID normalization in the Keygen so no license ever fails.
+Automated interaction tests for the key flows.

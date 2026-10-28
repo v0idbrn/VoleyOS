@@ -1,0 +1,5 @@
+Escáner QR nativo integrado: lee códigos con la cámara sin salir de la app.
+Desbloqueo PRO de pantalla a pantalla: comparte o escanea licencias al instante.
+Audio unificado del partido: silbato y cues con el motor PCM de alta ganancia.
+Todos los silbatos y alertas de arena ahora suenan fuerte en cualquier teléfono.
+Correcciones de estabilidad y permisos de cámara en el visor WebView.
