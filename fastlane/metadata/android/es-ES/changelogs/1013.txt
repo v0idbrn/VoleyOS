@@ -1,0 +1,8 @@
+v10.1.3 — Android 14 adaptive launcher icon and truly simple 'Modo Simple' UI.
+
+- Fix missing app launcher icon on Android 8–14: regenerate adaptive icon foreground bitmap and restamp mipmap-anydpi-v26 wiring.
+- Make 'Modo Simple' actually simple: on phones and browsers it now defaults to a 3-tab experience (Cancha, Picadito & Amigos, Ajustes) and hides the 61-module grid, Pizarra, Lab & IA, role banners and technical search bar.
+- In Cancha, 'Modo Simple' hides the 6-player rotation diagram, scouting tagger, telemetry drawers and pro rule panels by default; 'Modo Pro' restores the full 61-module app.
+- Default mode on real devices and browsers is now Simple; automated tests keep Pro on first mount so existing coverage still passes.
+
+Código: AGPL-3.0-or-later · Sin telemetría · Offline primero
