@@ -1,4 +1,5 @@
 import type { ScoreboardState } from "@/lib/local-engines";
+import { speakCourtVoice } from "@/lib/sound-effects";
 
 /** Window event carrying the latest live scoreboard snapshot (sticky bar sync). */
 export const LIVE_SCORE_EVENT = "voleyos:live-score";
@@ -80,16 +81,13 @@ export function triggerCourtHaptics(pattern: number | number[] = 25): boolean {
   }
 }
 
+/**
+ * v10.1 — the scoreboard voice rides the universal 4-tier announcer
+ * (native TTS ➔ matched Web voice ➔ any Web voice ➔ formant cadence),
+ * so no phone is ever silent during a rally.
+ */
 export function announceScoreTTS(text: string, enabled: boolean, locale = "es-ES"): boolean {
-  if (!enabled || typeof window === "undefined" || !("speechSynthesis" in window)) return false;
-  try {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = locale;
-    utterance.rate = 1.05;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-    return true;
-  } catch {
-    return false;
-  }
+  if (!enabled || typeof window === "undefined" || !text) return false;
+  void speakCourtVoice(text, locale.slice(0, 2));
+  return true;
 }

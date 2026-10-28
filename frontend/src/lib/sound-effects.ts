@@ -92,109 +92,20 @@ export function installAudioAutoResume(): boolean {
 
 installAudioAutoResume();
 
-/** Dual detuned oscillators + 48 Hz FM pea modulation + 2800 Hz high-pass + breath attack. */
+/** Fox 40 dual-chamber PCM whistle + native AudioTrack layer, through the gym bus. */
 export function playWhistle(kind: WhistleKind = "short", volume = 0.6): boolean {
   if (!enabled) return false;
-  const audio = audioContext();
-  if (!audio) return false;
-  resume(audio);
-  const start = audio.currentTime;
-  const duration = WHISTLE_SPEC.durationsMs[kind] / 1000;
-
-  const highpass = audio.createBiquadFilter();
-  highpass.type = "highpass";
-  highpass.frequency.value = WHISTLE_SPEC.highPassHz;
-  highpass.connect(audio.destination);
-
-  const master = audio.createGain();
-  master.gain.setValueAtTime(0, start);
-  master.gain.linearRampToValueAtTime(volume, start + 0.008);
-  master.gain.setValueAtTime(volume, start + duration - 0.03);
-  master.gain.linearRampToValueAtTime(0, start + duration);
-  master.connect(highpass);
-
-  for (const baseHz of [WHISTLE_SPEC.highHz, WHISTLE_SPEC.detunedHz]) {
-    const osc = audio.createOscillator();
-    osc.type = "sine";
-    osc.frequency.value = baseHz;
-    // 48 Hz pea rattle wobbles the pitch like a real Fox 40.
-    const pea = audio.createOscillator();
-    pea.type = "sine";
-    pea.frequency.value = WHISTLE_SPEC.peaHz;
-    const peaGain = audio.createGain();
-    peaGain.gain.value = 42;
-    pea.connect(peaGain);
-    peaGain.connect(osc.frequency);
-    osc.connect(master);
-    osc.start(start);
-    osc.stop(start + duration);
-    pea.start(start);
-    pea.stop(start + duration);
-  }
-
-  // Breath burst attack so the onset sounds blown, not electronic.
-  const noiseMs = WHISTLE_SPEC.breathMs / 1000;
-  const burst = audio.createOscillator();
-  burst.type = "sawtooth";
-  burst.frequency.value = 1800;
-  const burstGain = audio.createGain();
-  burstGain.gain.setValueAtTime(volume * 0.5, start);
-  burstGain.gain.linearRampToValueAtTime(0, start + noiseMs);
-  burst.connect(burstGain);
-  burstGain.connect(highpass);
-  burst.start(start);
-  burst.stop(start + noiseMs);
-
-  if (kind === "double") {
-    const second = start + 0.25;
-    const osc = audio.createOscillator();
-    osc.type = "sine";
-    osc.frequency.value = WHISTLE_SPEC.highHz;
-    const gain = audio.createGain();
-    gain.gain.setValueAtTime(0, second);
-    gain.gain.linearRampToValueAtTime(volume, second + 0.008);
-    gain.gain.linearRampToValueAtTime(0, second + 0.2);
-    osc.connect(gain);
-    gain.connect(highpass);
-    osc.start(second);
-    osc.stop(second + 0.2);
-  }
-  return true;
+  nativeHardwareCue(
+    kind === "double" ? "whistle_double" : kind === "long" ? "whistle_long" : "whistle_short",
+  );
+  return playUniversalPcm(scalePcm(synthFox40Pcm(kind), volume));
 }
 
-/** 3-oscillator saw/square chord through a soft-clipping WaveShaperNode. */
+/** 0.85 s FIVB air-horn PCM + native AudioTrack layer, through the gym bus. */
 export function playBuzzer(volume = 0.55): boolean {
   if (!enabled) return false;
-  const audio = audioContext();
-  if (!audio) return false;
-  resume(audio);
-  const start = audio.currentTime;
-  const duration = BUZZER_SPEC.durationMs / 1000;
-
-  const shaper = audio.createWaveShaper();
-  const curve = new Float32Array(1024);
-  for (let index = 0; index < curve.length; index += 1) {
-    const x = (index / (curve.length - 1)) * 2 - 1;
-    curve[index] = Math.tanh(x * 3);
-  }
-  shaper.curve = curve;
-  shaper.connect(audio.destination);
-
-  const master = audio.createGain();
-  master.gain.setValueAtTime(volume, start);
-  master.gain.setValueAtTime(volume, start + duration - 0.06);
-  master.gain.linearRampToValueAtTime(0, start + duration);
-  master.connect(shaper);
-
-  BUZZER_SPEC.freqsHz.forEach((freq, index) => {
-    const osc = audio.createOscillator();
-    osc.type = index === 0 ? "sawtooth" : "square";
-    osc.frequency.value = freq;
-    osc.connect(master);
-    osc.start(start);
-    osc.stop(start + duration);
-  });
-  return true;
+  nativeHardwareCue("buzzer");
+  return playUniversalPcm(scalePcm(synthFivbHornPcm(), volume));
 }
 
 /** Crisp wood-court ball pop on every point. */
@@ -213,7 +124,7 @@ export function playScorePop(volume = 0.5): boolean {
   gain.gain.setValueAtTime(volume, start);
   gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
   osc.connect(gain);
-  gain.connect(audio.destination);
+  gain.connect(masterBus(audio));
   osc.start(start);
   osc.stop(start + duration);
   return true;
@@ -232,7 +143,7 @@ export function playSetWinFanfare(volume = 0.5): boolean {
   master.gain.setValueAtTime(volume, start);
   master.gain.setValueAtTime(volume, start + duration - 0.12);
   master.gain.linearRampToValueAtTime(0, start + duration);
-  master.connect(audio.destination);
+  master.connect(masterBus(audio));
   FANFARE_SPEC.freqsHz.forEach((freq) => {
     const osc = audio.createOscillator();
     osc.type = "sawtooth";
@@ -329,7 +240,7 @@ export function playPicaditoCue(cue: PicaditoCue, volume = 0.5): boolean {
     gain.gain.setValueAtTime(volume, cursor);
     gain.gain.exponentialRampToValueAtTime(0.001, cursor + duration);
     osc.connect(gain);
-    gain.connect(audio.destination);
+    gain.connect(masterBus(audio));
     osc.start(cursor);
     osc.stop(cursor + duration);
     playMikasaSpikeThump(volume * 0.85);
@@ -346,7 +257,7 @@ export function playPicaditoCue(cue: PicaditoCue, volume = 0.5): boolean {
     gain.gain.linearRampToValueAtTime(volume, cursor + 0.008);
     gain.gain.exponentialRampToValueAtTime(0.001, cursor + duration);
     osc.connect(gain);
-    gain.connect(audio.destination);
+    gain.connect(masterBus(audio));
     osc.start(cursor);
     osc.stop(cursor + duration);
     cursor += duration + 0.02;
@@ -380,7 +291,7 @@ export function playCrowdCheer(intensity = 1): boolean {
   gain.gain.linearRampToValueAtTime(0, start + duration);
   source.connect(bandpass);
   bandpass.connect(gain);
-  gain.connect(audio.destination);
+  gain.connect(masterBus(audio));
   source.start(start);
   source.stop(start + duration);
   return true;
@@ -401,7 +312,7 @@ export function playWarmupTick(finalSecond = false, volume = 0.45): boolean {
   gain.gain.setValueAtTime(volume, start);
   gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
   osc.connect(gain);
-  gain.connect(audio.destination);
+  gain.connect(masterBus(audio));
   osc.start(start);
   osc.stop(start + duration);
   return true;
@@ -424,7 +335,7 @@ export function playCoinClink(volume = 0.45): boolean {
     gain.gain.setValueAtTime(peak, start);
     gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
     osc.connect(gain);
-    gain.connect(audio.destination);
+    gain.connect(masterBus(audio));
     osc.start(start);
     osc.stop(start + duration);
   });
@@ -449,7 +360,7 @@ export function playJudgeGavel(volume = 0.6): boolean {
     gain.gain.setValueAtTime(volume, at);
     gain.gain.exponentialRampToValueAtTime(0.001, at + duration);
     osc.connect(gain);
-    gain.connect(audio.destination);
+    gain.connect(masterBus(audio));
     osc.start(at);
     osc.stop(at + duration);
   });
@@ -512,7 +423,7 @@ export function playSneakerSqueak(volume = 0.5): boolean {
   gain.gain.linearRampToValueAtTime(volume, start + 0.02);
   gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
   bandpass.connect(gain);
-  gain.connect(audio.destination);
+  gain.connect(masterBus(audio));
 
   const osc = audio.createOscillator();
   osc.type = "sawtooth";
@@ -542,7 +453,7 @@ export function playMikasaSpikeThump(volume = 0.5): boolean {
   punchGain.gain.setValueAtTime(volume, start);
   punchGain.gain.exponentialRampToValueAtTime(0.001, start + duration);
   punch.connect(punchGain);
-  punchGain.connect(audio.destination);
+  punchGain.connect(masterBus(audio));
   punch.start(start);
   punch.stop(start + duration);
 
@@ -553,7 +464,7 @@ export function playMikasaSpikeThump(volume = 0.5): boolean {
   slapGain.gain.setValueAtTime(volume * 0.35, start);
   slapGain.gain.exponentialRampToValueAtTime(0.001, start + 0.03);
   slap.connect(slapGain);
-  slapGain.connect(audio.destination);
+  slapGain.connect(masterBus(audio));
   slap.start(start);
   slap.stop(start + 0.045);
   return true;
@@ -589,7 +500,7 @@ export function playNetCordSnap(volume = 0.5): boolean {
   gain.gain.setValueAtTime(volume, start);
   gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
   carrier.connect(gain);
-  gain.connect(audio.destination);
+  gain.connect(masterBus(audio));
   carrier.start(start);
   carrier.stop(start + duration);
   return true;
@@ -613,7 +524,7 @@ export function playApproachCadence(tempo: ApproachTempo, volume = 0.5): boolean
     gain.gain.setValueAtTime(volume, at);
     gain.gain.exponentialRampToValueAtTime(0.001, at + 0.07);
     osc.connect(gain);
-    gain.connect(audio.destination);
+    gain.connect(masterBus(audio));
     osc.start(at);
     osc.stop(at + 0.07);
   });
@@ -627,7 +538,7 @@ export function playApproachCadence(tempo: ApproachTempo, volume = 0.5): boolean
   chimeGain.gain.linearRampToValueAtTime(volume * 0.8, contactAt + 0.012);
   chimeGain.gain.exponentialRampToValueAtTime(0.001, contactAt + 0.25);
   chime.connect(chimeGain);
-  chimeGain.connect(audio.destination);
+  chimeGain.connect(masterBus(audio));
   chime.start(contactAt);
   chime.stop(contactAt + 0.25);
   return true;
@@ -653,10 +564,414 @@ export function playLevelUpArpeggio(volume = 0.5): boolean {
     gain.gain.linearRampToValueAtTime(peak, cursor + 0.012);
     gain.gain.exponentialRampToValueAtTime(0.001, cursor + duration);
     osc.connect(gain);
-    gain.connect(audio.destination);
+    gain.connect(masterBus(audio));
     osc.start(cursor);
     osc.stop(cursor + duration);
     cursor += duration * 0.8;
   });
   return true;
+}
+
+/* ------------------------------------------------------------------ *
+ * v10.1 universal audio: in-memory RIFF WAV, WebAudio/HTML5 dual
+ * player, high-gain Fox 40 / FIVB horn PCM and the 4-tier court voice.
+ * ------------------------------------------------------------------ */
+
+export const UNIVERSAL_PCM_SPEC = { sampleRate: 44100, gymBoostDb: 9 } as const;
+
+/** Fox 40 dual-chamber PCM numbers (mirrored by the native AudioTrack synth). */
+export const FOX40_PCM_SPEC = {
+  frequenciesHz: [3745, 4085, 7490],
+  peaHz: 54,
+  bandpassHz: 3600,
+  attackSec: 0.008,
+  durationsSec: { short: 0.45, long: 1.1, double: 0.86 },
+  doubleGapSec: [0.4, 0.54] as const,
+} as const;
+
+/** FIVB table air-horn PCM numbers: 7 brass harmonics, 18 Hz growl, tanh(3.2x). */
+export const FIVB_HORN_PCM_SPEC = {
+  durationSec: 0.85,
+  baseHz: 196,
+  stepHz: 98,
+  harmonics: 7,
+  growlHz: 18,
+  saturation: 3.2,
+} as const;
+
+type NativeBridge = {
+  speakNativeTts?: (text: string, langCode: string) => boolean;
+  stopNativeTts?: () => void;
+  playNativeHardwareCue?: (cueType: string) => boolean;
+};
+
+type BridgeWindow = Window & { VoleyOSBridge?: NativeBridge; VosleyOSBridge?: NativeBridge };
+
+function nativeBridge(): NativeBridge | null {
+  if (typeof window === "undefined") return null;
+  const bridgeWindow = window as BridgeWindow;
+  return bridgeWindow.VoleyOSBridge ?? bridgeWindow.VosleyOSBridge ?? null;
+}
+
+/** Pushes a cue to the native AudioTrack mixer when running inside the APK. */
+function nativeHardwareCue(cueType: string): boolean {
+  try {
+    return nativeBridge()?.playNativeHardwareCue?.(cueType) ?? false;
+  } catch {
+    return false;
+  }
+}
+
+/** Valid 44-byte RIFF/WAVEfmt header + 16-bit PCM mono → Base64 data URI. */
+export function encodePcmToWavDataUri(
+  samples: Float32Array,
+  sampleRate = UNIVERSAL_PCM_SPEC.sampleRate,
+): string {
+  const dataSize = samples.length * 2;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+  const writeTag = (offset: number, tag: string): void => {
+    for (let index = 0; index < tag.length; index += 1) view.setUint8(offset + index, tag.charCodeAt(index));
+  };
+  writeTag(0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeTag(8, "WAVE");
+  writeTag(12, "fmt ");
+  view.setUint32(16, 16, true); // PCM fmt chunk size
+  view.setUint16(20, 1, true); // PCM format
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); // byte rate
+  view.setUint16(32, 2, true); // block align
+  view.setUint16(34, 16, true); // bits per sample
+  writeTag(36, "data");
+  view.setUint32(40, dataSize, true);
+  let offset = 44;
+  for (let index = 0; index < samples.length; index += 1) {
+    const clamped = Math.max(-1, Math.min(1, samples[index] ?? 0));
+    view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
+    offset += 2;
+  }
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunk));
+  }
+  return `data:audio/wav;base64,${btoa(binary)}`;
+}
+
+const masterBuses = new WeakMap<object, AudioNode>();
+
+/** Shared +9 dB gym-boost → compressor → tanh soft-clip bus every cue rides. */
+function masterBus(audio: AudioContext): AudioNode {
+  const key = audio as unknown as object;
+  const cached = masterBuses.get(key);
+  if (cached) return cached;
+  try {
+    const boost = audio.createGain();
+    boost.gain.value = Math.pow(10, UNIVERSAL_PCM_SPEC.gymBoostDb / 20);
+    const compressor = audio.createDynamicsCompressor();
+    compressor.threshold.value = -10;
+    compressor.knee.value = 8;
+    compressor.ratio.value = 12;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.12;
+    const limiter = audio.createWaveShaper();
+    const curve = new Float32Array(2048);
+    for (let index = 0; index < curve.length; index += 1) {
+      const x = (index / (curve.length - 1)) * 2 - 1;
+      curve[index] = Math.tanh(1.8 * x);
+    }
+    limiter.curve = curve;
+    boost.connect(compressor);
+    compressor.connect(limiter);
+    limiter.connect(audio.destination);
+    masterBuses.set(key, boost);
+    return boost;
+  } catch {
+    // Minimal test fakes / restricted engines expose a bare destination.
+    return audio.destination;
+  }
+}
+
+function playViaAudioElement(dataUri: string): boolean {
+  if (typeof Audio === "undefined") return false;
+  try {
+    const element = new Audio(dataUri);
+    void Promise.resolve(element.play()).catch(() => undefined);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function schedulePcm(audio: AudioContext, samples: Float32Array, sampleRate: number): void {
+  const buffer = audio.createBuffer(1, samples.length, sampleRate);
+  const channel = buffer.getChannelData(0);
+  channel.set(samples.subarray(0, channel.length));
+  const source = audio.createBufferSource();
+  source.buffer = buffer;
+  source.connect(masterBus(audio));
+  source.start(audio.currentTime);
+}
+
+function scalePcm(samples: Float32Array, volume: number): Float32Array {
+  const gain = Math.max(0, Math.min(1, volume));
+  if (gain === 1) return samples;
+  const scaled = new Float32Array(samples.length);
+  for (let index = 0; index < samples.length; index += 1) {
+    scaled[index] = (samples[index] ?? 0) * gain;
+  }
+  return scaled;
+}
+
+function clampSample(value: number): number {
+  return Math.max(-1, Math.min(1, value));
+}
+
+/**
+ * Plays PCM on any device: WebAudio through the gym-boost bus while the
+ * context runs, and a RIFF WAV `<audio>` element when WebAudio is suspended
+ * or restricted (classic iOS Safari). No AudioContext at all → false.
+ */
+export function playUniversalPcm(
+  samples: Float32Array,
+  sampleRate = UNIVERSAL_PCM_SPEC.sampleRate,
+): boolean {
+  if (!enabled || samples.length === 0) return false;
+  const audio = audioContext();
+  if (!audio) return false;
+  const state = (audio as AudioContext & { state?: string }).state;
+  if (state === undefined || state === "running") {
+    try {
+      schedulePcm(audio, samples, sampleRate);
+      return true;
+    } catch {
+      return playViaAudioElement(encodePcmToWavDataUri(samples, sampleRate));
+    }
+  }
+  resume(audio);
+  return playViaAudioElement(encodePcmToWavDataUri(samples, sampleRate));
+}
+
+/** Pure-TS Fox 40 dual-chamber whistle PCM (mirrors the native synth). */
+export function synthFox40Pcm(
+  kind: WhistleKind,
+  sampleRate = UNIVERSAL_PCM_SPEC.sampleRate,
+): Float32Array {
+  const duration = FOX40_PCM_SPEC.durationsSec[kind];
+  const total = Math.floor(duration * sampleRate);
+  const pcm = new Float32Array(total);
+  const gapStart = kind === "double" ? FOX40_PCM_SPEC.doubleGapSec[0] : -1;
+  const gapEnd = kind === "double" ? FOX40_PCM_SPEC.doubleGapSec[1] : -1;
+  // 2nd-order band-pass (fc 3600 Hz) for the 2.8–4.4 kHz air rush.
+  const w0 = (2 * Math.PI * FOX40_PCM_SPEC.bandpassHz) / sampleRate;
+  const alpha = Math.sin(w0) / 2;
+  const b0 = alpha;
+  const b2 = -alpha;
+  const a0 = 1 + alpha;
+  const a1 = -2 * Math.cos(w0);
+  const a2 = 1 - alpha;
+  let x1 = 0;
+  let x2 = 0;
+  let y1 = 0;
+  let y2 = 0;
+  let seed = 0x564f53;
+  const noise = (): number => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return (seed / 0xffffffff) * 2 - 1;
+  };
+  const [f1 = 3745, f2 = 4085, f3 = 7490] = FOX40_PCM_SPEC.frequenciesHz;
+  for (let index = 0; index < total; index += 1) {
+    const t = index / sampleRate;
+    if (gapStart > 0 && t >= gapStart && t < gapEnd) continue;
+    const burstT = gapStart > 0 && t >= gapEnd ? t - gapEnd : t;
+    const attack = Math.min(1, burstT / FOX40_PCM_SPEC.attackSec);
+    const pea = 1 + 0.28 * Math.sin(2 * Math.PI * FOX40_PCM_SPEC.peaHz * burstT);
+    const envelope = attack * Math.exp(-1.6 * burstT);
+    const raw = noise();
+    const band = (b0 * raw + b2 * x2 - a1 * y1 - a2 * y2) / a0;
+    x2 = x1;
+    x1 = raw;
+    y2 = y1;
+    y1 = band;
+    const core =
+      Math.sin(2 * Math.PI * f1 * burstT) +
+      Math.sin(2 * Math.PI * f2 * burstT) +
+      0.5 * Math.sin(2 * Math.PI * f3 * burstT);
+    pcm[index] = clampSample(envelope * pea * (core / 2.5 + band * 0.35));
+  }
+  return pcm;
+}
+
+/** 0.85 s FIVB air-horn PCM: 7 brass harmonics 196→784 Hz, 18 Hz growl, tanh(3.2x). */
+export function synthFivbHornPcm(sampleRate = UNIVERSAL_PCM_SPEC.sampleRate): Float32Array {
+  const total = Math.floor(FIVB_HORN_PCM_SPEC.durationSec * sampleRate);
+  const pcm = new Float32Array(total);
+  for (let index = 0; index < total; index += 1) {
+    const t = index / sampleRate;
+    const attack = Math.min(1, t / 0.012);
+    const release =
+      t > 0.7 ? Math.max(0, (FIVB_HORN_PCM_SPEC.durationSec - t) / 0.15) : 1;
+    const growl = 1 + 0.25 * Math.sin(2 * Math.PI * FIVB_HORN_PCM_SPEC.growlHz * t);
+    let brass = 0;
+    for (let harmonic = 0; harmonic < FIVB_HORN_PCM_SPEC.harmonics; harmonic += 1) {
+      const frequency = FIVB_HORN_PCM_SPEC.baseHz + FIVB_HORN_PCM_SPEC.stepHz * harmonic;
+      brass += Math.sin(2 * Math.PI * frequency * t) / (harmonic + 1);
+    }
+    const driven = (attack * release * growl * brass) / 3.2;
+    pcm[index] = clampSample(Math.tanh(FIVB_HORN_PCM_SPEC.saturation * driven) / Math.tanh(3.2));
+  }
+  return pcm;
+}
+
+const VOWEL_FORMANTS_HZ: readonly (readonly [number, number, number])[] = [
+  [730, 1090, 2440], // a
+  [530, 1840, 2480], // e
+  [270, 2290, 3000], // i
+  [570, 840, 2410], // o
+  [300, 870, 2240], // u
+];
+
+/**
+ * Tier-4 acoustic fallback: a 3-formant vocal cadence with court-announcement
+ * prosody plus a melodic two-note tail, so a device with zero OS voices is
+ * never silent.
+ */
+export function formantCadencePcm(
+  text: string,
+  sampleRate = UNIVERSAL_PCM_SPEC.sampleRate,
+): Float32Array {
+  const trimmed = text.trim();
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  const syllables = Math.min(18, Math.max(1, words.length + Math.floor(trimmed.length / 14)));
+  const syllableSec = 0.16;
+  const tailSec = 0.36;
+  const total = Math.floor((syllables * syllableSec + tailSec) * sampleRate);
+  const pcm = new Float32Array(total);
+  const rising = trimmed.endsWith("?");
+  for (let index = 0; index < syllables; index += 1) {
+    const formants = VOWEL_FORMANTS_HZ[index % VOWEL_FORMANTS_HZ.length] ?? [730, 1090, 2440];
+    const [f1, f2, f3] = formants;
+    const start = Math.floor(index * syllableSec * sampleRate);
+    const length = Math.floor(syllableSec * sampleRate);
+    const isLast = index === syllables - 1;
+    // Falling declarative cadence; questions lift on the last syllable.
+    const f0 = (rising && isLast ? 190 : 165) - index * 2.5;
+    const consonantSamples = Math.floor(0.018 * sampleRate);
+    for (let sample = 0; sample < length; sample += 1) {
+      const at = start + sample;
+      if (at >= total) break;
+      const t = sample / sampleRate;
+      const envelope = Math.min(1, t / 0.02) * Math.max(0, 1 - t / (syllableSec * 1.15));
+      const voiced =
+        0.35 * Math.sin(2 * Math.PI * f0 * t) +
+        Math.sin(2 * Math.PI * f1 * t) +
+        0.5 * Math.sin(2 * Math.PI * f2 * t) +
+        0.25 * Math.sin(2 * Math.PI * f3 * t);
+      const consonant = sample < consonantSamples ? 0.3 * Math.sin(2 * Math.PI * 3100 * t) : 0;
+      pcm[at] = clampSample((pcm[at] ?? 0) + envelope * (voiced * 0.28 + consonant));
+    }
+  }
+  // Melodic two-note tail: reads as an announcement, not a flat buzz.
+  const tailStart = Math.floor(syllables * syllableSec * sampleRate);
+  [880, 1174].forEach((frequency, part) => {
+    const offset = Math.floor(part * 0.15 * sampleRate);
+    const length = Math.floor(0.15 * sampleRate);
+    for (let sample = 0; sample < length; sample += 1) {
+      const at = tailStart + offset + sample;
+      if (at >= total) break;
+      const t = sample / sampleRate;
+      const envelope = Math.min(1, t / 0.01) * Math.max(0, 1 - t / 0.15);
+      pcm[at] = clampSample((pcm[at] ?? 0) + envelope * 0.4 * Math.sin(2 * Math.PI * frequency * t));
+    }
+  });
+  return pcm;
+}
+
+export type VoiceTier = "native" | "web-locale" | "web-any" | "formant" | "off";
+
+const PREFERRED_VOICE_TAGS: Record<string, string[]> = {
+  es: ["es-ar", "es-es", "es-us", "es"],
+  pt: ["pt-br", "pt-pt", "pt"],
+  en: ["en-us", "en-gb", "en"],
+};
+
+function normalizeLang(tag: string | undefined): string {
+  return (tag ?? "").replace("_", "-").toLowerCase();
+}
+
+/**
+ * v10.1 4-tier zero-fail court announcer. The cascade runs synchronously so
+ * the winning tier speaks before the returned promise settles:
+ *   1. native Android TextToSpeech (VoleyOSBridge.speakNativeTts)
+ *   2. speechSynthesis with a locale-matched installed voice (es-AR ➔ es-*)
+ *   3. speechSynthesis with whatever voice the device does have
+ *   4. acoustic 3-formant vocal cadence through playUniversalPcm
+ * A device with zero OS voices (or no speechSynthesis at all) jumps straight
+ * to tier 4 — no device is ever silent.
+ */
+export async function speakCourtVoice(text: string, locale = "es"): Promise<VoiceTier> {
+  if (!text || typeof window === "undefined") return "off";
+  const lang = (locale || "es").slice(0, 2).toLowerCase();
+
+  // Tier 1 — native Android TTS.
+  const bridge = nativeBridge();
+  if (bridge?.speakNativeTts) {
+    try {
+      if (bridge.speakNativeTts(text, lang)) return "native";
+    } catch {
+      // Native engine refused: fall through to the Web Speech tiers.
+    }
+  }
+
+  // Tiers 2/3 — Web Speech API with the cancel()+resume() anti-freeze guard.
+  const synth = typeof window.speechSynthesis === "object" ? window.speechSynthesis : null;
+  // Resolve the constructor from the window first, then the bare global, so
+  // embedded stubs of either shape keep the announcer talking.
+  const Utterance =
+    typeof window.SpeechSynthesisUtterance === "function"
+      ? window.SpeechSynthesisUtterance
+      : typeof SpeechSynthesisUtterance === "function"
+        ? SpeechSynthesisUtterance
+        : null;
+  if (synth && Utterance && typeof synth.speak === "function") {
+    const voices = typeof synth.getVoices === "function" ? synth.getVoices() : null;
+    if (voices === null || voices.length > 0) {
+      try {
+        synth.cancel();
+        if (typeof synth.resume === "function") synth.resume();
+        const utterance = new Utterance(text);
+        let tier: VoiceTier = "web-any";
+        if (voices && voices.length > 0) {
+          const preferred = PREFERRED_VOICE_TAGS[lang] ?? [lang];
+          const exact = preferred.find((tag) =>
+            voices.some((voice) => normalizeLang(voice.lang) === tag),
+          );
+          const match =
+            (exact
+              ? voices.find((voice) => normalizeLang(voice.lang) === exact)
+              : voices.find((voice) => normalizeLang(voice.lang).startsWith(lang))) ?? voices[0];
+          if (match) {
+            utterance.voice = match;
+            utterance.lang = match.lang || lang;
+            tier = normalizeLang(match.lang).startsWith(lang) ? "web-locale" : "web-any";
+          }
+        } else {
+          utterance.lang = PREFERRED_VOICE_TAGS[lang]?.[0] ?? lang;
+        }
+        utterance.rate = 1.05;
+        utterance.volume = 1;
+        synth.speak(utterance);
+        return tier;
+      } catch {
+        // The Web Speech engine exploded: formant tier below.
+      }
+    }
+  }
+
+  // Tier 4 — acoustic formant cadence: audible with zero OS voices.
+  playUniversalPcm(formantCadencePcm(text));
+  return "formant";
 }
