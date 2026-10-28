@@ -5,6 +5,8 @@
  * No network, no third-party dependency, no telemetry. Works inside the APK.
  */
 
+import { bridgeSaveData } from "@/lib/png-exporter";
+
 export interface SheetSpec {
   name: string;
   headers: string[];
@@ -232,7 +234,14 @@ function downloadBlob(blob: Blob, filename: string): void {
 
 export function downloadXlsx(report: ReportSpec): void {
   const bytes = buildXlsx(report);
-  downloadBlob(new Blob([bytes as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `${slugify(report.module)}-${report.generatedAt.slice(0, 10)}.xlsx`);
+  const filename = `${slugify(report.module)}-${report.generatedAt.slice(0, 10)}.xlsx`;
+  const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  // WebView cannot download blob: URLs — hand the workbook to the native
+  // bridge as a base64 data URI first, then fall back to the browser path.
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  if (bridgeSaveData(filename, `data:${mime};base64,${btoa(binary)}`, mime)) return;
+  downloadBlob(new Blob([bytes as BlobPart], { type: mime }), filename);
 }
 
 function slugify(value: string): string {

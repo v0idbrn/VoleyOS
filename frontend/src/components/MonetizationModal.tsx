@@ -1,5 +1,7 @@
 "use client";
 
+import { copyTextUniversal } from "@/lib/security-shield";
+
 import { useState } from "react";
 
 import {
@@ -16,6 +18,7 @@ import {
 } from "@/lib/payment-config";
 import {
   getDeviceInstallId,
+  normalizeDeviceId,
   signCustomerLicense,
   verifyCustomerLicense,
   type LicenseTier,
@@ -47,24 +50,28 @@ export function MonetizationModal({ locale, onClose, onActivated }: Monetization
   const [code, setCode] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [idCopied, setIdCopied] = useState(false);
   const [supporter, setSupporter] = useState(() => supporterChipActive());
   const deviceId = getDeviceInstallId();
   const price = priceFor(tier, duration, currency);
 
   const copyAlias = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(MP_ALIAS);
-    } catch {
-      /* clipboard blocked: the alias stays visible for manual copy */
-    }
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 2000);
+    const done = await copyTextUniversal(MP_ALIAS);
+    setCopied(done);
+    if (done) window.setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyMyId = async (): Promise<void> => {
+    const done = await copyTextUniversal(deviceId);
+    setIdCopied(done);
+    if (done) window.setTimeout(() => setIdCopied(false), 2000);
   };
 
   const activate = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
-    if (code.trim().toUpperCase().startsWith("VOS-CHIP")) {
-      const ok = await persistSupporterChip(code);
+    const cleaned = code.replace(/\s+/g, "");
+    if (cleaned.toUpperCase().startsWith("VOS-CHIP")) {
+      const ok = await persistSupporterChip(cleaned);
       setSupporter(ok || supporterChipActive());
       setStatus(
         ok
@@ -73,7 +80,7 @@ export function MonetizationModal({ locale, onClose, onActivated }: Monetization
       );
       return;
     }
-    const check = await verifyCustomerLicense(code, { deviceId });
+    const check = await verifyCustomerLicense(cleaned, { deviceId });
     if (!check.ok) {
       setStatus(
         check.reason === "device_mismatch"
@@ -91,8 +98,7 @@ export function MonetizationModal({ locale, onClose, onActivated }: Monetization
       );
       return;
     }
-    const trimmed = code.trim();
-    onActivated(trimmed);
+    onActivated(cleaned);
     setStatus(t(locale, "✅ Licencia activa", "✅ Licence active", "✅ Licença ativa"));
   };
 
@@ -118,6 +124,16 @@ export function MonetizationModal({ locale, onClose, onActivated }: Monetization
               {t(locale, "Bloqueada a este dispositivo", "Locked to this device", "Bloqueada neste dispositivo")} ·{" "}
               <span className="font-mono text-volt">{deviceId}</span>
             </p>
+            <button
+              type="button"
+              data-testid="copy-device-id"
+              onClick={() => void copyMyId()}
+              className="mt-1 rounded-lg border border-volt/40 bg-volt/10 px-2 py-1 text-[10px] font-black text-volt"
+            >
+              {idCopied
+                ? `✓ ${t(locale, "ID copiado", "ID copied", "ID copiado")}`
+                : `📋 ${t(locale, "Copiar mi ID", "Copy my ID", "Copiar meu ID")}`}
+            </button>
           </div>
           <button type="button" aria-label={t(locale, "Cerrar", "Close", "Fechar")} className="tap text-white/50" onClick={onClose}>
             ✕
@@ -291,6 +307,7 @@ export function CreatorKeygenPanel({ locale }: KeygenPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [chip, setChip] = useState<string | null>(null);
+  const [chipCopied, setChipCopied] = useState(false);
 
   const generate = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
@@ -323,21 +340,17 @@ export function CreatorKeygenPanel({ locale }: KeygenPanelProps) {
 
   const copyChip = async (): Promise<void> => {
     if (!chip) return;
-    try {
-      await navigator.clipboard.writeText(chip);
-    } catch {
-      /* clipboard blocked: the chip stays visible for manual copy */
+    if (await copyTextUniversal(chip)) {
+      setChipCopied(true);
+      window.setTimeout(() => setChipCopied(false), 2000);
     }
   };
 
   const copy = async (): Promise<void> => {
     if (!issued) return;
-    try {
-      await navigator.clipboard.writeText(issued);
+    if (await copyTextUniversal(issued)) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* clipboard blocked: the code stays visible for manual copy */
     }
   };
 
@@ -348,7 +361,7 @@ export function CreatorKeygenPanel({ locale }: KeygenPanelProps) {
         className={`${FIELD} font-mono uppercase`}
         placeholder={t(locale, "Device ID del comprador (XXXX-XXXX)", "Buyer Device ID (XXXX-XXXX)", "Device ID do comprador (XXXX-XXXX)")}
         value={device}
-        onChange={(event) => setDevice(event.target.value.toUpperCase())}
+        onChange={(event) => setDevice(normalizeDeviceId(event.target.value))}
         autoComplete="off"
       />
       <input
@@ -390,8 +403,10 @@ export function CreatorKeygenPanel({ locale }: KeygenPanelProps) {
           <p className="rounded-lg border border-white/10 bg-obsidian p-2 font-mono text-[10px] break-all text-emerald" data-testid="chip-code">
             {chip}
           </p>
-          <button type="button" onClick={() => void copyChip()} className={`${BTN} border border-white/15 bg-white/5`}>
-            📋 {t(locale, "Copiar chip", "Copy chip", "Copiar chip")}
+          <button type="button" data-testid="chip-copy" onClick={() => void copyChip()} className={`${BTN} border border-white/15 bg-white/5`}>
+            {chipCopied
+              ? `✓ ${t(locale, "Copiado", "Copied", "Copiado")}`
+              : `📋 ${t(locale, "Copiar chip", "Copy chip", "Copiar chip")}`}
           </button>
         </div>
       ) : null}

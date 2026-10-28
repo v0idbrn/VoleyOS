@@ -26,7 +26,7 @@ import { localizeReactTree } from "@/lib/engine-l10n";
 import { COPY, t } from "@/lib/i18n";
 import { BenchRotator, FlowWizard, PlayerChips } from "@/components/CasualPlayerSuite";
 import { LiveCastModal } from "@/components/LiveCastModal";
-import { sharePng } from "@/lib/png-exporter";
+import { bridgeSaveData, sharePng } from "@/lib/png-exporter";
 import {
   careerCardStats,
   flightTimeJump,
@@ -1453,6 +1453,25 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     );
   };
 
+  const editSetsTo = (side: ScoreboardState["serving"], raw: string): void => {
+    const value = Number.parseInt(raw, 10);
+    if (!Number.isFinite(value)) return;
+    const clamped = Math.max(0, Math.min(9, value));
+    setHistory((previous) =>
+      commitScoreboard(previous, side === "A" ? { ...previous.present, setsA: clamped } : { ...previous.present, setsB: clamped }),
+    );
+  };
+
+  // Quick faculty chips for tournament days: one tap renames the side and the
+  // new name flows into the header, the voice announcer and the live cast.
+  const applyFaculty = (side: ScoreboardState["serving"], name: string): void => {
+    setTeamDraft((draft) => (side === "A" ? { ...draft, a: name } : { ...draft, b: name }));
+    setHistory((previous) =>
+      commitScoreboard(previous, side === "A" ? { ...previous.present, teamA: name } : { ...previous.present, teamB: name }),
+    );
+    triggerCourtHaptics(12);
+  };
+
   // v9.4 OLED table saver: FLAG_KEEP_SCREEN_ON during a live match, released
   // the moment the board goes idle.
   useEffect(() => {
@@ -1702,7 +1721,11 @@ ${name}` : name))} testId="cancha-player-chips" />
           onClick={toggleSoloTeams}
           className={`${BTN} flex-1 ${soloTeams ? "border-volt text-volt" : ""}`}
         >
-          👥 {t(locale, "Solo equipos", "Teams only", "Só equipes")}: {soloTeams ? "ON" : "OFF"}
+          {soloTeams ? "🏐 " : "👥 "}
+          {soloTeams
+            ? t(locale, "Solo Equipos", "Team-only view", "Só Equipes")
+            : t(locale, "Con Rotación 6 en Cancha", "With 6-player rotation", "Com Rotação 6 em Quadra")}
+          : {soloTeams ? "ON" : "OFF"}
         </button>
         <button
           type="button"
@@ -1741,7 +1764,7 @@ ${name}` : name))} testId="cancha-player-chips" />
             className={BTN}
             onClick={() => setEditingScore(editingScore === null ? "A" : null)}
           >
-            ✏️ {t(locale, "Editar tantos", "Edit score", "Editar pontos")}
+            ✏️ {t(locale, "Editar Puntos / Sets", "Edit Points / Sets", "Editar Pontos / Sets")}
           </button>
           <button
             type="button"
@@ -1781,6 +1804,32 @@ ${name}` : name))} testId="cancha-player-chips" />
               }}
               className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-center text-sm font-bold"
             />
+            <input
+              data-testid="sets-edit-a"
+              type="number"
+              min={0}
+              max={9}
+              defaultValue={state.setsA}
+              aria-label={t(locale, "Ajustar Sets de Equipo A", "Adjust Team A sets", "Ajustar Sets do Time A")}
+              onBlur={(event) => editSetsTo("A", event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+              }}
+              className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-center text-sm font-bold"
+            />
+            <input
+              data-testid="sets-edit-b"
+              type="number"
+              min={0}
+              max={9}
+              defaultValue={state.setsB}
+              aria-label={t(locale, "Ajustar Sets de Equipo B", "Adjust Team B sets", "Ajustar Sets do Time B")}
+              onBlur={(event) => editSetsTo("B", event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+              }}
+              className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-center text-sm font-bold"
+            />
             <button type="button" data-testid="score-edit-done" className={`${BTN} col-span-2`} onClick={() => setEditingScore(null)}>
               ✓ {t(locale, "Listo", "Done", "Pronto")}
             </button>
@@ -1795,6 +1844,19 @@ ${name}` : name))} testId="cancha-player-chips" />
               onChange={(event) => setTeamDraft((draft) => ({ ...draft, a: event.target.value }))}
               className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[12px]"
             />
+            <div className="flex flex-wrap gap-1" data-testid="faculty-chips-a">
+              {(["Ingeniería", "Exactas", "Medicina", "Derecho", "Psicología", "Economía"] as const).map((name) => (
+                <button
+                  key={`fa-${name}`}
+                  type="button"
+                  data-testid={`faculty-a-${name}`}
+                  onClick={() => applyFaculty("A", name)}
+                  className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-bold text-white/70"
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
             <input
               data-testid="team-edit-b"
               value={teamDraft.b}
@@ -1802,6 +1864,19 @@ ${name}` : name))} testId="cancha-player-chips" />
               onChange={(event) => setTeamDraft((draft) => ({ ...draft, b: event.target.value }))}
               className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[12px]"
             />
+            <div className="flex flex-wrap gap-1" data-testid="faculty-chips-b">
+              {(["Ingeniería", "Exactas", "Medicina", "Derecho", "Psicología", "Economía"] as const).map((name) => (
+                <button
+                  key={`fb-${name}`}
+                  type="button"
+                  data-testid={`faculty-b-${name}`}
+                  onClick={() => applyFaculty("B", name)}
+                  className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-bold text-white/70"
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
             <div className="flex items-center gap-3 text-[10px] text-white/50">
               <label className="flex items-center gap-1">
                 {t(locale, "Color A", "Color A", "Cor A")}
@@ -1869,6 +1944,7 @@ ${name}` : name))} testId="cancha-player-chips" />
           <button type="button" className={BTN} onClick={undo} disabled={history.past.length === 0}>[Z] {t(locale, "Deshacer", "Undo", "Desfazer")} ({history.past.length})</button>
           <button type="button" className={BTN} onClick={redo} disabled={history.future.length === 0}>[Y] {t(locale, "Rehacer", "Redo", "Refazer")}</button>
           <button type="button" data-testid="sound-whistle" className={BTN} onClick={() => playWhistle("short")}>[W] 😗 {t(locale, "Silbato", "Whistle", "Apito")}</button>
+          <button type="button" data-testid="sound-whistle-double" className={BTN} onClick={() => playWhistle("double")}>[W] 😗😗 {t(locale, "Silbato doble", "Double whistle", "Apito duplo")}</button>
           <button type="button" data-testid="sound-buzzer" className={BTN} onClick={() => playBuzzer()}>[B] 🚨 {t(locale, "Chicharra", "Buzzer", "Buzina")}</button>
           <button type="button" className={BTN} onClick={() => {
             const next = !document.documentElement.classList.contains("high-contrast");
@@ -1893,7 +1969,7 @@ ${name}` : name))} testId="cancha-player-chips" />
               );
             }}
           >
-            🔊 {t(locale, "Probar audio", "Test audio", "Testar áudio")}
+            🔊 {t(locale, "Probar Voz", "Test Voice", "Testar Voz")}
           </button>
           <button
             type="button"
@@ -3059,6 +3135,7 @@ export function CapsuleStation({ meta, locale, onSave }: StationProps) {
 
   const download = (): void => {
     if (!report) return;
+    if (bridgeSaveData(report.filename, report.capsule, "application/json")) return;
     const blob = new Blob([report.capsule], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -3761,6 +3838,7 @@ export function MatchPosterStation({ meta, locale, onSave }: StationProps) {
   }, [locale, theme, format, nonce]);
   const download = (): void => {
     if (!report) return;
+    if (bridgeSaveData(report.filename, report.svg, "image/svg+xml")) return;
     const url = URL.createObjectURL(new Blob([report.svg], { type: "image/svg+xml" }));
     const anchor = document.createElement("a");
     anchor.href = url;

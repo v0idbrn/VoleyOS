@@ -1,5 +1,7 @@
 "use client";
 
+import { copyTextUniversal } from "@/lib/security-shield";
+
 import { useState } from "react";
 
 import { KOFI_URL, MP_ALIAS } from "@/lib/payment-config";
@@ -27,12 +29,7 @@ export function SupportSheet({ locale, moment, onClose }: SupportSheetProps) {
   };
 
   const copyAlias = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(MP_ALIAS);
-    } catch {
-      /* clipboard blocked: the alias stays visible for manual copy */
-    }
-    setCopied(true);
+    setCopied(await copyTextUniversal(MP_ALIAS));
   };
 
   return (

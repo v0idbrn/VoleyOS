@@ -185,6 +185,16 @@ export function getDeviceInstallId(): string {
   return "0000-0000";
 }
 
+/**
+ * v10.1.1 — the ONE normalization shared by the keygen input, the pasted
+ * code and the phone's own device id: strip every whitespace character
+ * (WhatsApp wrap, accidental spaces) and uppercase. A friend's key must never
+ * fail for casing or layout alone.
+ */
+export function normalizeDeviceId(raw: string): string {
+  return raw.replace(/\s+/g, "").toUpperCase();
+}
+
 export function holderSlug(name: string): string {
   const slug = name
     .normalize("NFD")
@@ -221,7 +231,7 @@ export async function signCustomerLicense(input: {
   expiry: string;
   holder: string;
 }): Promise<string | null> {
-  const device = input.deviceId.trim().toUpperCase();
+  const device = normalizeDeviceId(input.deviceId);
   const expiry = input.expiry.trim().toUpperCase();
   const holder = holderSlug(input.holder);
   if (!DEVICE_ID_PATTERN.test(device)) return null;
@@ -248,10 +258,13 @@ export async function verifyCustomerLicense(
   code: string,
   options: { deviceId?: string; now?: Date } = {},
 ): Promise<LicenseCheck> {
-  const parts = code.trim().split(".");
+  // Strips newlines/spaces introduced by copy-paste before parsing, so the
+  // validator accepts exactly what the keygen emits.
+  const cleaned = code.replace(/\s+/g, "");
+  const parts = cleaned.split(".");
   if (parts.length !== 6 || parts[0] !== "VOS-PRO") return { ok: false, reason: "malformed" };
   const [, rawDevice, rawTier, rawExpiry, rawHolder, rawSignature] = parts;
-  const device = (rawDevice ?? "").toUpperCase();
+  const device = normalizeDeviceId(rawDevice ?? "");
   const tier = rawTier as LicenseTier;
   const expiry = (rawExpiry ?? "").toUpperCase();
   const holder = rawHolder ?? "";
@@ -266,7 +279,7 @@ export async function verifyCustomerLicense(
   if (expected === null) return { ok: false, reason: "no_key" };
   if (expected !== signature) return { ok: false, reason: "signature" };
 
-  const currentDevice = (options.deviceId ?? getDeviceInstallId()).toUpperCase();
+  const currentDevice = normalizeDeviceId(options.deviceId ?? getDeviceInstallId());
   if (device !== currentDevice) return { ok: false, reason: "device_mismatch" };
 
   const observed = (options.now ?? new Date()).getTime();

@@ -1,6 +1,10 @@
 package org.voleyos.global;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -11,22 +15,33 @@ import android.media.AudioTrack;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.provider.MediaStore;
 import android.provider.Settings;
 import android.speech.tts.TextToSpeech;
+import android.util.Base64;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.JsPromptResult;
+import android.webkit.JsResult;
+import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.Toast;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -37,7 +52,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 
@@ -52,6 +69,10 @@ public class MainActivity extends Activity {
     private long lastBackPressMs;
     /** Tab requested by the home widget / launcher shortcut before the page is ready. */
     private String pendingTab;
+    /** Camera/mic grant waiting on the system dialog (QR scanner inside the WebView). */
+    private PermissionRequest pendingPermissionRequest;
+    /** requestCode for the WebView's runtime camera permission ask. */
+    private static final int REQUEST_WEBVIEW_PERMISSIONS = 4417;
 
     /** Exposed to JavaScript as VoleyOSBridge. */
     public static class VosleyOSBridge {
@@ -88,6 +109,96 @@ public class MainActivity extends Activity {
                 return sb.toString();
             } catch (Exception e) {
                 return "0000-0000";
+            }
+        }            /**
+             * v10.1.1 — native clipboard behind copyTextUniversal(). Under
+             * file:///android_asset navigator.clipboard is not a secure context,
+             * so every copy in the app reaches here first.
+             */
+            @JavascriptInterface
+            public boolean copyToClipboard(String text) {
+            if (text == null) return false;
+            try {
+                ClipboardManager clipboard =
+                        (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+                if (clipboard == null) return false;
+                clipboard.setPrimaryClip(ClipData.newPlainText("VoleyOS", text));
+                return true;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        /**
+         * v10.1.1 — WebView cannot download blob:/data: URLs, so every exporter
+         * (.png/.csv/.svg/.vos/.xlsx) hands the payload here instead. Decodes
+         * base64 (or plain text) and stores the file in public Downloads
+         * (MediaStore on API 29+, app-specific dir below), confirming with a
+         * toast so no save is ever silent. Returns true when written.
+         */
+        @JavascriptInterface
+        public boolean shareOrSaveDataUri(String filename, String dataUriOrText, String mimeType) {
+            if (filename == null || filename.trim().isEmpty() || dataUriOrText == null) return false;
+            try {
+                String safeName = filename.trim().replaceAll("[\\/\\r\\n]+", "_");
+                String mime = (mimeType == null || mimeType.trim().isEmpty())
+                        ? "application/octet-stream" : mimeType.trim();
+                byte[] bytes;
+                if (dataUriOrText.startsWith("data:")) {
+                    int comma = dataUriOrText.indexOf(',');
+                    if (comma < 0) return false;
+                    int semi = dataUriOrText.indexOf(';');
+                    if (mime.equals("application/octet-stream") && semi > 5) {
+                        mime = dataUriOrText.substring(5, semi);
+                    }
+                    String meta = dataUriOrText.substring(0, comma);
+                    String body = dataUriOrText.substring(comma + 1);
+                    bytes = meta.contains("base64")
+                            ? Base64.decode(body, Base64.DEFAULT)
+                            : Uri.decode(body).getBytes(StandardCharsets.UTF_8);
+                } else {
+                    bytes = dataUriOrText.getBytes(StandardCharsets.UTF_8);
+                }
+                if (bytes == null || bytes.length == 0) return false;
+                boolean saved = saveBytes(safeName, bytes, mime);
+                if (saved) {
+                    final String label = safeName;
+                    activity.showToastMessage("\u2705 " + label);
+                }
+                return saved;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        /** Writes to public Downloads (API 29+) or the app-specific dir below. */
+        private boolean saveBytes(String filename, byte[] bytes, String mime) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    ContentValues values = new ContentValues();
+                    values.put(MediaStore.Downloads.DISPLAY_NAME, filename);
+                    values.put(MediaStore.Downloads.MIME_TYPE, mime);
+                    values.put(MediaStore.Downloads.IS_PENDING, 1);
+                    Uri uri = context.getContentResolver()
+                            .insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                    if (uri == null) return false;
+                    try (OutputStream out = context.getContentResolver().openOutputStream(uri)) {
+                        if (out == null) return false;
+                        out.write(bytes);
+                    }
+                    values.clear();
+                    values.put(MediaStore.Downloads.IS_PENDING, 0);
+                    context.getContentResolver().update(uri, values, null, null);
+                    return true;
+                }
+                File dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                if (dir == null) dir = context.getCacheDir();
+                try (FileOutputStream out = new FileOutputStream(new File(dir, filename))) {
+                    out.write(bytes);
+                }
+                return true;
+            } catch (Exception e) {
+                return false;
             }
         }
 
@@ -724,6 +835,68 @@ public class MainActivity extends Activity {
         });
         webView.addJavascriptInterface(new VosleyOSBridge(this), "VoleyOSBridge");
 
+        // v10.1.1 — a stock WebView silently ignores alert()/confirm()/prompt(),
+        // which makes any button that uses them look 100% dead. Render the three
+        // dialogs natively and honour the camera/mic grant the offline QR
+        // scanner asks for through getUserMedia.
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
+                showToastMessage(message == null ? "" : message);
+                result.confirm();
+                return true;
+            }
+
+            @Override
+            public boolean onJsConfirm(WebView view, String url, String message, JsResult result) {
+                runOnUiThread(() -> new AlertDialog.Builder(MainActivity.this)
+                        .setMessage(message)
+                        .setPositiveButton(android.R.string.ok, (dialog, which) -> result.confirm())
+                        .setNegativeButton(android.R.string.cancel, (dialog, which) -> result.cancel())
+                        .setOnCancelListener(dialog -> result.cancel())
+                        .show());
+                return true;
+            }
+
+            @Override
+            public boolean onJsPrompt(WebView view, String url, String message,
+                                      String defaultValue, JsPromptResult result) {
+                runOnUiThread(() -> {
+                    final EditText field = new EditText(MainActivity.this);
+                    field.setText(defaultValue == null ? "" : defaultValue);
+                    new AlertDialog.Builder(MainActivity.this)
+                            .setMessage(message)
+                            .setView(field)
+                            .setPositiveButton(android.R.string.ok,
+                                    (dialog, which) -> result.confirm(field.getText().toString()))
+                            .setNegativeButton(android.R.string.cancel,
+                                    (dialog, which) -> result.cancel())
+                            .setOnCancelListener(dialog -> result.cancel())
+                            .show();
+                });
+                return true;
+            }
+
+            @Override
+            public void onPermissionRequest(final PermissionRequest request) {
+                // Offline app: only camera/mic for the QR scanner and telestrator.
+                final List<String> wanted = new ArrayList<>();
+                for (String resource : request.getResources()) {
+                    if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)
+                            || PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
+                        wanted.add(resource);
+                    }
+                }
+                if (wanted.isEmpty() || Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+                    runOnUiThread(request::deny);
+                    return;
+                }
+                pendingPermissionRequest = request;
+                requestPermissions(wanted.toArray(new String[0]), REQUEST_WEBVIEW_PERMISSIONS);
+                return;
+            }
+        });
+
         // Tier-1 native voice: media usage + speech content so announcements
         // duck the soundtrack correctly instead of using the silent stream.
         nativeTts = new TextToSpeech(this, status -> {
@@ -750,6 +923,73 @@ public class MainActivity extends Activity {
 
         webView.loadUrl("file:///android_asset/index.html");
     }
+
+    /** Toast from any thread (JS interface callbacks run off the UI thread). */
+    private void showToastMessage(final String message) {
+        runOnUiThread(() -> Toast.makeText(this, message, Toast.LENGTH_SHORT).show());
+    }
+
+    /** Resolves the WebView's pending camera/mic grant once the user answers. */
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);                if (requestCode != REQUEST_WEBVIEW_PERMISSIONS) return;
+                final PermissionRequest pending = pendingPermissionRequest;
+                pendingPermissionRequest = null;
+                if (pending == null) return;
+                boolean granted = grantResults.length > 0;
+                for (int result : grantResults) {
+                    if (result != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        granted = false;
+                        break;
+                    }
+                }
+                final boolean wasGranted = granted;
+                runOnUiThread(() -> {
+                    if (wasGranted) {
+                        pending.grant(pending.getResources());
+                    } else {
+                        pending.deny();
+                    }
+                });
+            }
+
+            /**
+             * v10.1.2 — frontend-requested camera permission grant.
+             * The QR scanner/Keygen views call this BEFORE getUserMedia so the
+             * WebChromeClient path can grant the same PermissionRequest the page
+             * is waiting for without re-triggering the system dialog.
+             */
+            @JavascriptInterface
+            public boolean requestNativeCameraPermission() {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true;
+                String perm = android.Manifest.permission.CAMERA;
+                if (checkSelfPermission(perm) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    return true;
+                }
+                if (pendingPermissionRequest != null) {
+                    // Mirror the answer back to the WebView that is already waiting.
+                    final PermissionRequest pending = pendingPermissionRequest;
+                    boolean granted = grantResultsFor(perm);
+                    runOnUiThread(() -> {
+                        if (granted) {
+                            pending.grant(pending.getResources());
+                        } else {
+                            pending.deny();
+                        }
+                    });
+                }
+                requestPermissions(new String[]{perm}, REQUEST_WEBVIEW_PERMISSIONS);
+                return true;
+            }
+
+            /**
+             * Tiny helper mirror of the system permission state for a single
+             * runtime perm so the bridge can summarize the camera answer.
+             */
+            private boolean grantResultsFor(String wanted) {
+                return android.content.pm.PackageManager.PERMISSION_GRANTED ==
+                        checkSelfPermission(wanted);
+            }
 
     /**
      * v10.1 back-gesture guard: swiping back never kills the Activity behind

@@ -1,5 +1,7 @@
 "use client";
 
+import { copyTextUniversal } from "@/lib/security-shield";
+
 import { useEffect, useRef, useState } from "react";
 
 import { t } from "@/lib/i18n";
@@ -233,12 +235,9 @@ export function LiveCastModal({
   };
 
   const copyUrl = async (value: string): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(value);
+    if (await copyTextUniversal(value)) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* clipboard blocked: the URL stays visible for manual copy */
     }
   };
 

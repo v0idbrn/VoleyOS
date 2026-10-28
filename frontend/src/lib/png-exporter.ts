@@ -67,6 +67,80 @@ export async function rasterizeSvgToPng(
   }
 }
 
+/* ------------------------------------------- Android WebView file bridge */
+
+interface VosSaveBridge {
+  shareOrSaveDataUri?: (filename: string, dataUriOrText: string, mimeType: string) => boolean;
+}
+
+function vosSaveBridge(): VosSaveBridge["shareOrSaveDataUri"] | undefined {
+  const bridge = (globalThis as { VoleyOSBridge?: VosSaveBridge }).VoleyOSBridge;
+  return typeof bridge?.shareOrSaveDataUri === "function" ? bridge.shareOrSaveDataUri.bind(bridge) : undefined;
+}
+
+function blobToDataUrl(blob: Blob): Promise<string | null> {
+  if (typeof FileReader === "undefined") return Promise.resolve(null);
+  return new Promise((resolve) => {
+    try {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/**
+ * v10.1.1 — hand the payload to the native Android bridge first: WebView
+ * cannot download `blob:` URLs, so inside the APK every export must become a
+ * real file + native share sheet. Text payloads go across synchronously;
+ * `data:` URIs are decoded natively. Returns `false` outside the APK.
+ */
+export async function saveViaBridge(
+  input: Blob | string,
+  filename: string,
+  mimeType = "application/octet-stream",
+): Promise<boolean> {
+  const bridge = vosSaveBridge();
+  if (!bridge) return false;
+  try {
+    if (typeof input === "string") return bridge(filename, input, mimeType) === true;
+    const dataUrl = await blobToDataUrl(input);
+    if (!dataUrl) return false;
+    return bridge(filename, dataUrl, input.type || mimeType) === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Synchronous bridge save for TEXT exports (`.vos`, `.csv`, `.svg`, JSON). */
+export function bridgeSaveData(filename: string, data: string, mimeType: string): boolean {
+  const bridge = vosSaveBridge();
+  if (!bridge) return false;
+  try {
+    return bridge(filename, data, mimeType) === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Universal save: Android bridge → standard browser `<a download>`. Returns
+ * `true` when either path accepted the file.
+ */
+export async function saveFileUniversal(
+  input: Blob | string,
+  filename: string,
+  mimeType = "application/octet-stream",
+): Promise<boolean> {
+  const blob =
+    typeof input === "string" ? new Blob([input], { type: mimeType }) : input;
+  if (await saveViaBridge(blob, filename, mimeType)) return true;
+  return downloadBlob(blob, filename);
+}
+
 /** Saves a blob as a file download. Returns false where downloads are blocked. */
 export function downloadBlob(blob: Blob, filename: string): boolean {
   if (typeof document === "undefined") return false;
@@ -111,6 +185,10 @@ export async function sharePng(
     options.rasterize ?? ((value: string, w: number, h: number) => rasterizeSvgToPng(value, w, h));
   const blob = await rasterize(svg, width, height);
   if (!blob) return "failed";
+
+  // 1) Android APK: the native bridge turns the PNG into a real file and
+  //    opens the system share sheet (blob: URLs die inside WebView).
+  if (await saveViaBridge(blob, filename, "image/png")) return "downloaded";
 
   const file = new File([blob], filename, { type: "image/png" });
   const nav = typeof navigator === "undefined" ? null : navigator;

@@ -6,7 +6,7 @@
  * that restores everything on a new phone.
  */
 
-import { downloadBlob } from "@/lib/png-exporter";
+import { bridgeSaveData, downloadBlob } from "@/lib/png-exporter";
 import { checksumOf, safeJsonParse, sha256Hex } from "@/lib/security-shield";
 
 export const VOS_BACKUP_FORMAT = "volleyos.backup";
@@ -105,7 +105,9 @@ export function downloadVosBackup(now = Date.now()): string | null {
   if (typeof document === "undefined") return null;
   try {
     const filename = `volleyos-backup-${new Date(now).toISOString().slice(0, 10)}.vos`;
-    const blob = new Blob([serializeVosBackup(now)], { type: "application/json" });
+    const payload = serializeVosBackup(now);
+    if (bridgeSaveData(filename, payload, "application/json")) return filename;
+    const blob = new Blob([payload], { type: "application/json" });
     return downloadBlob(blob, filename) ? filename : null;
   } catch {
     return null;
@@ -289,6 +291,7 @@ export async function downloadEncryptedVosBackup(password: string, now = Date.no
     const payload = await encryptVosBackup(serializeVosBackup(now), password, now);
     if (payload === null) return null;
     const filename = `volleyos-backup-${new Date(now).toISOString().slice(0, 10)}.vos.enc`;
+    if (bridgeSaveData(filename, payload, "application/json")) return filename;
     const blob = new Blob([payload], { type: "application/json" });
     return downloadBlob(blob, filename) ? filename : null;
   } catch {

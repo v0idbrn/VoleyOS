@@ -1,5 +1,7 @@
 "use client";
 
+import { copyTextUniversal } from "@/lib/security-shield";
+
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { LOCALE_NAMES, SHELL, t } from "@/lib/i18n";
@@ -704,12 +706,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     const meta = MODULE_BY_SLUG.get(slug);
     if (!meta) return;
     const text = `${meta.icon} ${meta.name[locale]} — VolleyOS\n${meta.tagline[locale]}\n${t(locale, "61 módulos offline en tu cancha.", "61 offline modules on your court.", "61 módulos offline na sua quadra.")}`;
-    try {
-      await navigator.clipboard.writeText(text);
-      setToast(shell.copied);
-    } catch {
-      setToast(t(locale, "No se pudo copiar.", "Could not copy.", "Não foi possível copiar."));
-    }
+    const done = await copyTextUniversal(text);
+    setToast(done ? shell.copied : t(locale, "No se pudo copiar.", "Could not copy.", "Não foi possível copiar."));
     triggerCourtHaptics(20);
   };
 
@@ -1586,8 +1584,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                         if (typeof navigator.share === "function") {
                           await navigator.share(shareData);
                           setShareMsg(t(locale, "📤 Compartido.", "📤 Shared.", "📤 Compartilhado."));
-                        } else if (navigator.clipboard?.writeText) {
-                          await navigator.clipboard.writeText(shareData.url);
+                        } else if (await copyTextUniversal(shareData.url)) {
                           setShareMsg(t(locale, "🔗 Enlace copiado.", "🔗 Link copied.", "🔗 Link copiado."));
                         } else {
                           setShareMsg("🔗 volleyos.app");

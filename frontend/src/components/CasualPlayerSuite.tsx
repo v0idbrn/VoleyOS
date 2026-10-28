@@ -43,7 +43,8 @@ import {
   type JudgeVerdict,
   type OrganizerRoster,
 } from "@/lib/casual-engines";
-import { sharePng } from "@/lib/png-exporter";
+import { bridgeSaveData, sharePng } from "@/lib/png-exporter";
+import { copyTextUniversal } from "@/lib/security-shield";
 import { openPrintableReport, type ReportSpec } from "@/lib/offline-xlsx";
 import {
   loadFlowRoster,
@@ -291,15 +292,13 @@ export function WhatsAppMatchOrganizer({ locale, roster, onRosterChange }: Suite
 
   const copy = async (text: string, ok: string): Promise<void> => {
     if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
+    const done = await copyTextUniversal(text);
+    if (done) {
       setToast(ok);
       triggerCourtHaptics(15);
-    } catch {
-      setToast(
-        t(locale, "El navegador bloqueó el copiado.", "The browser blocked copying.", "O navegador bloqueou a cópia."),
-      );
+      return;
     }
+    setToast(t(locale, "No se pudo copiar.", "Could not copy.", "Não foi possível copiar."));
   };
 
   return (
@@ -712,7 +711,7 @@ function VaquitaPanel({ locale, roster, goToSection }: SuitePanelProps) {
       .concat(report.summary)
       .join("\n");
     try {
-      await navigator.clipboard.writeText(text);
+      if (!(await copyTextUniversal(text))) throw new Error("copy blocked");
       playCoinClink();
       setNotice(
         t(
@@ -874,7 +873,7 @@ function PrizePanel({ locale, roster }: SuitePanelProps) {
   const copy = async (): Promise<void> => {
     if (!poster) return;
     try {
-      await navigator.clipboard.writeText(poster);
+      if (!(await copyTextUniversal(poster))) throw new Error("copy blocked");
       setNotice(t(locale, "📋 SVG copiado.", "📋 SVG copied.", "📋 SVG copiado."));
       triggerCourtHaptics(15);
     } catch {
@@ -1028,7 +1027,7 @@ function SeasonPanel({ locale }: { locale: Locale }) {
 
   const copySummary = async (): Promise<void> => {
     try {
-      await navigator.clipboard.writeText(seasonSummaryText(history, locale));
+      if (!(await copyTextUniversal(seasonSummaryText(history, locale)))) throw new Error("copy blocked");
       setNotice(t(locale, "📲 Resumen copiado.", "📋 Summary copied.", "📋 Resumo copiado."));
     } catch {
       setNotice(
@@ -1039,6 +1038,10 @@ function SeasonPanel({ locale }: { locale: Locale }) {
 
   const exportCsv = (): void => {
     const csv = seasonToCsv(history);
+    if (bridgeSaveData("voleyos-temporada.csv", csv, "text/csv;charset=utf-8")) {
+      setNotice(t(locale, "📄 CSV generado.", "📄 CSV generated.", "📄 CSV gerado."));
+      return;
+    }
     try {
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
@@ -1049,8 +1052,12 @@ function SeasonPanel({ locale }: { locale: Locale }) {
       URL.revokeObjectURL(url);
       setNotice(t(locale, "📄 CSV generado.", "📄 CSV generated.", "📄 CSV gerado."));
     } catch {
-      void navigator.clipboard.writeText(csv).then(() =>
-        setNotice(t(locale, "📄 CSV copiado.", "📄 CSV copied.", "📄 CSV copiado.")),
+      void copyTextUniversal(csv).then((done) =>
+        setNotice(
+          done
+            ? t(locale, "📄 CSV copiado.", "📄 CSV copied.", "📄 CSV copiado.")
+            : t(locale, "No se pudo copiar.", "Could not copy.", "Não foi possível copiar."),
+        ),
       );
     }
   };

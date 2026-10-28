@@ -211,3 +211,54 @@ export function atomicLoad<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   return readSlot<T>(key) ?? readSlot<T>(backupKey(key)) ?? fallback;
 }
+
+/* ------------------------------------------------ universal clipboard */
+
+interface VosClipboardBridge {
+  copyToClipboard?: (value: string) => boolean;
+}
+
+/**
+ * v10.1.1 — clipboard that survives Android WebView's `file://` origin.
+ * `navigator.clipboard` requires a secure context, so under
+ * `file:///android_asset/index.html` it throws `NotAllowedError` or fails
+ * silently. Order: native bridge → async clipboard API → hidden textarea
+ * with `document.execCommand("copy")`. Returns `true` only when a strategy
+ * actually reported success, so callers can show a truthful toast.
+ */
+export async function copyTextUniversal(text: string): Promise<boolean> {
+  if (typeof window === "undefined" || typeof document === "undefined" || !text) return false;
+  const bridge = (window as Window & { VoleyOSBridge?: VosClipboardBridge }).VoleyOSBridge;
+  if (typeof bridge?.copyToClipboard === "function") {
+    try {
+      if (bridge.copyToClipboard(text) !== false) return true;
+    } catch {
+      /* bridge unavailable: keep falling down the chain */
+    }
+  }
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* NotAllowedError on file:// or denied permission: last resort below. */
+  }
+  try {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.top = "-10000px";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.focus();
+    area.select();
+    area.setSelectionRange(0, text.length);
+    const ok = document.execCommand("copy");
+    document.body.removeChild(area);
+    return ok;
+  } catch {
+    return false;
+  }
+}
