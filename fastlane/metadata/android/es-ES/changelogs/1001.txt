@@ -1,0 +1,1 @@
+Nuevo icono: emblema VoleyOS en negro obsidiana y carmesí con el wordmark, dentro de la zona segura del lanzador de Android 14 para que ninguna máscara lo recorte. Iconos web, tienda y PWA actualizados.
