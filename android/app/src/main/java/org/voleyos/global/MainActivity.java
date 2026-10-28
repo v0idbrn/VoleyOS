@@ -4,16 +4,22 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.media.AudioAttributes;
+import android.media.AudioFormat;
+import android.media.AudioManager;
+import android.media.AudioTrack;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.provider.Settings;
+import android.speech.tts.TextToSpeech;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -33,26 +39,34 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Enumeration;
 import java.util.Locale;
+import java.util.Random;
 
 public class MainActivity extends Activity {
     /** Pure-SDK live scoreboard port: http://<hotspot-ip>:8765/state */
     private static final int LIVE_PORT = 8765;
 
     private WebView webView;
+    /** Native multi-locale TTS — Tier 1 of the universal court voice. */
+    private TextToSpeech nativeTts;
+    /** When JS last told us to hold the Back press awaiting a double-press exit. */
+    private long lastBackPressMs;
     /** Tab requested by the home widget / launcher shortcut before the page is ready. */
     private String pendingTab;
 
     /** Exposed to JavaScript as VoleyOSBridge. */
     public static class VosleyOSBridge {
         private final Context context;
+        /** Host activity: owns the native TextToSpeech used by speakNativeTts. */
+        private final MainActivity activity;
         /** Latest signed match packet (JSON) served to every spectator on the hotspot. */
         private volatile String latestLiveJson = "{\"status\":\"idle\"}";
         private volatile ServerSocket liveServer;
         /** v10.0.0 — 4-digit bench PIN gating /state ("" = open, legacy). */
         private volatile String livePin = "";
 
-        VosleyOSBridge(Context context) {
-            this.context = context;
+        VosleyOSBridge(MainActivity activity) {
+            this.activity = activity;
+            this.context = activity;
         }
 
         /**
@@ -193,6 +207,199 @@ public class MainActivity extends Activity {
                     activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 }
             });
+        }
+
+        // ------------------------------------------------------------ v10.1 voice
+        /**
+         * v10.1 Tier-1 universal voice. Picks the first language pack that
+         * actually exists on this device (es-AR ➔ es-ES ➔ es-US ➔ es ➔
+         * device default; pt-BR ➔ pt-PT ➔ pt; en-US ➔ en-GB ➔ en) and speaks
+         * at volume 1.0 on QUEUE_FLUSH. Returns false when native TTS is
+         * unavailable so the JS announcer falls through to Tier 2/3.
+         */
+        @JavascriptInterface
+        public boolean speakNativeTts(String text, String langCode) {
+            MainActivity host = activity;
+            TextToSpeech tts = host == null ? null : host.nativeTts;
+            if (tts == null || text == null || text.isEmpty()) return false;
+            try {
+                Locale locale = resolveLocale(tts, langCode);
+                int applied = tts.setLanguage(locale);
+                if (applied == TextToSpeech.LANG_MISSING_DATA
+                        || applied == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    applied = tts.setLanguage(Locale.getDefault());
+                }
+                if (applied < 0) return false;
+                Bundle params = new Bundle();
+                params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f);
+                int queued = tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "vos-tts");
+                return queued == TextToSpeech.SUCCESS;
+            } catch (Throwable t) {
+                return false; // any native failure → JS Tier 2/3
+            }
+        }
+
+        /** Hard-stops any in-flight announcement (new score call wins). */
+        @JavascriptInterface
+        public void stopNativeTts() {
+            MainActivity host = activity;
+            TextToSpeech tts = host == null ? null : host.nativeTts;
+            if (tts == null) return;
+            try {
+                tts.stop();
+            } catch (Throwable ignored) {
+                // Stopping speech must never take the WebView down.
+            }
+        }
+
+        /** Cascade locale selection against the engines actually installed. */
+        private static Locale resolveLocale(TextToSpeech tts, String langCode) {
+            String lang = langCode == null ? "" : langCode.toLowerCase(Locale.ROOT);
+            Locale[] candidates;
+            if (lang.startsWith("pt")) {
+                candidates = new Locale[]{new Locale("pt", "BR"), new Locale("pt", "PT"), new Locale("pt")};
+            } else if (lang.startsWith("en")) {
+                candidates = new Locale[]{Locale.US, Locale.UK, Locale.ENGLISH};
+            } else if (lang.startsWith("es")) {
+                candidates = new Locale[]{new Locale("es", "AR"), new Locale("es", "ES"),
+                        new Locale("es", "US"), new Locale("es")};
+            } else {
+                candidates = new Locale[0];
+            }
+            for (Locale candidate : candidates) {
+                try {
+                    if (tts.isLanguageAvailable(candidate) >= TextToSpeech.LANG_AVAILABLE) {
+                        return candidate;
+                    }
+                } catch (Throwable ignored) {
+                    // Unreadable engine data: keep cascading.
+                }
+            }
+            return Locale.getDefault();
+        }
+
+        // ------------------------------------------------------------ v10.1 hardware audio
+        /**
+         * v10.1 raw PCM on the hardware mixer: 44.1 kHz 16-bit mono AudioTrack
+         * on USAGE_MEDIA, synthesized on a background thread so the WebView
+         * never blocks. Covers Fox 40 dual-chamber whistles and the FIVB
+         * stadium air-horn. False only for unknown cues or a dead track.
+         */
+        @JavascriptInterface
+        public boolean playNativeHardwareCue(String cueType) {
+            String type = cueType == null ? "" : cueType;
+            if (!type.equals("whistle_short") && !type.equals("whistle_long")
+                    && !type.equals("whistle_double") && !type.equals("buzzer")) {
+                return false;
+            }
+            try {
+                Thread worker = new Thread(() -> streamCue(type), "vos-hw-cue");
+                worker.setDaemon(true);
+                worker.start();
+                return true;
+            } catch (Throwable t) {
+                return false;
+            }
+        }
+
+        /** Streams a synthesized cue straight to the AudioTrack mixer. */
+        private static void streamCue(String cueType) {
+            try {
+                int sampleRate = 44100;
+                short[] pcm = synthesizeCue(cueType, sampleRate);
+                AudioFormat format = new AudioFormat.Builder()
+                        .setSampleRate(sampleRate)
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build();
+                AudioAttributes attributes = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build();
+                AudioTrack track = new AudioTrack(attributes, format, pcm.length * 2,
+                        AudioTrack.MODE_STREAM, 0);
+                if (track.getState() != AudioTrack.STATE_INITIALIZED) {
+                    track.release();
+                    return;
+                }
+                track.play();
+                int written = 0;
+                while (written < pcm.length) {
+                    int chunk = track.write(pcm, written, pcm.length - written);
+                    if (chunk <= 0) break;
+                    written += chunk;
+                }
+                track.stop();
+                track.release();
+            } catch (Throwable ignored) {
+                // Best-effort: WebAudio already played the same cue.
+            }
+        }
+
+        /** Fox 40 dual-chamber whistle (3745 + 4085 Hz, 54 Hz pea, 8 ms lip). */
+        private static short[] synthesizeCue(String cueType, int sampleRate) {
+            if ("buzzer".equals(cueType)) return hornPcm(sampleRate);
+            Random noise = new Random(0x564F53L); // deterministic across devices
+            double duration = "whistle_long".equals(cueType) ? 1.10
+                    : "whistle_double".equals(cueType) ? 0.86 : 0.45;
+            int total = (int) (duration * sampleRate);
+            short[] pcm = new short[total];
+            double gapStart = "whistle_double".equals(cueType) ? 0.40 : -1.0;
+            double gapEnd = gapStart + 0.14;
+            // Crude 2.8–4.4 kHz band-pass (fc 3600 Hz, Q 1.0) for the air rush.
+            double w0 = 2.0 * Math.PI * 3600.0 / sampleRate;
+            double alpha = Math.sin(w0) / 2.0;
+            double b0 = alpha, b2 = -alpha, a0 = 1.0 + alpha,
+                    a1 = -2.0 * Math.cos(w0), a2 = 1.0 - alpha;
+            double x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+            for (int i = 0; i < total; i += 1) {
+                double t = i / (double) sampleRate;
+                if (gapStart > 0 && t >= gapStart && t < gapEnd) {
+                    pcm[i] = 0;
+                    continue;
+                }
+                double burstT = gapStart > 0 && t >= gapEnd ? t - gapEnd : t;
+                double attack = Math.min(1.0, burstT / 0.008);
+                double pea = 1.0 + 0.28 * Math.sin(2.0 * Math.PI * 54.0 * burstT);
+                double envelope = attack * Math.exp(-1.6 * burstT);
+                double raw = noise.nextDouble() * 2.0 - 1.0;
+                double band = (b0 * raw + b2 * x2 - a1 * y1 - a2 * y2) / a0;
+                x2 = x1; x1 = raw; y2 = y1; y1 = band;
+                double core = Math.sin(2.0 * Math.PI * 3745.0 * burstT)
+                        + Math.sin(2.0 * Math.PI * 4085.0 * burstT)
+                        + 0.5 * Math.sin(2.0 * Math.PI * 7490.0 * burstT);
+                double sample = envelope * pea * (core / 2.5 + band * 0.35);
+                pcm[i] = clamp16(sample * 13000.0);
+            }
+            return pcm;
+        }
+
+        /** FIVB stadium air-horn: 7 brass harmonics 196–784 Hz, 18 Hz growl, tanh(3.2x). */
+        private static short[] hornPcm(int sampleRate) {
+            int total = (int) (0.85 * sampleRate);
+            short[] pcm = new short[total];
+            for (int i = 0; i < total; i += 1) {
+                double t = i / (double) sampleRate;
+                double attack = Math.min(1.0, t / 0.012);
+                double release = t > 0.70 ? Math.max(0.0, (0.85 - t) / 0.15) : 1.0;
+                double growl = 1.0 + 0.25 * Math.sin(2.0 * Math.PI * 18.0 * t);
+                double brass = 0.0;
+                for (int harmonic = 0; harmonic < 7; harmonic += 1) {
+                    double frequency = 196.0 + 98.0 * harmonic;
+                    brass += Math.sin(2.0 * Math.PI * frequency * t) / (harmonic + 1);
+                }
+                double sample = attack * release * growl * brass / 3.2;
+                sample = Math.tanh(3.2 * sample) / Math.tanh(3.2);
+                pcm[i] = clamp16(sample * 14000.0);
+            }
+            return pcm;
+        }
+
+        private static short clamp16(double value) {
+            int rounded = (int) value;
+            if (rounded > 32767) return 32767;
+            if (rounded < -32768) return -32768;
+            return (short) rounded;
         }
 
         /** Active non-loopback IPv4 of this phone (hotspot: 192.168.43.1 / 192.168.137.1). */
@@ -479,6 +686,10 @@ public class MainActivity extends Activity {
                         | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
         setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER);
 
+        // Hardware volume keys always drive the match soundtrack (whistles,
+        // buzzer, voice), never the ringtone stream.
+        setVolumeControlStream(AudioManager.STREAM_MUSIC);
+
         pendingTab = consumeTarget(getIntent());
 
         FrameLayout container = new FrameLayout(this);
@@ -491,6 +702,9 @@ public class MainActivity extends Activity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
+        // Once the scorer has touched the screen, cues must fire with no
+        // further gesture — same rule iOS Safari applies after first tap.
+        settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setAllowFileAccess(true);
         // The shell is file:///android_asset: page JS must never read or write
         // arbitrary files through that origin.
@@ -510,6 +724,17 @@ public class MainActivity extends Activity {
         });
         webView.addJavascriptInterface(new VosleyOSBridge(this), "VoleyOSBridge");
 
+        // Tier-1 native voice: media usage + speech content so announcements
+        // duck the soundtrack correctly instead of using the silent stream.
+        nativeTts = new TextToSpeech(this, status -> {
+            if (status == TextToSpeech.SUCCESS && nativeTts != null) {
+                nativeTts.setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build());
+            }
+        });
+
         // Native Android copy/paste: let long-press on text inputs (and links) reach
         // the system selection menu while still blocking random image/context menus.
         webView.setLongClickable(true);
@@ -524,6 +749,55 @@ public class MainActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
         webView.loadUrl("file:///android_asset/index.html");
+    }
+
+    /**
+     * v10.1 back-gesture guard: swiping back never kills the Activity behind
+     * React's back. The page decides first:
+     *   "handled" -> swallow (modal/drawer/sub-module already closed),
+     *   "exit"    -> only a second Back within 2 s really leaves the app,
+     *   anything else (page still booting) -> park the app in background.
+     */
+    @Override
+    public void onBackPressed() {
+        if (webView == null) {
+            moveTaskToBack(true);
+            return;
+        }
+        String probe = "(function(){try{"
+                + "if(typeof window.__vosHandleAndroidBack==='function'){"
+                + "return window.__vosHandleAndroidBack();"
+                + "}return 'unhandled';}catch(e){return 'unhandled';}})();";
+        webView.evaluateJavascript(probe, (ValueCallback<String>) value -> {
+            String result = value == null ? "\"unhandled\"" : value;
+            if (result.contains("\"handled\"")) {
+                return; // consumed inside the app
+            }
+            if (!result.contains("\"exit\"")) {
+                moveTaskToBack(true); // no JS decision: background, never kill
+                return;
+            }
+            long now = System.currentTimeMillis();
+            if (now - lastBackPressMs < 2000L) {
+                finish(); // deliberate double-back within 2 seconds
+            } else {
+                lastBackPressMs = now; // first press: hold for the second
+            }
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (nativeTts != null) {
+            try {
+                nativeTts.stop();
+                nativeTts.shutdown();
+            } catch (Exception ignored) {
+                // TTS teardown must never block the Activity.
+            }
+            nativeTts = null;
+        }
+        super.onDestroy();
     }
 
     @Override
