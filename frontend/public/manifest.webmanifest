@@ -2,7 +2,7 @@
   "id": "/",
   "name": "VolleyOS Global",
   "short_name": "VolleyOS",
-  "description": "12 módulos offline-first para vóley: biomecánica, rotaciones, scouting, torneos, VAR y streaming.",
+  "description": "61 módulos offline-first para vóley: biomecánica, rotaciones, scouting, arbitraje, torneos, salas en vivo y streaming OBS. ES/EN/PT, sin telemetría.",
   "start_url": "/es",
   "scope": "/",
   "display": "standalone",

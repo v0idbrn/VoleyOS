@@ -1463,6 +1463,29 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     return () => bridge?.setKeepScreenAwake?.(false);
   }, [state]);
 
+  // v10.1.0 web back-gesture guard: while points are on the board an
+  // accidental back/swipe must not wipe the match. We hold one extra history
+  // entry (merging Next's own fields) and bounce popstate straight back.
+  useEffect(() => {
+    if (state.status !== "live" || !isMatchActive(state)) return;
+    if (!(window.history.state as { vosBackGuard?: number } | null)?.vosBackGuard) {
+      window.history.pushState({ ...(window.history.state ?? {}), vosBackGuard: 1 }, "");
+    }
+    const onPop = (): void => {
+      window.history.pushState({ ...(window.history.state ?? {}), vosBackGuard: 1 }, "");
+      setMessage(
+        t(
+          locale,
+          "⚠️ Partido en curso: para salir, usá el menú de la app.",
+          "⚠️ Match in progress: leave through the in-app menu.",
+          "⚠️ Partida em andamento: saia pelo menu do app.",
+        ),
+      );
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [state, locale]);
+
   // v9.4: dim non-essential chrome after 30s of stillness; any touch revives it.
   useEffect(() => {
     let timer: number | null = null;

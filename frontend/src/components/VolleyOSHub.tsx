@@ -285,6 +285,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   );
   const [voice, setVoice] = useState(false);
   const [courtAudio, setCourtAudio] = useState(true);
+  const [shareMsg, setShareMsg] = useState<string | null>(null);
 
   const toggleUiMode = (): void => {
     const next: "simple" | "pro" = uiMode === "simple" ? "pro" : "simple";
@@ -1570,6 +1571,40 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
 
                 {creator ? <CreatorKeygenPanel locale={locale} /> : null}
 
+                <button
+                  type="button"
+                  data-testid="share-app"
+                  onClick={() => {
+                    void (async () => {
+                      const shareData = {
+                        title: "VolleyOS Global",
+                        text: t(locale, "El sistema operativo del vóley", "The volleyball operating system", "O sistema operacional do voleibol"),
+                        url: "https://volleyos.app",
+                      };
+                      try {
+                        if (typeof navigator.share === "function") {
+                          await navigator.share(shareData);
+                          setShareMsg(t(locale, "📤 Compartido.", "📤 Shared.", "📤 Compartilhado."));
+                        } else if (navigator.clipboard?.writeText) {
+                          await navigator.clipboard.writeText(shareData.url);
+                          setShareMsg(t(locale, "🔗 Enlace copiado.", "🔗 Link copied.", "🔗 Link copiado."));
+                        } else {
+                          setShareMsg("🔗 volleyos.app");
+                        }
+                      } catch {
+                        setShareMsg(t(locale, "✖ Cancelado.", "✖ Cancelled.", "✖ Cancelado."));
+                      }
+                    })();
+                  }}
+                  className="tap w-full rounded-xl border border-white/10 bg-panel px-4 py-3 text-left text-[13px] font-semibold text-white"
+                >
+                  📤 {t(locale, "Compartir VolleyOS", "Share VolleyOS", "Compartilhar VolleyOS")}
+                </button>
+                {shareMsg ? (
+                  <p data-testid="share-result" role="status" className="rounded-xl border border-white/15 bg-panel px-3 py-2 text-[11px] font-semibold text-white/70">
+                    {shareMsg}
+                  </p>
+                ) : null}
                 <button
                   type="button"
                   data-testid="update-check"

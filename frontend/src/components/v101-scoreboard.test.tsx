@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScoreboardStation } from "./stations";
@@ -177,6 +177,29 @@ describe("v10.1 scoreboard: sound bar routing", () => {
   });
 });
 
+describe("v10.1 web back-gesture guard", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("bounces popstate while a match has points on the board", () => {
+    renderBoard();
+    fireEvent.click(screen.getByRole("button", { name: "+ Tiburones [A]" }));
+    expect((window.history.state as { vosBackGuard?: number } | null)?.vosBackGuard).toBe(1);
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect((window.history.state as { vosBackGuard?: number } | null)?.vosBackGuard).toBe(1);
+    expect(document.body.textContent).toContain("Partido en curso");
+  });
+});
+
 describe("v10.1 hub: top-level Simple/Pro toggle keeps every tab", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -206,5 +229,17 @@ describe("v10.1 hub: top-level Simple/Pro toggle keeps every tab", () => {
     expect(screen.getByTestId("hub-mode-toggle").getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getAllByRole("tab", { name: /Inicio/ }).at(-1)!);
     audit(); // Simple — nothing is removed
+  });
+
+  it("shares the app through the Web Share API", async () => {
+    const share = vi.fn(async (_data?: ShareData) => undefined);
+    Object.defineProperty(navigator, "share", { value: share, configurable: true });
+    render(<VolleyOSHub locale="es" />);
+    fireEvent.click(screen.getByRole("tab", { name: /Ajustes/ }));
+    fireEvent.click(screen.getByTestId("share-app"));
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: "https://volleyos.app" }));
+    expect(screen.getByTestId("share-result")).toBeTruthy();
+    Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
   });
 });

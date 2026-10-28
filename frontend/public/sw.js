@@ -1,5 +1,5 @@
-const VERSION = "volleyos-v1";
-const SHELL = ["/es", "/en", "/pt", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
+const VERSION = "volleyos-v10.1.0";
+const SHELL = ["/es", "/en", "/pt", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
