@@ -249,7 +249,7 @@ MODULES: tuple[ModuleInfo, ...] = (
         name_en="Setter IQ Auditor",
         profile="coaches",
         profiles=["coaches"],
-        description="Distribucion R1-R6, indice 0-100 y sesgos criticos por calidad de pase.",
+        description="Distribución R1-R6, índice 0-100 y sesgos críticos por calidad de pase.",
     ),
     ModuleInfo(
         slug="lineup-slip",
@@ -265,7 +265,7 @@ MODULES: tuple[ModuleInfo, ...] = (
         name_en="Integrity Seal",
         profile="referees",
         profiles=["referees"],
-        description="HMAC-SHA256 sobre JSON canonico, hash publico y verificacion de actas.",
+        description="HMAC-SHA256 sobre JSON canónico, hash público y verificación de actas.",
     ),
     ModuleInfo(
         slug="capsule-io",
@@ -281,7 +281,7 @@ MODULES: tuple[ModuleInfo, ...] = (
         name_en="FIVB Referee Console",
         profile="referees",
         profiles=["referees"],
-        description="Tarjetas FIVB, escalamiento automatico y relojes de 8s/30s.",
+        description="Tarjetas FIVB, escalada automática y relojes de 8s/30s.",
     ),
     ModuleInfo(
         slug="substitution-tracker",
@@ -452,7 +452,7 @@ MODULES: tuple[ModuleInfo, ...] = (
         name_en="4-2 / 6-2 / 5-1 Transition Simulator",
         profile="coaches",
         profiles=["coaches"],
-        description="Atacantes delanteros por rotacion, sistema optimo y mapa de infiltracion.",
+        description="Atacantes delanteros por rotación, sistema óptimo y mapa de infiltración.",
     ),
     ModuleInfo(
         slug="deception-reader",
@@ -492,7 +492,7 @@ MODULES: tuple[ModuleInfo, ...] = (
         name_en="House Rules, Mixed & Relojito",
         profile="court",
         profiles=["court"],
-        description="Contactos por genero, rotacion con banco y sets a 15 con golden point.",
+        description="Contactos por género, rotación con banco y sets a 15 con golden point.",
     ),
     ModuleInfo(
         slug="arena-dj",
@@ -612,7 +612,7 @@ MODULES: tuple[ModuleInfo, ...] = (
         name_en="Peripheral Reflex",
         profile="court",
         profiles=["court"],
-        description="Tiempos de reaccion, consistencia y rating.",
+        description="Tiempos de reacción, consistencia y rating.",
     ),
     ModuleInfo(
         slug="club-white-label",

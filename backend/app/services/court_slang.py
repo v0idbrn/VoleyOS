@@ -80,7 +80,7 @@ SLANG: dict[str, SlangEntry] = {
     ),
     "bloqueo": _entry(
         "bloqueo", "bloqueo", "bloqueo", "bloqueio", "block",
-        "Accion defensiva en la red para detener el ataque.",
+        "Acción defensiva en la red para detener el ataque.",
         "El bloqueo cerro la paralela.",
         ["defensa", "remate", "tool"],
     ),
@@ -99,19 +99,19 @@ SLANG: dict[str, SlangEntry] = {
     "levantador": _entry(
         "armador", "colocador", "armador", "levantador", "setter",
         "Nombre regional del armador que distribuye el juego.",
-        "El levantador jugo el pipe en transicion.",
+        "El levantador jugó el pipe en transición.",
         ["armador", "pase", "pipe"],
     ),
     "punta": _entry(
         "punta", "receptor", "punta", "ponteiro", "outside hitter",
-        "Atacante de zona 4 que tambien recibe el saque.",
+        "Atacante de zona 4 que también recibe el saque.",
         "El punta ataco la linea corta.",
         ["remate", "pase", "pipe"],
     ),
     "libero": _entry(
         "libero", "libero", "libero", "libero", "libero",
         "Especialista defensivo con camiseta distinta.",
-        "El libero entro por el central en la rotacion.",
+        "El líbero entró por el central en la rotación.",
         ["defensa", "pase", "recepcion"],
     ),
     "ace": _entry(
@@ -128,7 +128,7 @@ SLANG: dict[str, SlangEntry] = {
     ),
     "shank": _entry(
         "mufa", "fallo", "mufa", "mancada", "shank",
-        "Recepcion desviada fuera de la zona de armado.",
+        "Recepción desviada fuera de la zona de armado.",
         "Ese shank dejo el balon en la tribuna.",
         ["pase", "defensa", "recepcion"],
     ),

@@ -25,7 +25,7 @@ DELAY_KINDS = {"DELAY_WARNING", "DELAY_PENALTY"}
 
 RULE_TEXT: dict[str, str] = {
     "WARNING_YELLOW": (
-        "Amonestacion verbal con tarjeta amarilla: se advierte al jugador, "
+        "Amonestación verbal con tarjeta amarilla: se advierte al jugador, "
         "sin consecuencia en el marcador (Regla FIVB 21.1)."
     ),
     "PENALTY_RED": (
@@ -33,11 +33,11 @@ RULE_TEXT: dict[str, str] = {
         "contrario (Regla FIVB 21.2)."
     ),
     "EXPULSION_JOINT": (
-        "Expulsion con tarjeta amarilla y roja juntas: el jugador debe abandonar "
+        "Expulsión con tarjeta amarilla y roja juntas: el jugador debe abandonar "
         "el set y permanecer en el banquillo (Regla FIVB 21.3)."
     ),
     "DISQUALIFICATION_SEPARATE": (
-        "Descalificacion con tarjeta amarilla y roja separadas: el jugador debe "
+        "Descalificación con tarjeta amarilla y roja separadas: el jugador debe "
         "abandonar el partido y el area de juego (Regla FIVB 21.4)."
     ),
     "DELAY_WARNING": (

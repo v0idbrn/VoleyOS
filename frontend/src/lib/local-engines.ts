@@ -1703,10 +1703,10 @@ export interface RefereeReport {
 }
 
 const CARD_TEXT: Record<CardKind, string> = {
-  WARNING_YELLOW: "Amonestacion: sin consecuencia en el marcador (FIVB 21.1).",
+  WARNING_YELLOW: "Amonestación: sin consecuencia en el marcador (FIVB 21.1).",
   PENALTY_RED: "Castigo: punto y saque al rival (FIVB 21.2).",
-  EXPULSION_JOINT: "Expulsion: sale por el resto del set (FIVB 21.3).",
-  DISQUALIFICATION_SEPARATE: "Descalificacion: sale por todo el partido (FIVB 21.4).",
+  EXPULSION_JOINT: "Expulsión: sale por el resto del set (FIVB 21.3).",
+  DISQUALIFICATION_SEPARATE: "Descalificación: sale por todo el partido (FIVB 21.4).",
   DELAY_WARNING: "Primera demora del equipo: advertencia (FIVB 21.5).",
   DELAY_PENALTY: "Demora repetida: punto y saque al rival (FIVB 21.6).",
 };
@@ -2033,7 +2033,7 @@ function pickupSplit(input: SplitInput): PickupSplit {
         payer: holder,
         payee: attendee.name,
         amount: money(-balanceCents),
-        concept: "devolucion de sena",
+        concept: "devolución de seña",
       });
     }
     rows.push({
@@ -2189,9 +2189,9 @@ export const REFEREE_GESTURES: Record<RefereeGesture, GestureInfo> = {
       pt: "A equipe tocou a bola quatro vezes.",
     },
     example: {
-      es: "Recepcion, armado, ataque y bloqueo propio.",
+      es: "Recepción, armado, ataque y bloqueo propio.",
       en: "Pass, set, attack and an own block.",
-      pt: "Passe, levantamento, ataque e bloqueio proprio.",
+      pt: "Passe, levantamento, ataque e bloqueio próprio.",
     },
     rule: "FIVB 9.3.1",
   },
@@ -2201,12 +2201,12 @@ export const REFEREE_GESTURES: Record<RefereeGesture, GestureInfo> = {
     why: {
       es: "Los equipos cambian de lado antes del siguiente set.",
       en: "Teams switch sides before the next set.",
-      pt: "As equipes trocam de lado antes do proximo set.",
+      pt: "As equipes trocam de lado antes do próximo set.",
     },
     example: {
-      es: "El arbitro gira los antebrazos.",
+      es: "El árbitro gira los antebrazos.",
       en: "The referee rotates their forearms.",
-      pt: "O arbitro gira os antebracos.",
+      pt: "O árbitro gira os antebraços.",
     },
     rule: "FIVB 18.2",
   },
@@ -2234,9 +2234,9 @@ export const REFEREE_GESTURES: Record<RefereeGesture, GestureInfo> = {
       pt: "A bola tocou o piso dentro das linhas.",
     },
     example: {
-      es: "El juez senala la linea.",
+      es: "El juez señala la línea.",
       en: "The referee points at the line.",
-      pt: "O arbitro aponta para a linha.",
+      pt: "O árbitro aponta para a linha.",
     },
     rule: "FIVB 8.4.1",
   },
@@ -2275,7 +2275,7 @@ export const FAN_QUESTIONS: FanQuestion[] = [
       pt: "Pode-se salvar a bola com o pe?",
     },
     options: {
-      es: ["Si, cualquier parte del cuerpo", "No, solo manos", "Solo el libero"],
+      es: ["Sí, cualquier parte del cuerpo", "No, solo manos", "Solo el libero"],
       en: ["Yes, any part of the body", "No, hands only", "Libero only"],
       pt: ["Sim, qualquer parte do corpo", "Nao, so as maos", "So o libero"],
     },
@@ -2315,15 +2315,15 @@ export const FAN_QUESTIONS: FanQuestion[] = [
       pt: "O libero pode sacar?",
     },
     options: {
-      es: ["Si, siempre", "No, no puede sacar", "Solo en el tie-break"],
+      es: ["Sí, siempre", "No, no puede sacar", "Solo en el tie-break"],
       en: ["Yes, always", "No, the libero cannot serve", "Only in the tie-break"],
-      pt: ["Sim, sempre", "Nao, o libero nao pode sacar", "So no tie-break"],
+      pt: ["Sim, sempre", "Não, o líbero não pode sacar", "Só no tie-break"],
     },
     correct: 1,
     explanation: {
       es: "El libero no puede sacar ni completar un ataque.",
       en: "The libero cannot serve or complete an attack.",
-      pt: "O libero nao pode sacar nem completar um ataque.",
+      pt: "O líbero não pode sacar nem completar um ataque.",
     },
     rule: "FIVB 19.3.1",
   },
@@ -2337,7 +2337,7 @@ export const FAN_QUESTIONS: FanQuestion[] = [
     options: {
       es: ["Si", "No, hacen falta dos de diferencia", "Depende del saque"],
       en: ["Yes", "No, a two-point lead is required", "Depends on serve"],
-      pt: ["Sim", "Nao, sao necessarios dois de vantagem", "Depende do saque"],
+      pt: ["Sim", "Não, são necessários dois de vantagem", "Depende do saque"],
     },
     correct: 1,
     explanation: {
@@ -2350,9 +2350,9 @@ export const FAN_QUESTIONS: FanQuestion[] = [
   {
     id: 5,
     question: {
-      es: "¿Cuanto dura el tiempo tecnico indoor?",
+      es: "¿Cuánto dura el tiempo técnico indoor?",
       en: "How long is an indoor technical timeout?",
-      pt: "Quanto dura o tempo tecnico indoor?",
+      pt: "Quanto dura o tempo técnico indoor?",
     },
     options: {
       es: ["30 segundos", "60 segundos", "90 segundos"],
@@ -2361,9 +2361,9 @@ export const FAN_QUESTIONS: FanQuestion[] = [
     },
     correct: 1,
     explanation: {
-      es: "El tiempo tecnico FIVB dura 60 segundos.",
+      es: "El tiempo técnico FIVB dura 60 segundos.",
       en: "The FIVB technical timeout lasts 60 seconds.",
-      pt: "O tempo tecnico da FIVB dura 60 segundos.",
+      pt: "O tempo técnico da FIVB dura 60 segundos.",
     },
     rule: "FIVB 15.4",
   },
@@ -2402,7 +2402,7 @@ export function fanReport(input: {
     return {
       decision,
       trivia: null,
-      message: `El juez cobro ${decision.call.es} (${decision.rule}).`,
+      message: `El juez cobró ${decision.call.es} (${decision.rule}).`,
     };
   }
   const answers = input.answers ?? [];
@@ -2518,7 +2518,7 @@ export function buildSignalSheet(input: {
     (left, right) => SETTER_GESTURES.indexOf(left.gesture) - SETTER_GESTURES.indexOf(right.gesture),
   );
   const lines = [
-    `# Senas del armador - ${input.team ?? "Mi equipo"}`,
+    `# Señas del armador - ${input.team ?? "Mi equipo"}`,
     `Armador: ${input.setterName || "sin nombre"}`,
     "",
     "| Sena | Jugada |",
@@ -2537,7 +2537,7 @@ export function buildSignalSheet(input: {
     missingGestures: SETTER_GESTURES.filter((gesture) => !grouped.has(gesture)),
     sheet: lines.join("\n"),
     message: valid
-      ? "Hoja de senas valida y sin colisiones."
+      ? "Hoja de señas válida y sin colisiones."
       : `${collisions.length} colisiones y ${duplicatePlays.length} jugadas duplicadas.`,
   };
 }
@@ -2607,8 +2607,8 @@ const MVP_AWARDS: Array<Omit<MvpAward, "winner" | "team" | "value" | "message">>
   { key: "WALL", label: "El Muro", emoji: "🧱", metric: "blocks" },
   { key: "LOCK", label: "El Candado", emoji: "🛡️", metric: "digs" },
   { key: "SNIPER", label: "Francotirador", emoji: "🎯", metric: "aces" },
-  { key: "BUILDER", label: "El Albanil", emoji: "👷", metric: "assists" },
-  { key: "ICE", label: "Sangre Fria 24-24", emoji: "🧊", metric: "pressurePoints" },
+  { key: "BUILDER", label: "El Albañil", emoji: "👷", metric: "assists" },
+  { key: "ICE", label: "Sangre Fría 24-24", emoji: "🧊", metric: "pressurePoints" },
 ];
 
 export async function awardMvp(input: { match?: string; players: MvpPlayer[] }): Promise<MvpReport> {
@@ -2740,11 +2740,11 @@ export function validateRosterPlayers(players: RosterPlayer[]): string[] {
   const numbers = players.map((player) => player.number);
   if (new Set(numbers).size !== numbers.length) issues.push("Dorsales repetidos.");
   const liberos = players.filter((player) => player.role === "L");
-  if (liberos.length > 2) issues.push("Maximo dos liberos.");
+  if (liberos.length > 2) issues.push("Máximo dos liberos.");
   const captains = players.filter((player) => player.captain);
   if (captains.length !== 1) issues.push("Debe haber exactamente un capitan.");
   if (captains[0]?.role === "L") issues.push("El libero no puede ser capitan.");
-  if (players.filter((player) => player.role !== "L").length < 6) issues.push("Seis jugadores de cancha como minimo.");
+  if (players.filter((player) => player.role !== "L").length < 6) issues.push("Seis jugadores de cancha como mínimo.");
   return issues;
 }
 
@@ -3362,8 +3362,8 @@ export function serveRadar(input: {
           ? "POWER_JUMP_SERVE"
           : "WORLD_CLASS_BOMB";
   const labels: Record<ServeClass, string> = {
-    FLOAT_TACTICAL: "flotado tactico",
-    HYBRID_FAST: "hibrido rapido",
+    FLOAT_TACTICAL: "flotado táctico",
+    HYBRID_FAST: "híbrido rápido",
     POWER_JUMP_SERVE: "jump serve de poder",
     WORLD_CLASS_BOMB: "bomba de clase mundial",
   };
@@ -3525,7 +3525,7 @@ export function evaluateBlockout(input: {
       decision,
       probabilityPct: round1(probability),
       ev: round3(ev),
-      note: `${round1(probability)}% de exito; EV ${round3(ev)}.`,
+      note: `${round1(probability)}% de éxito; EV ${round3(ev)}.`,
     };
   });
   const recommended = options.reduce((best, option) => (option.ev > best.ev ? option : best));
@@ -3540,7 +3540,7 @@ export function evaluateBlockout(input: {
     options,
     recommended: recommended.decision,
     wristAngleDeg: round1(angle),
-    message: `${recommended.decision} con EV ${recommended.ev}; muneca ${round1(angle)} grados.`,
+    message: `${recommended.decision} con EV ${recommended.ev}; muñeca ${round1(angle)} grados.`,
   };
 }
 
@@ -3570,15 +3570,15 @@ export interface PracticeReport {
 }
 
 const PRACTICE_TEMPLATES: Record<60 | 90 | 120, Array<[string, number]>> = {
-  60: [["Activacion", 10], ["Tecnica", 15], ["Tactica", 15], ["Juego", 15], ["Cierre", 5]],
-  90: [["Activacion", 12], ["Tecnica", 23], ["Tactica", 25], ["Juego", 25], ["Cierre", 5]],
-  120: [["Activacion", 15], ["Tecnica", 30], ["Tactica", 35], ["Juego", 35], ["Cierre", 5]],
+  60: [["Activación", 10], ["Técnica", 15], ["Táctica", 15], ["Juego", 15], ["Cierre", 5]],
+  90: [["Activación", 12], ["Técnica", 23], ["Táctica", 25], ["Juego", 25], ["Cierre", 5]],
+  120: [["Activación", 15], ["Técnica", 30], ["Táctica", 35], ["Juego", 35], ["Cierre", 5]],
 };
 const PRACTICE_FOCUS: Record<PracticeFocus, [string, string, string]> = {
   k1_reception: ["Estabilizar K1", "Servicio dirigido a zonas 1/5", "3 recepciones positivas"],
   block_defense_transition: ["Cerrar bloqueo y reciclar", "Bloqueo de dos y cobertura", "2 bloqueos-untos"],
   serve_pressure: ["Presionar saque bajo fatiga", "Series cortas y profundas", "70% dentro"],
-  setter_tempo: ["Acelerar decision del armador", "Quick-shoot-pipe", "5 ataques en tempo"],
+  setter_tempo: ["Acelerar decisión del armador", "Quick-shoot-pipe", "5 ataques en tempo"],
 };
 
 export function planPractice(input: {
@@ -3764,7 +3764,7 @@ export function buildCareerReport(input: {
     nextCategory,
     gapToNext: round1(gap),
     bottleneck,
-    message: `${input.player}: indice ${evolutionIndex}/100. Cuello: ${bottleneck}.`,
+    message: `${input.player}: índice ${evolutionIndex}/100. Cuello: ${bottleneck}.`,
   };
 }
 
@@ -3815,7 +3815,7 @@ export function analyzeAerodynamics(input: {
     verticalDropCm: round2(drop),
     landingDistanceM: round2(landing),
     landsInCourt: landing > 0 && landing <= 18,
-    message: `${regime} con Re=${reynoldsNumber}; desvio ${round2(lateral)} cm.`,
+    message: `${regime} con Re=${reynoldsNumber}; desvío ${round2(lateral)} cm.`,
   };
 }
 
@@ -3919,11 +3919,11 @@ export async function buildRecruitingDossier(input: RecruitInput): Promise<{
   if (input.verticalJumpCm >= 80) strengths.push("Salto explosivo con buen tiempo de ataque.");
   if (input.attackEfficiencyPct >= 45) strengths.push("Eficiencia de ataque superior a la media.");
   if (input.kills >= 250) strengths.push("Volumen de puntos probado.");
-  if (input.heightCm < 180) gaps.push("Altura limitada: proyectar a defensa y recepcion.");
-  if (input.verticalJumpCm < 50) gaps.push("Salto bajo: plan de fuerza y pliometria.");
-  if (input.attackEfficiencyPct < 25) gaps.push("Eficiencia baja: revisar seleccion de golpe.");
+  if (input.heightCm < 180) gaps.push("Altura limitada: proyectar a defensa y recepción.");
+  if (input.verticalJumpCm < 50) gaps.push("Salto bajo: plan de fuerza y pliometría.");
+  if (input.attackEfficiencyPct < 25) gaps.push("Eficiencia baja: revisar selección de golpe.");
   if (!strengths.length) strengths.push("Perfil equilibrado sin rasgo dominante.");
-  if (!gaps.length) gaps.push("Sin brechas criticas.");
+  if (!gaps.length) gaps.push("Sin brechas críticas.");
   const digest = await hmacSha256(canonicalJson(input as unknown as JsonValue), INTEGRITY_SEAL_SECRET);
   const seal = `VOS-SEAL-${digest.slice(0, 16).toUpperCase()}`;
   return { score, tier, strengths, gaps, seal, message: `Dossier ${tier} ${score}/100; sello ${seal}.` };
@@ -4044,7 +4044,7 @@ export function buildAdaptiveRulebook(input: {
     servingLegal: true,
     blockServeLegal: false,
     pelvisContactRequired: false,
-    rules: ["Saque bajo el hombro.", "Rotacion obligatoria.", "Todos atacan y rotan."],
+    rules: ["Saque bajo el hombro.", "Rotación obligatoria.", "Todos atacan y rotan."],
     message: `${input.mode}: ${court[0]} x ${court[1]} m.`,
   };
 }
@@ -4098,7 +4098,7 @@ export function buildTreasury(input: {
     totalDue,
     totalPaid,
     collectionPct,
-    whatsappText: `TESORERIA VOLLEYOS\n${perPlayer.map((player) => `${player.name}: ${player.balance}`).join("\n")}\nRecaudacion ${collectionPct}%`,
+    whatsappText: `TESORERIA VOLLEYOS\n${perPlayer.map((player) => `${player.name}: ${player.balance}`).join("\n")}\nRecaudación ${collectionPct}%`,
     excelRows: [["Jugador", "Cuota", "Pagado", "Saldo", "Estado"], ...perPlayer.map((player) => [player.name, String(player.due), String(player.paid), String(player.balance), player.status])],
     message: `${totalPaid} de ${totalDue} recaudado (${collectionPct}%).`,
   };
@@ -4127,7 +4127,7 @@ export function validateHouseRules(input: {
     for (const [label, genders] of [["A", input.teamAGenders], ["B", input.teamBGenders]] as const) {
       if (genders.length !== 6) violations.push(`Equipo ${label}: seis jugadores.`);
       if (genders.filter((gender) => gender === "M").length < 2 || genders.filter((gender) => gender === "F").length < 2) {
-        violations.push(`Equipo ${label}: minimo 2 M y 2 F.`);
+        violations.push(`Equipo ${label}: mínimo 2 M y 2 F.`);
       }
     }
   }
@@ -4142,7 +4142,7 @@ export function validateHouseRules(input: {
     targetScore: input.format === "short_sets" ? 15 : 25,
     goldenPointRequired: input.format === "short_sets" && input.scoreA === 14 && input.scoreB === 14,
     minContactsPerGender,
-    message: violations.length === 0 ? "Reglas validas." : `${violations.length} violaciones.`,
+    message: violations.length === 0 ? "Reglas válidas." : `${violations.length} violaciones.`,
   };
 }
 
@@ -4168,14 +4168,14 @@ export function buildArenaCue(input: { event: ArenaEvent }): {
 }
 
 const SLANG_TERMS: Record<string, { translations: Record<string, string>; technicalMeaning: string; usageExample: string; relatedTerms: string[] }> = {
-  mate: { translations: { AR: "mate", ES: "remate", MX: "mate", BR: "mate", US: "kill" }, technicalMeaning: "Remate que cierra el punto.", usageExample: "Que mate!", relatedTerms: ["remate", "ace"] },
+  mate: { translations: { AR: "mate", ES: "remate", MX: "mate", BR: "mate", US: "kill" }, technicalMeaning: "Remate que cierra el punto.", usageExample: "¡Qué mate!", relatedTerms: ["remate", "ace"] },
   pase: { translations: { AR: "pase", ES: "pase", MX: "pase", BR: "passe", US: "pass" }, technicalMeaning: "Primer contacto al armador.", usageExample: "Pase perfecto.", relatedTerms: ["recepcion", "armador"] },
-  remate: { translations: { AR: "remate", ES: "remate", MX: "remate", BR: "cortada", US: "spike" }, technicalMeaning: "Ataque aereo sobre la red.", usageExample: "Remate cruzado.", relatedTerms: ["mate", "bloqueo"] },
+  remate: { translations: { AR: "remate", ES: "remate", MX: "remate", BR: "cortada", US: "spike" }, technicalMeaning: "Ataque aéreo sobre la red.", usageExample: "Remate cruzado.", relatedTerms: ["mate", "bloqueo"] },
   bloqueo: { translations: { AR: "bloqueo", ES: "bloqueo", MX: "bloqueo", BR: "bloqueio", US: "block" }, technicalMeaning: "Defensa en la red.", usageExample: "Buen bloqueo.", relatedTerms: ["defensa", "tool"] },
-  armador: { translations: { AR: "armador", ES: "colocador", MX: "armador", BR: "levantador", US: "setter" }, technicalMeaning: "Organiza el ataque.", usageExample: "El armador abrio la red.", relatedTerms: ["pase", "pipe"] },
-  punta: { translations: { AR: "punta", ES: "receptor", MX: "punta", BR: "ponteiro", US: "outside hitter" }, technicalMeaning: "Atacante de zona 4.", usageExample: "El punta ataco la linea.", relatedTerms: ["remate", "pase"] },
-  pipe: { translations: { AR: "pipe", ES: "pipe", MX: "pipe", BR: "pipe", US: "pipe" }, technicalMeaning: "Ataque de zaguero por zona 6.", usageExample: "Pipe en transicion.", relatedTerms: ["armador", "remate"] },
-  tool: { translations: { AR: "mano afuera", ES: "mano y afuera", MX: "mano afuera", BR: "explorar bloqueio", US: "tool" }, technicalMeaning: "Usar el bloqueo para salir fuera.", usageExample: "Pidio el tool.", relatedTerms: ["remate", "bloqueo"] },
+  armador: { translations: { AR: "armador", ES: "colocador", MX: "armador", BR: "levantador", US: "setter" }, technicalMeaning: "Organiza el ataque.", usageExample: "El armador abrió la red.", relatedTerms: ["pase", "pipe"] },
+  punta: { translations: { AR: "punta", ES: "receptor", MX: "punta", BR: "ponteiro", US: "outside hitter" }, technicalMeaning: "Atacante de zona 4.", usageExample: "El punta atacó la línea.", relatedTerms: ["remate", "pase"] },
+  pipe: { translations: { AR: "pipe", ES: "pipe", MX: "pipe", BR: "pipe", US: "pipe" }, technicalMeaning: "Ataque de zaguero por zona 6.", usageExample: "Pipe en transición.", relatedTerms: ["armador", "remate"] },
+  tool: { translations: { AR: "mano afuera", ES: "mano y afuera", MX: "mano afuera", BR: "explorar bloqueio", US: "tool" }, technicalMeaning: "Usar el bloqueo para salir fuera.", usageExample: "Pidió el tool.", relatedTerms: ["remate", "bloqueo"] },
 };
 
 export function translateSlang(input: { term: string; origin: "AR" | "ES" | "MX" | "BR" | "US" }): {
@@ -4511,7 +4511,7 @@ export function assessPrehab(input: PrehabInput): PrehabReport {
   if (input.priorInjury) score -= 10;
   score = Math.max(0, Math.min(100, score));
   const drills = ["Movilidad de tobillo y cadera", "Face pull y rotadores externos"];
-  if (kneePain >= 3) drills.push("Isometrico de cuadriceps y control de aterrizaje");
+  if (kneePain >= 3) drills.push("Isométrico de cuádriceps y control de aterrizaje");
   if (shoulderPain >= 3) drills.push("Scapular push-up y sleeper stretch");
   const risk = score >= 80 ? "BAJO" : score >= 55 ? "MEDIO" : "ALTO";
   const jumpLimit = Math.max(0, 350 - Math.floor(input.weeklyJumps / 20));
@@ -4743,7 +4743,7 @@ export function buildWhiteLabel(input: WhiteLabelInput): WhiteLabelReport {
   const brightness = hexBrightness(input.primary);
   const textOnPrimary = brightness >= 140 ? "#070709" : "#f7f6f4";
   const readable = brightness >= 140 || brightness <= 80;
-  const quality = readable ? "valido" : "ajustable";
+  const quality = readable ? "válido" : "ajustable";
   return {
     club,
     cssVars: {

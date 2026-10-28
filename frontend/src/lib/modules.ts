@@ -629,9 +629,9 @@ export const MODULES: ModuleMeta[] = [
     profiles: ["players"],
     name: { es: "Animador de Jugadas", en: "Playbook Animator", pt: "Animador de Jogadas" },
     tagline: {
-      es: "Secuencias en 3 fases: saque, transicion y ataque.",
+      es: "Secuencias en 3 fases: saque, transición y ataque.",
       en: "Sequences in 3 phases: serve, transition and attack.",
-      pt: "Sequencias em 3 fases: saque, transicao e ataque.",
+      pt: "Sequências em 3 fases: saque, transição e ataque.",
     },
   },
   {
@@ -651,11 +651,11 @@ export const MODULES: ModuleMeta[] = [
     number: 54,
     icon: "🥤",
     profiles: ["coaches"],
-    name: { es: "Nutricion de Torneo", en: "Tournament Nutrition", pt: "Nutricao de Torneio" },
+    name: { es: "Nutrición de Torneo", en: "Tournament Nutrition", pt: "Nutrição de Torneio" },
     tagline: {
-      es: "Carbohidratos, liquido y sodio por partido con clima y sudoracion.",
+      es: "Carbohidratos, líquido y sodio por partido con clima y sudoración.",
       en: "Carbs, fluid and sodium per match using weather and sweat rate.",
-      pt: "Carboidratos, liquido e sodio por partida com clima e sudoracao.",
+      pt: "Carboidratos, líquido e sódio por partida com clima e sudoração.",
     },
   },
   {
@@ -677,9 +677,9 @@ export const MODULES: ModuleMeta[] = [
     profiles: ["referees"],
     name: { es: "Comandante de Tie-Break", en: "Tiebreak Commander", pt: "Comandante de Tie-Break" },
     tagline: {
-      es: "Punto de oro, cambios de lado y decision de saque a 14-14.",
+      es: "Punto de oro, cambios de lado y decisión de saque a 14-14.",
       en: "Golden point, side switches and serve decisions at 14-14.",
-      pt: "Ponto de ouro, trocas de lado e decisao de saque em 14-14.",
+      pt: "Ponto de ouro, trocas de lado e decisão de saque em 14-14.",
     },
   },
   {
@@ -715,7 +715,7 @@ export const MODULES: ModuleMeta[] = [
     tagline: {
       es: "Historial, racha y dominio por sets entre dos equipos.",
       en: "History, streak and set dominance between two teams.",
-      pt: "Historico, sequencia e dominio por sets entre duas equipes.",
+      pt: "Histórico, sequência e domínio por sets entre duas equipes.",
     },
   },
   {
@@ -723,11 +723,11 @@ export const MODULES: ModuleMeta[] = [
     number: 60,
     icon: "👁️",
     profiles: ["court"],
-    name: { es: "Reflejo Periferico", en: "Peripheral Reflex", pt: "Reflexo Periferico" },
+    name: { es: "Reflejo Periférico", en: "Peripheral Reflex", pt: "Reflexo Periférico" },
     tagline: {
-      es: "Tiempos de reaccion, consistencia y rating de lectura de cancha.",
+      es: "Tiempos de reacción, consistencia y rating de lectura de cancha.",
       en: "Reaction times, consistency and court-reading rating.",
-      pt: "Tempos de reacao, consistencia e rating de leitura de quadra.",
+      pt: "Tempos de reação, consistência e rating de leitura de quadra.",
     },
   },
   {

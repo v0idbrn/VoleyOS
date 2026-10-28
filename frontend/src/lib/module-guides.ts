@@ -32,7 +32,7 @@ export const MODULE_GUIDES: Record<string, Record<Locale, ModuleGuide>> = {
   scoreboard: {
     es: g("Reemplaza el marcador de cartón y la planilla de papel.", "Creá los dos equipos y elegí el formato.", "Anotá con botones o volumen; el motor cierra el set.", "Deshacé con ⏪ si te pasaste de punto.", [["Deuce", "24-24: gana por 2"], ["Set point", "Punto para llevarse el set"]]),
     en: g("Replaces the flip board and the paper sheet.", "Create both teams and pick the format.", "Score with buttons or volume keys; the engine closes sets.", "Undo with ⏪ if you overscored.", [["Deuce", "24-24: win by 2"], ["Set point", "Point that wins the set"]]),
-    pt: g("Substitui o fliper de papelão e a súmula.", "Crie os dois times e escolha o formato.", "Anote por botões ou volume; o motor fecha o set.", "Desfaça com ⏪ se errou o ponto.", [["Duplo", "24-24: vence por 2"], ["Set point", "Ponto que decide o set"]]),
+    pt: g("Substitui o placar de papelão e a súmula.", "Crie os dois times e escolha o formato.", "Anote por botões ou volume; o motor fecha o set.", "Desfaça com ⏪ se errou o ponto.", [["Duplo", "24-24: vence por 2"], ["Set point", "Ponto que decide o set"]]),
   },
   tournament: {
     es: g("Arma la copa y publica posiciones sin Excel.", "Cargá equipos y formato (todos contra todos o llaves).", "Generá el calendario automático.", "Leé tabla, movimientos y ranking.", [["Tabla", "Clasificación acumulada"], ["Fixture", "Calendario de partidos"]]),
@@ -62,7 +62,7 @@ export const MODULE_GUIDES: Record<string, Record<Locale, ModuleGuide>> = {
   volleycard: {
     es: g("Le muestra al jugador como lo lee un scout.", "Calificá los 6 ejes de 1 a 99.", "Mirá el radar hexagonal y el overall.", "Exportá la tarjeta para redes o captas.", [["Radar", "Gráfico hexagonal de atributos"], ["OVR", "Calificación global del jugador"]]),
     en: g("Shows a player the way a scout reads them.", "Grade the 6 axes from 1 to 99.", "Read the hexagon radar and overall rating.", "Export the card for socials or scouts.", [["Radar", "Hexagon chart of attributes"], ["OVR", "Overall player rating"]]),
-    pt: g("Mostra ao jogador como um scout o lê.", "Note os 6 eixos de 1 a 99.", "Leia o radar hexagonal e o geral.", "Exporte o card para redes ou olheiros.", [["Radar", "Gráfico hexagonal de atributos"], ["OVR", "Nota global do jogador"]]),
+    pt: g("Mostra ao jogador como um scout o lê.", "Avalie os 6 eixos de 1 a 99.", "Leia o radar hexagonal e o geral.", "Exporte o card para redes ou olheiros.", [["Radar", "Gráfico hexagonal de atributos"], ["OVR", "Nota global do jogador"]]),
   },
   tempo: {
     es: g("Enseña tempo 1/2 y el hueco del pipe en milisegundos.", "Registrá cada salto del armador.", "Compará contra la ventana perfecta.", "Corregí con el próximo lanzamiento.", [["Tempo 1", "Bola rápida al ala"], ["Pipe", "Ataque por el centro desde atrás"]]),
@@ -132,7 +132,7 @@ export const MODULE_GUIDES: Record<string, Record<Locale, ModuleGuide>> = {
   "mvp-awards": {
     es: g("Entrega premios post-partido a prueba de trampa.", "Calificá a los jugadores del partido.", "Leé MVP, Muralla y Candado.", "Compartí la tarjeta sellada.", [["MVP", "Jugador más valioso"], ["Sello", "Token firmado del premio"]]),
     en: g("Delivers tamper-proof post-match awards.", "Grade the players of the match.", "Read MVP, Wall and Lock.", "Share the sealed card.", [["MVP", "Most valuable player"], ["Seal", "Signed award token"]]),
-    pt: g("Entrega prêmios pós-jogo à prova de trapaça.", "Note os jogadores da partida.", "Leia MVP, Muralha e Fechadura.", "Compartilhe o card selado.", [["MVP", "Jogador mais valioso"], ["Selo", "Token assinado do prêmio"]]),
+    pt: g("Entrega prêmios pós-jogo à prova de trapaça.", "Avalie os jogadores da partida.", "Leia MVP, Muralha e Fechadura.", "Compartilhe o card selado.", [["MVP", "Jogador mais valioso"], ["Selo", "Token assinado do prêmio"]]),
   },
   "timeout-chalkboard": {
     es: g("Convierte los 30 segundos de huddle en táctica escrita.", "Elegí el bloque táctico.", "Corré con el reloj FIVB de 30s.", "Exportá la pizarra al equipo.", [["Huddle", "Reunión rápida del equipo"], ["Bloque", "Jugada prediseñada"]]),
@@ -172,7 +172,7 @@ export const MODULE_GUIDES: Record<string, Record<Locale, ModuleGuide>> = {
   "matchup-matrix": {
     es: g("Pone tus mejores bloqueadores sobre la cañona rival.", "Calificá la matriz 6x6.", "Leé la rotación óptima.", "Ordená el saque en consecuencia.", [["Matriz", "Cruce atacante vs bloqueador"], ["Rotación", "Orden defensivo óptimo"]]),
     en: g("Puts your best blockers on the rival gun.", "Grade the 6x6 matrix.", "Read the optimal rotation.", "Order the serve accordingly.", [["Matrix", "Hitter vs blocker cross"], ["Rotation", "Optimal defensive order"]]),
-    pt: g("Ponha seus melhores bloqueadores na canhoneira rival.", "Note a matriz 6x6.", "Leia o rodízio ótimo.", "Ordene o saque em consequência.", [["Matriz", "Cruzamento atacante vs bloqueador"], ["Rodízio", "Ordem defensiva ótima"]]),
+    pt: g("Ponha seus melhores bloqueadores na canhoneira rival.", "Avalie a matriz 6x6.", "Leia o rodízio ótimo.", "Ordene o saque em consequência.", [["Matriz", "Cruzamento atacante vs bloqueador"], ["Rodízio", "Ordem defensiva ótima"]]),
   },
   "blockout-lab": {
     es: g("Pone precio esperado a manos abajo vs cepillar.", "Elegí el esquema de bloqueo.", "Compará el valor esperado de cada opción.", "Seguí la decisión del lab.", [["Block-out", "Golpe fuera del bloqueo"], ["Valor esperado", "Probabilidad × resultado"]]),
@@ -192,7 +192,7 @@ export const MODULE_GUIDES: Record<string, Record<Locale, ModuleGuide>> = {
   "player-career": {
     es: g("Entrega un dossier de progresión listo para el club.", "Calificá los 5 ejes vs referencias.", "Leé el índice 0-100.", "Seguí el cuello de botella sugerido.", [["Índice", "Nota global de carrera"], ["Cuello de botella", "Eje más atrasado"]]),
     en: g("Hands a club-ready progress dossier.", "Grade the 5 axes vs benchmarks.", "Read the 0-100 index.", "Follow the suggested bottleneck fix.", [["Index", "Career overall score"], ["Bottleneck", "Weakest axis to fix"]]),
-    pt: g("Entrega um dossiê de progressão pronto para o clube.", "Note os 5 eixos vs referências.", "Leia o índice 0-100.", "Siga a correção do gargalo.", [["Índice", "Nota global de carreira"], ["Gargalo", "Eixo mais atrasado"]]),
+    pt: g("Entrega um dossiê de progressão pronto para o clube.", "Avalie os 5 eixos vs referências.", "Leia o índice 0-100.", "Siga a correção do gargalo.", [["Índice", "Nota global de carreira"], ["Gargalo", "Eixo mais atrasado"]]),
   },
   "ball-aerodynamics": {
     es: g("Explica con números un flotado que muere en pleno vuelo.", "Ingresá velocidad, giro y ángulo.", "Mirá la predicción de caída.", "Detectá la crisis de flotado.", [["Flotado", "Saque sin rotación"], ["Drag", "Resistencia del aire"]]),
@@ -207,12 +207,12 @@ export const MODULE_GUIDES: Record<string, Record<Locale, ModuleGuide>> = {
   "recruiting-dossier": {
     es: g("Postula a un recluta universitario sin escáner.", "Ingresá objetivos y año de egreso.", "Completá medidas y métricas.", "Exportá el dossier sellado.", [["Dossier", "Ficha formal del atleta"], ["Sello", "Firma HMAC del documento"]]),
     en: g("Pitches a college recruit without a scanner.", "Enter goals and graduation year.", "Fill in measurables and metrics.", "Export the sealed dossier.", [["Dossier", "Formal athlete profile"], ["Seal", "HMAC signature of the file"]]),
-    pt: g("Candidata um recruta universitário sem scanner.", "Insira objetivos e ano de formatura.", "Preencha medidas e métricas.", "Exporte o dossiê selado.", [["Dossiê", "Ficha formal do atleta"], ["Selo", "Assinatura HMAC do arquivo"]]),
+    pt: g("Apresenta um recruta universitário sem scanner.", "Insira objetivos e ano de formatura.", "Preencha medidas e métricas.", "Exporte o dossiê selado.", [["Dossiê", "Ficha formal do atleta"], ["Selo", "Assinatura HMAC do arquivo"]]),
   },
   "system-transition": {
     es: g("Confirma qué sistema hace pie con tu plantel.", "Calificá armadores, recepción y penetración.", "Leé la recomendación 4-2 / 6-2 / 5-1.", "Simulá el cambio de sistema.", [["5-1", "Un armador rotando seis zonas"], ["6-2", "Dos armadores sin rotar"]]),
     en: g("Confirms which system fits your personnel.", "Grade setters, reception and penetration.", "Read the 4-2 / 6-2 / 5-1 advice.", "Simulate the system change.", [["5-1", "One setter rotating six zones"], ["6-2", "Two setters, no rotation"]]),
-    pt: g("Confirma qual sistema funciona com seu elenco.", "Note levantadores, recepção e penetração.", "Leia o conselho 4-2 / 6-2 / 5-1.", "Simule a troca de sistema.", [["5-1", "Um levantador rotacionando"], ["6-2", "Dois levantadores sem rotação"]]),
+    pt: g("Confirma qual sistema funciona com seu elenco.", "Avalie levantadores, recepção e penetração.", "Leia o conselho 4-2 / 6-2 / 5-1.", "Simule a troca de sistema.", [["5-1", "Um levantador rotacionando"], ["6-2", "Dois levantadores sem rotação"]]),
   },
   "deception-reader": {
     es: g("Mide qué tan legibles son tus atacantes.", "Ingresá carrera, codo y línea de pelota.", "Leé el compromiso probable de la defensa.", "Trabajá los indicadores de engaño.", [["Engaño", "Falsa lectura del defensor"], ["Compromiso", "Defensor adelantado antes del tiempo"]]),
@@ -272,7 +272,7 @@ export const MODULE_GUIDES: Record<string, Record<Locale, ModuleGuide>> = {
   "playbook-animator": {
     es: g("Reemplaza las tizas con una jugada animada en 3 fases.", "Elegí saque, transición y ataque.", "Ubicá jugadores y zona objetivo.", "Reproducí y exportá el SVG.", [["Fase", "Tramo de la jugada"], ["Zona", "Destino del ataque"]]),
     en: g("Replaces chalk arrows with an animated 3-phase play.", "Pick serve, transition and attack.", "Place players and target zone.", "Play and export the SVG.", [["Phase", "Segment of the play"], ["Zone", "Attack target area"]]),
-    pt: g("Troca as giz por uma jogada animada em 3 fases.", "Escolha saque, transição e ataque.", "Posicione jogadores e zona alvo.", "Reproduza e exporte o SVG.", [["Fase", "Trecho da jogada"], ["Zona", "Área alvo do ataque"]]),
+    pt: g("Troca o giz por uma jogada animada em 3 fases.", "Escolha saque, transição e ataque.", "Posicione jogadores e zona alvo.", "Reproduza e exporte o SVG.", [["Fase", "Trecho da jogada"], ["Zona", "Área alvo do ataque"]]),
   },
   "shot-heatmap": {
     es: g("Lee tendencias de ataque del rival por zona.", "Tocá origen y después destino.", "Marcá el resultado del remate.", "Leé zona caliente y eficiencia.", [["Zona caliente", "Sector más atacado"], ["Eficiencia", "Kills sobre remates"]]),

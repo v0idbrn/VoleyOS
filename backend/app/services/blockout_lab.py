@@ -164,7 +164,7 @@ def evaluate_blockout(request: BlockoutRequest) -> BlockoutReport:
                 probability_pct=_q1(probability),
                 ev=_q3(ev),
                 note=(
-                    f"{_q1(probability)}% de exito con valor esperado "
+                    f"{_q1(probability)}% de éxito con valor esperado "
                     f"{_q3(ev)}."
                 ),
             )
@@ -185,7 +185,7 @@ def evaluate_blockout(request: BlockoutRequest) -> BlockoutReport:
         recommended=recommended.decision,
         wrist_angle_deg=_q1(angle),
         message=(
-            f"Decision recomendada: {recommended.decision} con EV "
-            f"{recommended.ev}; muneca a {_q1(angle)} grados."
+            f"Decisión recomendada: {recommended.decision} con EV "
+            f"{recommended.ev}; muñeca a {_q1(angle)} grados."
         ),
     )

@@ -130,6 +130,6 @@ def build_clip_plan(request: ClipRequest) -> ClipReport:
             f"{len(selected)} jugada(s) del jugador {request.player_number}; "
             f"{_q2(net_play)} s de juego neto ({net_pct}%)."
             if selected
-            else f"Sin jugadas del jugador {request.player_number} con el minimo pedido."
+            else f"Sin jugadas del jugador {request.player_number} con el mínimo pedido."
         ),
     )

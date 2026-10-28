@@ -121,7 +121,7 @@ def _pickup(request: CourtSplitRequest) -> PickupReport:
                     payer=request.payment_holder,
                     payee=attendee.name,
                     amount=_money(-balance),
-                    concept="devolucion de sena",
+                    concept="devolución de seña",
                 )
             )
         else:

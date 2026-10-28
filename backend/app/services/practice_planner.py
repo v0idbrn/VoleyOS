@@ -16,32 +16,32 @@ DURATION = Literal[60, 90, 120]
 
 BLOCKS: dict[int, list[tuple[str, int]]] = {
     60: [
-        ("Activacion", 10),
-        ("Tecnica", 15),
-        ("Tactica", 15),
+        ("Activación", 10),
+        ("Técnica", 15),
+        ("Táctica", 15),
         ("Juego", 15),
         ("Cierre", 5),
     ],
     90: [
-        ("Activacion", 12),
-        ("Tecnica", 23),
-        ("Tactica", 25),
+        ("Activación", 12),
+        ("Técnica", 23),
+        ("Táctica", 25),
         ("Juego", 25),
         ("Cierre", 5),
     ],
     120: [
-        ("Activacion", 15),
-        ("Tecnica", 30),
-        ("Tactica", 35),
+        ("Activación", 15),
+        ("Técnica", 30),
+        ("Táctica", 35),
         ("Juego", 35),
         ("Cierre", 5),
     ],
 }
 FOCUS_PLAN: dict[str, tuple[str, str, str]] = {
     "k1_reception": (
-        "Estabilizar K1 y primera transicion",
-        "Servicio dirigido a zonas 1/5 con recepcion a blanco",
-        "3 recepciones positivas por rotacion",
+        "Estabilizar K1 y primera transición",
+        "Servicio dirigido a zonas 1/5 con recepción a blanco",
+        "3 recepciones positivas por rotación",
     ),
     "block_defense_transition": (
         "Cerrar bloqueo y reciclar defensa",
@@ -51,12 +51,12 @@ FOCUS_PLAN: dict[str, tuple[str, str, str]] = {
     "serve_pressure": (
         "Presionar saque bajo fatiga",
         "Series de saque a zona corta y profunda con reloj",
-        "70% de saques dentro con 2 errores maximos",
+        "70% de saques dentro con 2 errores máximos",
     ),
     "setter_tempo": (
-        "Acelerar decision y tempo del armador",
-        "Combinaciones quick-shoot-pipe con recepcion imperfecta",
-        "5 ataques en tempo por rotacion",
+        "Acelerar decisión y tempo del armador",
+        "Combinaciones quick-shoot-pipe con recepción imperfecta",
+        "5 ataques en tempo por rotación",
     ),
 }
 

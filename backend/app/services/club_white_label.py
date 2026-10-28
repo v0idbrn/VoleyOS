@@ -44,7 +44,7 @@ def analyze(request: WhiteLabelRequest) -> WhiteLabelReport:
     brightness = _brightness(request.primary)
     text = "#070709" if brightness >= Decimal(140) else "#f7f6f4"
     readable = brightness >= Decimal(140) or brightness <= Decimal(80)
-    quality = "valido" if readable else "ajustable"
+    quality = "válido" if readable else "ajustable"
     return WhiteLabelReport(
         club=request.club.strip(),
         css_vars={

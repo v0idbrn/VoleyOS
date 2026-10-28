@@ -101,7 +101,7 @@ def build_signal_sheet(request: SetterSignalRequest) -> SignalSheetReport:
         key=lambda item: GESTURES.index(item.gesture),
     )
     lines = [
-        f"# Senas del armador - {request.team}",
+        f"# Señas del armador - {request.team}",
         f"Armador: {request.setter_name or 'sin nombre'}",
         "",
         "| Sena | Jugada |",
@@ -123,7 +123,7 @@ def build_signal_sheet(request: SetterSignalRequest) -> SignalSheetReport:
         lines.append(f"Jugadas repetidas: {', '.join(duplicate_plays)}")
     valid = not collisions and not duplicate_plays
     message = (
-        "Hoja de senas valida y sin colisiones."
+        "Hoja de señas válida y sin colisiones."
         if valid
         else f"{len(collisions)} colisiones y {len(duplicate_plays)} jugadas duplicadas."
     )

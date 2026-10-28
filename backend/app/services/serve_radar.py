@@ -69,8 +69,8 @@ def analyze_serve(request: ServeRadarRequest) -> ServeRadarReport:
     classification = _classify(initial)
     margin = max(0, request.flight_time_ms - HUMAN_REACTION_MS)
     labels = {
-        "FLOAT_TACTICAL": "flotado tactico",
-        "HYBRID_FAST": "hibrido rapido",
+        "FLOAT_TACTICAL": "flotado táctico",
+        "HYBRID_FAST": "híbrido rápido",
         "POWER_JUMP_SERVE": "jump serve de poder",
         "WORLD_CLASS_BOMB": "bomba de clase mundial",
     }

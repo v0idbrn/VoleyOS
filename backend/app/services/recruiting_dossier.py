@@ -95,21 +95,21 @@ def build_recruiting_dossier(request: RecruitRequest) -> RecruitReport:
     if request.vertical_jump_cm >= Decimal("80"):
         strengths.append("Salto vertical explosivo con buen tiempo de ataque.")
     if request.attack_efficiency_pct >= Decimal("45"):
-        strengths.append("Eficiencia de ataque por encima de la media de la categoria.")
+        strengths.append("Eficiencia de ataque por encima de la media de categoría.")
     if request.kills >= 250:
         strengths.append("Volumen de puntos probado en competencia.")
     if request.height_cm < Decimal("180"):
-        gaps.append("Altura limitada: proyectar a posiciones de defensa y recepcion.")
+        gaps.append("Altura limitada: proyectar a posiciones de defensa y recepción.")
     if request.vertical_jump_cm < Decimal("50"):
         gaps.append("Salto por debajo del umbral: plan de fuerza y pliometria.")
     if request.attack_efficiency_pct < Decimal("25"):
-        gaps.append("Eficiencia de ataque baja: revisar seleccion de golpe y errores.")
+        gaps.append("Eficiencia de ataque baja: revisar selección de golpe y errores.")
     if request.kills < 50:
-        gaps.append("Poco volumen de kills: necesita mas muestra competitiva.")
+        gaps.append("Poco volumen de kills: necesita más muestra competitiva.")
     if not strengths:
         strengths.append("Perfil equilibrado sin un rasgo dominante.")
     if not gaps:
-        gaps.append("Sin brechas criticas: mantener seguimiento y desarrollo tecnico.")
+        gaps.append("Sin brechas críticas: mantener seguimiento y desarrollo técnico.")
 
     seal = _seal(request.model_dump())
     return RecruitReport(

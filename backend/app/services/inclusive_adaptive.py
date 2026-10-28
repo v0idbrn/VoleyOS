@@ -43,8 +43,8 @@ class AdaptiveReport(BaseModel):
 def _mini_rules(mode: str) -> list[str]:
     return [
         "Saque por debajo del hombro para mantener el intercambio.",
-        "Rotacion obligatoria cada vez que el equipo recupera el saque.",
-        "Todos los jugadores rotan y atacan: sin especializacion temprana.",
+        "Rotación obligatoria cada vez que el equipo recupera el saque.",
+        "Todos los jugadores rotan y atacan: sin especialización temprana.",
         f"Formato {mode}: cancha reducida y red adaptada a la edad.",
     ]
 

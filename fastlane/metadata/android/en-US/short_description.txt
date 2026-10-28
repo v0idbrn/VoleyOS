@@ -1,1 +1,1 @@
-48 offline volleyball modules: scouting, rotations, VAR, beach and OBS overlay.
+61 offline volleyball modules: scouting, rotations, VAR, beach and OBS overlay.

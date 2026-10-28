@@ -123,7 +123,20 @@ const EXACT: Record<string, Translation> = {
   "Alto contraste alternado.": { en: "High contrast toggled.", pt: "Alto contraste alternado." },
   "Ejemplo cargado: set decisivo 22-20.": { en: "Example loaded: decider 22-20.", pt: "Exemplo carregado: set decisivo 22-20." },
   "Elegí un equipo para sumar.": { en: "Pick a team to score.", pt: "Escolha um time para pontuar." },
-  "Reglas validas.": { en: "Rules valid.", pt: "Regras válidas." },
+  "Reglas válidas.": { en: "Rules valid.", pt: "Regras válidas." },
+  "Hoja de señas válida y sin colisiones.": {
+    en: "Valid setter-signal sheet with no collisions.",
+    pt: "Folha de sinais válida e sem colisões.",
+  },
+  "Rotación obligatoria.": { en: "Mandatory rotation.", pt: "Rotação obrigatória." },
+  "Expulsión: sale por el resto del set (FIVB 21.3).": {
+    en: "Ejection: leaves for the rest of the set (FIVB 21.3).",
+    pt: "Expulsão: sai pelo resto do set (FIVB 21.3).",
+  },
+  "Descalificación: sale por todo el partido (FIVB 21.4).": {
+    en: "Disqualification: leaves for the whole match (FIVB 21.4).",
+    pt: "Desclassificação: sai pelo jogo inteiro (FIVB 21.4).",
+  },
   "Líbero armando de dedos delante de la línea de 3 m": {
     en: "Libero setting with fingers in front of the 3 m line",
     pt: "Líbero levantando de dedos à frente da linha de 3 m",
@@ -194,7 +207,7 @@ const EXACT: Record<string, Translation> = {
 };
 
 const PHRASES: Array<{ pattern: RegExp; en: string; pt: string }> = [
-  { pattern: /Senas del armador/gi, en: "Setter signals", pt: "Sinais do levantador" },
+  { pattern: /Señas del armador/gi, en: "Setter signals", pt: "Sinais do levantador" },
   { pattern: /Armador:/g, en: "Setter:", pt: "Levantador:" },
   { pattern: /Cancha \+ luz/g, en: "Court + lights", pt: "Quadra + luz" },
   { pattern: /cuota de cancha/g, en: "court fee", pt: "vaquinha da quadra" },
@@ -216,9 +229,9 @@ const PHRASES: Array<{ pattern: RegExp; en: string; pt: string }> = [
   { pattern: /Punto clutch de/g, en: "Clutch point by", pt: "Ponto decisivo de" },
   { pattern: /Punto de/g, en: "Point by", pt: "Ponto de" },
   { pattern: /recepciones positivas/g, en: "positive passes", pt: "passes positivos" },
-  { pattern: /Activacion/g, en: "Activation", pt: "Ativação" },
-  { pattern: /Tecnica/g, en: "Technique", pt: "Técnica" },
-  { pattern: /Tactica/g, en: "Tactics", pt: "Tática" },
+  { pattern: /Activación/g, en: "Activation", pt: "Ativação" },
+  { pattern: /Técnica/g, en: "Technique", pt: "Técnica" },
+  { pattern: /Táctica/g, en: "Tactics", pt: "Tática" },
   { pattern: /Cierre/g, en: "Cool-down", pt: "Fechamento" },
   { pattern: /Mano afuera/g, en: "Hand wipe", pt: "Mão fora" },
   { pattern: /Mano tarde/g, en: "Late hand", pt: "Mão atrasada" },
@@ -227,7 +240,7 @@ const PHRASES: Array<{ pattern: RegExp; en: string; pt: string }> = [
   { pattern: /Cerrado/g, en: "Closed", pt: "Fechado" },
   { pattern: /Costura/g, en: "Seam", pt: "Costura" },
   { pattern: /Reciclaje/g, en: "Recycle", pt: "Reciclagem" },
-  { pattern: /Amonestacion/g, en: "Warning", pt: "Advertência" },
+  { pattern: /Amonestación/g, en: "Warning", pt: "Advertência" },
   { pattern: /Primera demora del equipo/g, en: "First team delay", pt: "Primeira demora da equipe" },
   { pattern: /sin consecuencia en el marcador/g, en: "no scoreboard consequence", pt: "sem consequência no placar" },
   { pattern: /FALTA en banda superior\/antena/g, en: "FAULT on top band/antenna", pt: "FALTA na faixa superior/antena" },
@@ -282,8 +295,8 @@ const PATTERNS: Array<{ pattern: RegExp; en: (...groups: string[]) => string; pt
   },
   {
     pattern: /^Saque (.+?) a ([\d.]+) km\/h; margen (\d+) ms\.$/,
-    en: (type, speed, margin) => `${type} serve at ${speed} km/h; ${margin} ms reaction margin.`,
-    pt: (type, speed, margin) => `Saque ${type} a ${speed} km/h; margem de ${margin} ms.`,
+    en: (type, speed, margin) => `${serveClass(type, "en")} serve at ${speed} km/h; ${margin} ms reaction margin.`,
+    pt: (type, speed, margin) => `Saque ${serveClass(type, "pt")} a ${speed} km/h; margem de ${margin} ms.`,
   },
   {
     pattern: /^Inicia en R(\d+); evita R(\d+)\. Bloqueo top: R(\d+)\.$/,
@@ -291,12 +304,12 @@ const PATTERNS: Array<{ pattern: RegExp; en: (...groups: string[]) => string; pt
     pt: (start, avoid, block) => `Comece em R${start}; evite R${avoid}. Melhor bloqueio: R${block}.`,
   },
   {
-    pattern: /^([\d.]+)% de exito; EV ([\d.-]+)\.$/,
+    pattern: /^([\d.]+)% de éxito; EV ([\d.-]+)\.$/,
     en: (pct, ev) => `${pct}% success; EV ${ev}.`,
     pt: (pct, ev) => `${pct}% de sucesso; EV ${ev}.`,
   },
   {
-    pattern: /^(.+?) con EV ([\d.-]+); muneca ([\d.-]+) grados\.$/,
+    pattern: /^(.+?) con EV ([\d.-]+); muñeca ([\d.-]+) grados\.$/,
     en: (decision, ev, angle) => `${decision} with EV ${ev}; wrist ${angle} degrees.`,
     pt: (decision, ev, angle) => `${decision} com EV ${ev}; punho ${angle} graus.`,
   },
@@ -306,7 +319,7 @@ const PATTERNS: Array<{ pattern: RegExp; en: (...groups: string[]) => string; pt
     pt: (minutes, players, groups) => `Plano de ${minutes} min para ${players} jogadores em ${groups} grupos.`,
   },
   {
-    pattern: /^(.+?): indice (\d+)\/100\. Cuello: (.+?)\.$/,
+    pattern: /^(.+?): índice (\d+)\/100\. Cuello: (.+?)\.$/,
     en: (player, index, gap) => `${player}: index ${index}/100. Bottleneck: ${gap}.`,
     pt: (player, index, gap) => `${player}: índice ${index}/100. Gargalo: ${gap}.`,
   },
@@ -439,7 +452,7 @@ const PATTERNS: Array<{ pattern: RegExp; en: (...groups: string[]) => string; pt
     pt: (profit, teams) => `Torneio com ${profit} de resultado e break-even em ${teams} equipes.`,
   },
   {
-    pattern: /^El juez cobro (.+) \((.+)\)\.$/,
+    pattern: /^El juez cobró (.+) \((.+)\)\.$/,
     en: (call, rule) => `The referee called ${call} (${rule}).`,
     pt: (call, rule) => `O árbitro marcou ${call} (${rule}).`,
   },
@@ -453,7 +466,29 @@ const PATTERNS: Array<{ pattern: RegExp; en: (...groups: string[]) => string; pt
     en: () => "Timeout board ready: 30 FIVB seconds, two cues, validated strokes.",
     pt: () => "Lousa de tempo pronta: 30 s FIVB, duas orientações e traços validados.",
   },
+  {
+    pattern: /^Jugada de (\d+) ms en 3 fases lista para reproducir sin conexión\.$/,
+    en: (ms) => `Play of ${ms} ms in 3 phases ready to replay offline.`,
+    pt: (ms) => `Jogada de ${ms} ms em 3 fases pronta para reproduzir sem conexão.`,
+  },
+  {
+    pattern: /^(.+?) listo con contraste (.+?)\.$/,
+    en: (club, quality) => `Theme for ${club} ready with ${quality === "válido" ? "readable" : "adjustable"} contrast.`,
+    pt: (club, quality) => `Tema de ${club} pronto com contraste ${quality === "válido" ? "válido" : "ajustável"}.`,
+  },
 ];
+
+const SERVE_CLASS: Record<string, Record<"en" | "pt", string>> = {
+  "flotado táctico": { en: "tactical float", pt: "flutuante táctico" },
+  "híbrido rápido": { en: "hybrid fast", pt: "híbrido rápido" },
+  "jump serve de poder": { en: "power jump serve", pt: "jump serve de poder" },
+  "bomba de clase mundial": { en: "world-class bomb", pt: "bomba de classe mundial" },
+};
+
+/** Serve classes travel in Spanish inside the message; render them per locale. */
+function serveClass(type: string, locale: "en" | "pt"): string {
+  return SERVE_CLASS[type]?.[locale] ?? type;
+}
 
 export function translateEngineText(text: string, locale: Locale): string {
   if (locale === "es") return text;

@@ -106,5 +106,5 @@ def analyze(request: PlaybookRequest) -> PlaybookReport:
         total_duration_ms=cursor,
         keyframes=sum(len(phase.players) for phase in request.phases),
         phases=frames,
-        message=f"Jugada de {cursor} ms en 3 fases lista para reproducir sin conexion.",
+        message=f"Jugada de {cursor} ms en 3 fases lista para reproducir sin conexión.",
     )

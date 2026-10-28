@@ -90,10 +90,10 @@ def _best(players: list[PlayerStats], metric: str) -> tuple[PlayerStats, Decimal
 AWARDS: tuple[tuple[str, str, str, str, str], ...] = (
     ("MVP", "MVP Global", "🏆", "score", "Mejor rendimiento global del partido."),
     ("WALL", "El Muro", "🧱", "blocks", "Mayor cantidad de bloqueos."),
-    ("LOCK", "El Candado", "🛡️", "digs", "Defensa mas confiable, con bonus para libero."),
-    ("SNIPER", "Francotirador", "🎯", "aces", "Saque mas letal del encuentro."),
-    ("BUILDER", "El Albanil", "👷", "assists", "Mas asistencias y construccion de juego."),
-    ("ICE", "Sangre Fria 24-24", "🧊", "pressure_points", "Puntos en los momentos mas calientes."),
+    ("LOCK", "El Candado", "🛡️", "digs", "Defensa más confiable, con bonus para líbero."),
+    ("SNIPER", "Francotirador", "🎯", "aces", "Saque más letal del encuentro."),
+    ("BUILDER", "El Albañil", "👷", "assists", "Más asistencias y construcción de juego."),
+    ("ICE", "Sangre Fría 24-24", "🧊", "pressure_points", "Puntos en los momentos más calientes."),
 )
 
 

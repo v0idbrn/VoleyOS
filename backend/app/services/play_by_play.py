@@ -72,14 +72,14 @@ def _commentary(event: MatchEvent, team_name: str, clutch: bool) -> str:
     actor = f" {event.player}" if event.player else ""
     score = f"{event.score_home}-{event.score_away}"
     if event.kind == "point":
-        prefix = "Punto de alta presion" if clutch else "Punto"
+        prefix = "Punto de alta presión" if clutch else "Punto"
         return f"{prefix} de{actor} ({team_name}). Marcador {score}."
     if event.kind == "timeout":
         return f"{team_name} pide tiempo muerto con {score}."
     if event.kind == "substitution":
         return f"{team_name} mueve el banco: entra{actor}. Marcador {score}."
     if event.kind == "card":
-        return f"El arbitro amonesta a{actor} ({team_name}). Marcador {score}."
+        return f"El árbitro amonesta a{actor} ({team_name}). Marcador {score}."
     return f"Se cierra el set {event.set_number} con {score}."
 
 

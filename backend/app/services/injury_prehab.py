@@ -44,7 +44,7 @@ def analyze(request: PrehabRequest) -> PrehabReport:
     score = max(Decimal(0), min(HUNDRED, score))
     drills = ["Movilidad de tobillo y cadera", "Face pull y rotadores externos"]
     if request.knee_pain >= 3:
-        drills.append("Isometrico de cuadriceps y control de aterrizaje")
+        drills.append("Isométrico de cuádriceps y control de aterrizaje")
     if request.shoulder_pain >= 3:
         drills.append("Scapular push-up y sleeper stretch")
     risk = "BAJO" if score >= 80 else "MEDIO" if score >= 55 else "ALTO"

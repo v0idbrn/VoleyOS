@@ -92,7 +92,7 @@ def build_treasury(request: TreasuryRequest) -> TreasuryReport:
             "TESORERIA VOLLEYOS",
             *(f"{entry.name}: cuota {entry.due} / pagado {entry.paid} / saldo {entry.balance}"
               for entry in balances),
-            f"Recaudacion: {collection_pct}%",
+            f"Recaudación: {collection_pct}%",
         ]
     )
     excel_rows: list[list[str]] = [["Jugador", "Cuota", "Pagado", "Saldo", "Estado"]]

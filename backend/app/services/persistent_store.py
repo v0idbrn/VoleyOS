@@ -234,7 +234,7 @@ def delete_job(job_id: str) -> dict[str, str] | None:
         "job_id": job_id,
         "deleted_at": deleted_at,
         "receipt_signature": proof,
-        "message": "Datos destruidos. Recibo criptografico UTC emitido.",
+        "message": "Datos destruidos. Recibo criptográfico UTC emitido.",
     }
 
 
@@ -350,7 +350,7 @@ def delete_live_room(room_id: str) -> dict[str, str] | None:
         "room_id": room_id,
         "deleted_at": deleted_at,
         "receipt_signature": proof,
-        "message": "Sala eliminada. Recibo criptografico UTC emitido.",
+        "message": "Sala eliminada. Recibo criptográfico UTC emitido.",
     }
 
 

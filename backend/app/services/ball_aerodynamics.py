@@ -100,6 +100,6 @@ def analyze_aerodynamics(request: BallAeroRequest) -> BallAeroReport:
         lands_in_court=lands_in_court,
         message=(
             f"Vuelo {labels[regime]} con Re={reynolds}; "
-            f"desvio lateral {_q2(lateral_cm)} cm y caida {_q2(landing_distance)} m."
+            f"desvío lateral {_q2(lateral_cm)} cm y caída {_q2(landing_distance)} m."
         ),
     )

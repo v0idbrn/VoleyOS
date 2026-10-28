@@ -47,12 +47,12 @@ GESTURES: dict[str, GestureInfo] = {
         why={
             "es": "El balon rozo el brazo o la mano y sale fuera.",
             "en": "The ball brushed an arm or hand and went out.",
-            "pt": "A bola raspou o braco ou a mao e saiu.",
+            "pt": "A bola raspou o braço ou a mão e saiu.",
         },
         example={
-            "es": "Un bloqueo desvia la pelota y el arbitro toca su antebrazo.",
+            "es": "Un bloqueo desvía la pelota y el árbitro toca su antebrazo.",
             "en": "A block deflects the ball and the referee touches their forearm.",
-            "pt": "Um bloqueio desvia a bola e o arbitro toca o antebraco.",
+            "pt": "Um bloqueio desvia a bola e o árbitro toca o antebraço.",
         },
         rule="FIVB 9.1",
     ),
@@ -69,9 +69,9 @@ GESTURES: dict[str, GestureInfo] = {
             "pt": "O set chegou a 25 pontos com dois de diferenca, ou 15 no tie-break.",
         },
         example={
-            "es": "25-23: el arbitro cruza los brazos y se cambia de lado.",
+            "es": "25-23: el árbitro cruza los brazos y se cambia de lado.",
             "en": "25-23: the referee crosses their arms and teams switch sides.",
-            "pt": "25-23: o arbitro cruza os bracos e os times trocam de lado.",
+            "pt": "25-23: o árbitro cruza os braços e os times trocam de lado.",
         },
         rule="FIVB 6.2 / 6.3",
     ),
@@ -88,7 +88,7 @@ GESTURES: dict[str, GestureInfo] = {
             "pt": "A equipe tocou a bola quatro vezes antes de devolve-la.",
         },
         example={
-            "es": "Recepcion, armado, ataque y un bloqueo propio que sigue en juego.",
+            "es": "Recepción, armado, ataque y un bloqueo propio que sigue en juego.",
             "en": "Pass, set, attack and an own block that stays in play.",
             "pt": "Passe, levantamento, ataque e um bloqueio proprio que segue em jogo.",
         },
@@ -104,12 +104,12 @@ GESTURES: dict[str, GestureInfo] = {
         why={
             "es": "Los equipos deben cambiar de lado antes del siguiente set.",
             "en": "Teams must switch sides before the next set.",
-            "pt": "As equipes devem trocar de lado antes do proximo set.",
+            "pt": "As equipes devem trocar de lado antes do próximo set.",
         },
         example={
-            "es": "Termina el set y el arbitro gira los antebrazos.",
+            "es": "Termina el set y el árbitro gira los antebrazos.",
             "en": "The set ends and the referee rotates their forearms.",
-            "pt": "O set termina e o arbitro gira os antebracos.",
+            "pt": "O set termina e o árbitro gira os antebraços.",
         },
         rule="FIVB 18.2",
     ),
@@ -126,7 +126,7 @@ GESTURES: dict[str, GestureInfo] = {
             "pt": "Um jogador tocou a faixa branca superior ou a antena.",
         },
         example={
-            "es": "El bloqueador roza la malla despues del ataque rival.",
+            "es": "El bloqueador roza la malla después del ataque rival.",
             "en": "The blocker brushes the net after the opponent attack.",
             "pt": "O bloqueador roca a rede depois do ataque rival.",
         },
@@ -145,9 +145,9 @@ GESTURES: dict[str, GestureInfo] = {
             "pt": "A bola tocou o piso dentro das linhas.",
         },
         example={
-            "es": "El arbitro senala la linea y autoriza el punto.",
+            "es": "El árbitro señala la línea y autoriza el punto.",
             "en": "The referee points at the line and awards the point.",
-            "pt": "O arbitro aponta para a linha e marca o ponto.",
+            "pt": "O árbitro aponta para a linha e marca o ponto.",
         },
         rule="FIVB 8.4.1",
     ),
@@ -166,7 +166,7 @@ GESTURES: dict[str, GestureInfo] = {
         example={
             "es": "El remate pasa por fuera de la antena y el juez levanta el pulgar.",
             "en": "The spike passes outside the antenna and the referee raises a thumb.",
-            "pt": "O ataque passa fora da antena e o arbitro levanta o polegar.",
+            "pt": "O ataque passa fora da antena e o árbitro levanta o polegar.",
         },
         rule="FIVB 8.4.3",
     ),
@@ -191,7 +191,7 @@ QUESTIONS: list[TriviaQuestion] = [
             "pt": "Pode-se salvar a bola com o pe?",
         },
         options={
-            "es": ["Si, cualquier parte del cuerpo", "No, solo manos", "Solo el libero"],
+            "es": ["Sí, cualquier parte del cuerpo", "No, solo manos", "Solo el libero"],
             "en": ["Yes, any part of the body", "No, hands only", "Libero only"],
             "pt": ["Sim, qualquer parte do corpo", "Nao, so as maos", "So o libero"],
         },
@@ -231,15 +231,15 @@ QUESTIONS: list[TriviaQuestion] = [
             "pt": "O libero pode sacar?",
         },
         options={
-            "es": ["Si, siempre", "No, no puede sacar", "Solo en el tie-break"],
+            "es": ["Sí, siempre", "No, no puede sacar", "Solo en el tie-break"],
             "en": ["Yes, always", "No, the libero cannot serve", "Only in the tie-break"],
-            "pt": ["Sim, sempre", "Nao, o libero nao pode sacar", "So no tie-break"],
+            "pt": ["Sim, sempre", "Não, o líbero não pode sacar", "Só no tie-break"],
         },
         correct=1,
         explanation={
             "es": "El libero no puede completar un ataque ni sacar.",
             "en": "The libero cannot complete an attack or serve.",
-            "pt": "O libero nao pode completar um ataque nem sacar.",
+            "pt": "O líbero não pode completar um ataque nem sacar.",
         },
         rule="FIVB 19.3.1",
     ),
@@ -253,7 +253,7 @@ QUESTIONS: list[TriviaQuestion] = [
         options={
             "es": ["Si", "No, hacen falta dos de diferencia", "Depende del saque"],
             "en": ["Yes", "No, a two-point lead is required", "Depends on serve"],
-            "pt": ["Sim", "Nao, sao necessarios dois de vantagem", "Depende do saque"],
+            "pt": ["Sim", "Não, são necessários dois de vantagem", "Depende do saque"],
         },
         correct=1,
         explanation={
@@ -266,9 +266,9 @@ QUESTIONS: list[TriviaQuestion] = [
     TriviaQuestion(
         id=5,
         question={
-            "es": "Cuanto dura el tiempo muerto tecnico en indoor?",
+            "es": "¿Cuánto dura el tiempo muerto técnico en indoor?",
             "en": "How long is a technical timeout in indoor volleyball?",
-            "pt": "Quanto dura o tempo tecnico no indoor?",
+            "pt": "Quanto dura o tempo técnico no indoor?",
         },
         options={
             "es": ["30 segundos", "60 segundos", "90 segundos"],
@@ -277,9 +277,9 @@ QUESTIONS: list[TriviaQuestion] = [
         },
         correct=1,
         explanation={
-            "es": "El tiempo tecnico de FIVB dura 60 segundos cuando se aplica.",
+            "es": "El tiempo técnico de FIVB dura 60 segundos cuando se aplica.",
             "en": "The FIVB technical timeout lasts 60 seconds when applied.",
-            "pt": "O tempo tecnico da FIVB dura 60 segundos quando aplicado.",
+            "pt": "O tempo técnico da FIVB dura 60 segundos quando aplicado.",
         },
         rule="FIVB 15.4",
     ),
@@ -394,7 +394,7 @@ def fan_report(request: FanRequest) -> FanReport:
         return FanReport(
             decision=decision,
             trivia=None,
-            message=f"El juez cobro {decision.call['es']} ({decision.rule}).",
+            message=f"El juez cobró {decision.call['es']} ({decision.rule}).",
         )
     trivia = _trivia(request.answers)
     return FanReport(decision=None, trivia=trivia, message=trivia.message)

@@ -371,7 +371,7 @@ export function BiomechanicsStation({ meta, locale, onSave }: StationProps) {
       </div>
       <div className="mt-3 rounded-xl border border-white/10 bg-obsidian/60 p-2">
         <p className="text-[10px] font-bold uppercase tracking-wide text-white/50">
-          🎵 {t(locale, "Metronomo de aproximacion", "Approach metronome", "Metronomo de aproximacao")}
+          🎵 {t(locale, "Metrónomo de aproximación", "Approach metronome", "Metrónomo de aproximação")}
         </p>
         <div className="mt-1 flex flex-wrap gap-1">
           {(["1st", "2nd", "3rd"] as const).map((tempo) => (
@@ -1549,7 +1549,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
             placeholder={"1 Sofia S C\n7 Martina L\n4 Valentina OH\n9 Renata MB\n11 Carla OPP\n14 Julieta MB"}
             className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 font-mono text-[10px]"
           />
-          <p className="text-[9px] text-white/40">{t(locale, "Dorsal nombre rol (S OH MB OPP L) y C/L para capitan o libero.", "Number name role (S OH MB OPP L), C/L for captain or libero.", "Numero nome posicao (S OH MB OPP L), C/L para capitao ou libero.")}</p>
+          <p className="text-[9px] text-white/40">{t(locale, "Dorsal nombre rol (S OH MB OPP L) y C/L para capitán o líbero.", "Number name role (S OH MB OPP L), C/L for captain or libero.", "Número nome posição (S OH MB OPP L), C/L para capitão ou líbero.")}</p>
           <PlayerChips locale={locale} onPick={(name) => setRosterSheet((current) => (current ? `${current}
 ${name}` : name))} testId="cancha-player-chips" />
           {rosterError ? <p className="text-[10px] text-crimson">{rosterError}</p> : null}
@@ -3717,7 +3717,7 @@ export function BlockoutLabStation({ meta, locale, onSave }: StationProps) {
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Metric label={t(locale, "Recomendado", "Recommended", "Recomendado")} value={BLOCKOUT_DECISION_LABELS[report.recommended]} tone="text-emerald" />
-        <Metric label={t(locale, "Muneca", "Wrist", "Punho")} value={`${report.wristAngleDeg} deg`} tone="text-volt" />
+        <Metric label={t(locale, "Muñeca", "Wrist", "Punho")} value={`${report.wristAngleDeg} deg`} tone="text-volt" />
       </div>
       <ul className="mt-3 space-y-1">
         {report.options.map((option) => (
@@ -3745,7 +3745,7 @@ export function PracticePlannerStation({ meta, locale, onSave }: StationProps) {
           <span className={LABEL}>{t(locale, "Jugadores", "Players", "Jogadores")}</span>
           <input className={INPUT} type="number" min={4} max={24} value={players} onChange={(event) => setPlayers(Number(event.target.value))} />
         </label>
-        <select className={INPUT} value={duration} onChange={(event) => setDuration(Number(event.target.value) as 60 | 90 | 120)} aria-label="Duracion">
+        <select className={INPUT} value={duration} onChange={(event) => setDuration(Number(event.target.value) as 60 | 90 | 120)} aria-label="Duración">
           <option value={60}>60 min</option>
           <option value={90}>90 min</option>
           <option value={120}>120 min</option>
@@ -3827,7 +3827,7 @@ export function PlayerCareerStation({ meta, locale, onSave }: StationProps) {
     <StationShell meta={meta} locale={locale} rows={2} onSave={onSave} onExample={() => undefined}>
       <div className="grid grid-cols-3 gap-2">
         <Metric label="Index" value={`${report.evolutionIndex}/100`} tone="text-volt" />
-        <Metric label={t(locale, "Categoria", "Category", "Categoria")} value={report.category.replaceAll("_", " ")} tone="text-emerald" />
+        <Metric label={t(locale, "Categoría", "Category", "Categoria")} value={report.category.replaceAll("_", " ")} tone="text-emerald" />
         <Metric label={t(locale, "Cuello", "Bottleneck", "Gargalo")} value={report.bottleneck} tone="text-crimson" />
       </div>
       <div className="mt-3 grid grid-cols-2 gap-1 text-[11px]">
@@ -3838,7 +3838,7 @@ export function PlayerCareerStation({ meta, locale, onSave }: StationProps) {
           </span>
         ))}
       </div>
-      <p className="mt-2 text-[10px] text-white/60">{report.message} {t(locale, "Faltan", "Next gap", "Proximo gap")}: {report.gapToNext}.</p>
+      <p className="mt-2 text-[10px] text-white/60">{report.message} {t(locale, "Faltan", "Next gap", "Próximo gap")}: {report.gapToNext}.</p>
     </StationShell>
   );
 }
@@ -4446,7 +4446,7 @@ export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) 
         <div className="mt-2 rounded-xl border border-white/10 p-2 text-[10px]">
           <p>{report.message}</p>
           <p className="text-white/50">
-            {t(locale, "Angulo medio", "Mean angle", "Angulo medio")}: {report.meanAngleDeg}° · {t(locale, "Maximo", "Max", "Maximo")}: {report.maxAngleDeg}°
+            {t(locale, "Ángulo medio", "Mean angle", "Ângulo médio")}: {report.meanAngleDeg}° · {t(locale, "Máximo", "Max", "Máximo")}: {report.maxAngleDeg}°
           </p>
         </div>
       ) : null}

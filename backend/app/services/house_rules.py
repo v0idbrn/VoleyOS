@@ -38,7 +38,7 @@ def _mixed_violations(
     if len(genders) != 6:
         violations.append(f"Equipo {label}: se requieren 6 jugadores en cancha.")
     if genders.count("M") < 2 or genders.count("F") < 2:
-        violations.append(f"Equipo {label}: minimo 2 M y 2 F en cancha.")
+        violations.append(f"Equipo {label}: mínimo 2 M y 2 F en cancha.")
 
 
 def _relojito_plan(bench_order: list[str]) -> list[str]:
@@ -81,8 +81,8 @@ def validate_house_rules(request: HouseRulesRequest) -> HouseRulesReport:
         golden_point_required=golden_point,
         min_contacts_per_gender=min_contacts,
         message=(
-            "Reglas de la casa validas."
+            "Reglas de la casa válidas."
             if valid
-            else f"{len(violations)} violacion(es) de las reglas de la casa."
+            else f"{len(violations)} violación(es) de las reglas de la casa."
         ),
     )

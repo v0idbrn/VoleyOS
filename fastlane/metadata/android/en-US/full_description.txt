@@ -1,4 +1,4 @@
-VolleyOS is the offline-first operating system for volleyball. Forty-eight modules that work in a gym with no signal, on a phone, tablet or laptop.
+VolleyOS is the offline-first operating system for volleyball. Sixty-one modules that work in a gym with no signal, on a phone, tablet or laptop.
 
 WHAT YOU GET
 • 5-Frame Lab: measure jump height and attack mechanics with physics, not guesswork.

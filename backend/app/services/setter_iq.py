@@ -119,6 +119,6 @@ def compute_setter_iq(request: SetterIQRequest) -> SetterIQReport:
         recommendations=recommendations,
         message=(
             f"?ndice de imprevisibilidad {unpredictability}/100 con {total} armados. "
-            + (f"Sesgo cr?tico a {bias} ({bias_share}%)." if bias else "Sin sesgo > 65%.")
+            + (f"Sesgo crítico a {bias} ({bias_share}%)." if bias else "Sin sesgo > 65%.")
         ),
     )

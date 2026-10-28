@@ -72,7 +72,7 @@ def build_seal(payload: dict[str, Any]) -> SealReport:
         seal=f"VOS-SEAL-{digest[:32].upper()}",
         sha256=public,
         canonical=canonical,
-        message="Sello HMAC-SHA256 emitido sobre JSON can?nico ordenado.",
+        message="Sello HMAC-SHA256 emitido sobre JSON canónico ordenado.",
     )
 
 

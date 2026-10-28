@@ -16,7 +16,7 @@ FRONT_ATTACKERS: dict[SystemName, list[int]] = {
 
 DESCRIPTIONS: dict[SystemName, str] = {
     "4-2": "Dos armadores que alternan entre delantera y zaga; siempre dos atacantes al frente.",
-    "6-2": "Dos armadores con el de zaga penetrando; tres atacantes al frente en cada rotacion.",
+    "6-2": "Dos armadores con el de zaga penetrando; tres atacantes al frente en cada rotación.",
     "5-1": "Un armador fijo: tres atacantes al frente en R1-R3 y dos en R4-R6.",
 }
 
@@ -108,6 +108,6 @@ def analyze_system(request: SystemRequest) -> SystemReport:
         infiltration_map=infiltration_map,
         message=(
             f"Sistema recomendado {recommended} con {request.pure_hitters} atacantes puros "
-            f"y lectura de transicion {request.transition_read_grade}/10."
+            f"y lectura de transición {request.transition_read_grade}/10."
         ),
     )

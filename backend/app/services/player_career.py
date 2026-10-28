@@ -106,7 +106,7 @@ def build_career_report(request: CareerRequest) -> CareerReport:
         gap_to_next=_q1(gap),
         bottleneck=bottleneck,
         message=(
-            f"{request.player}: indice {index}/100 ({category}). Cuello de botella "
+            f"{request.player}: índice {index}/100 ({category}). Cuello de botella "
             f"actual: {bottleneck}; faltan {_q1(gap)} puntos para {next_category}."
         ),
     )

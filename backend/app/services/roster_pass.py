@@ -107,7 +107,7 @@ def build_roster_pass(request: RosterRequest) -> RosterReport:
             "capitan_no_libero",
         ],
         message=(
-            "Pase de plantel verificado: dorsales unicos, liberos y capitan "
+            "Pase de plantel verificado: dorsales únicos, líberos y capitán "
             "conformes al reglamento para entregar en mesa."
         ),
     )
