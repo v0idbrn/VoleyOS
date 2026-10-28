@@ -322,6 +322,9 @@ import { safeJsonParse } from "@/lib/security-shield";
 export interface ScoreboardState {
   teamA: string;
   teamB: string;
+  /** Brand colours carried into the live-cast packet (optional, v10.1.0). */
+  colorA?: string;
+  colorB?: string;
   bestOf: number;
   setNumber: number;
   scoreA: number;

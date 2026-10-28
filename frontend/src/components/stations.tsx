@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import jsQR from "jsqr";
 
-import { playArenaCue, playWhistle, type ArenaCue } from "@/lib/court-audio";
+import { playArenaCue, playWhistle as playCourtWhistle, type ArenaCue } from "@/lib/court-audio";
 import {
   type ApproachTempo,
   loadCrowdAmbience,
@@ -17,6 +17,7 @@ import {
   playSetWinFanfare,
   playSneakerSqueak,
   playWarmupTick,
+  playWhistle,
   saveCrowdAmbience,
 } from "@/lib/sound-effects";
 import { announceScoreTTS, isMatchActive, persistLiveScoreboard, readLiveScoreboard, triggerCourtHaptics } from "@/lib/court-ux";
@@ -910,6 +911,29 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [burst, setBurst] = useState<"set" | "match" | null>(null);
   const [voiceOn, setVoiceOn] = useState(() => window.localStorage.getItem("volleyos.voice") === "1");
   const [crowdOn, setCrowdOn] = useState(() => loadCrowdAmbience() > 0.01);
+  // v10.1.0 teams-only board + Simple/Pro shell.
+  const [soloTeams, setSoloTeams] = useState(() => window.localStorage.getItem("volleyos.soloTeams") === "1");
+  const [uiMode, setUiMode] = useState<"simple" | "pro">(() =>
+    window.localStorage.getItem("volleyos.uiMode") === "simple" ? "simple" : "pro",
+  );
+  const [editingTeams, setEditingTeams] = useState(false);
+  const [teamDraft, setTeamDraft] = useState({ a: "", b: "" });
+  const [editingScore, setEditingScore] = useState<ScoreboardState["serving"] | null>(null);
+
+  // The hub toggle and this board share one persisted mode; both dispatch the
+  // same event so a switch made on either side stays in sync.
+  useEffect(() => {
+    const onUiMode = (event: Event): void => {
+      const mode = (event as CustomEvent<{ mode?: string }>).detail?.mode;
+      if (mode === "simple" || mode === "pro") {
+        setUiMode(mode);
+        return;
+      }
+      setUiMode(window.localStorage.getItem("volleyos.uiMode") === "simple" ? "simple" : "pro");
+    };
+    window.addEventListener("volleyos:uimode", onUiMode);
+    return () => window.removeEventListener("volleyos:uimode", onUiMode);
+  }, []);
   const undoTimerRef = useRef<number | null>(null);
   const burstTimerRef = useRef<number | null>(null);
   const serveStreakRef = useRef(0);
@@ -981,6 +1005,8 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           seq: seqRef.current,
           mode: castMode,
           hostSecret: secretRef.current,
+          homeColor: state.colorA,
+          awayColor: state.colorB,
         });
         if (!alive) return;
         pushLocalLiveServer(packet);
@@ -1270,7 +1296,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
 
   const swapSides = (): void => {
     setHistory((previous) => commitScoreboard(previous, swapCourt(previous.present)));
-    playWhistle("double");
+    playCourtWhistle("double");
     triggerCourtHaptics([40, 30, 40]);
     setFlashSwap(true);
     window.setTimeout(() => setFlashSwap(false), 450);
@@ -1338,7 +1364,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         setScout((previous) => undoScoutPoint(previous));
       } else if (key === "w") {
         event.preventDefault();
-        playWhistle("short");
+        playCourtWhistle("short");
       } else if (key === "b") {
         event.preventDefault();
         playBuzzer();
@@ -1373,6 +1399,60 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     triggerCourtHaptics(16);
   };
 
+  const toggleSoloTeams = (): void => {
+    const next = !soloTeams;
+    setSoloTeams(next);
+    window.localStorage.setItem("volleyos.soloTeams", next ? "1" : "0");
+    triggerCourtHaptics(14);
+  };
+
+  const toggleUiMode = (): void => {
+    const next = uiMode === "simple" ? "pro" : "simple";
+    setUiMode(next);
+    window.localStorage.setItem("volleyos.uiMode", next);
+    window.dispatchEvent(new CustomEvent("volleyos:uimode", { detail: { mode: next } }));
+    triggerCourtHaptics(14);
+    setMessage(
+      next === "simple"
+        ? t(locale, "⚡ Modo Simple: solo el marcador.", "⚡ Simple mode: scoreboard only.", "⚡ Modo Simples: só o placar.")
+        : t(locale, "🛠️ Modo Pro: paneles completos.", "🛠️ Pro mode: full panels.", "🛠️ Modo Pro: painéis completos."),
+    );
+  };
+
+  const openTeamEditor = (): void => {
+    setTeamDraft({ a: state.teamA, b: state.teamB });
+    setEditingTeams(true);
+  };
+
+  const commitTeamDraft = (): void => {
+    const a = teamDraft.a.trim();
+    const b = teamDraft.b.trim();
+    if ((a && a !== state.teamA) || (b && b !== state.teamB)) {
+      setHistory((previous) =>
+        commitScoreboard(previous, {
+          ...previous.present,
+          teamA: a || previous.present.teamA,
+          teamB: b || previous.present.teamB,
+        }),
+      );
+    }
+    setEditingTeams(false);
+  };
+
+  const editScoreTo = (side: ScoreboardState["serving"], raw: string): void => {
+    const value = Number.parseInt(raw, 10);
+    if (!Number.isFinite(value)) return;
+    const clamped = Math.max(0, Math.min(99, value));
+    setHistory((previous) =>
+      commitScoreboard(
+        previous,
+        side === "A"
+          ? { ...previous.present, scoreA: clamped }
+          : { ...previous.present, scoreB: clamped },
+      ),
+    );
+  };
+
   // v9.4 OLED table saver: FLAG_KEEP_SCREEN_ON during a live match, released
   // the moment the board goes idle.
   useEffect(() => {
@@ -1403,11 +1483,11 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
 
   const swapped = state.isCourtSwapped === true;
   const left = swapped
-    ? { name: state.teamB, score: state.scoreB, sets: state.setsB, serving: state.serving === "B" }
-    : { name: state.teamA, score: state.scoreA, sets: state.setsA, serving: state.serving === "A" };
+    ? { name: state.teamB, score: state.scoreB, sets: state.setsB, serving: state.serving === "B", color: state.colorB }
+    : { name: state.teamA, score: state.scoreA, sets: state.setsA, serving: state.serving === "A", color: state.colorA };
   const right = swapped
-    ? { name: state.teamA, score: state.scoreA, sets: state.setsA, serving: state.serving === "A" }
-    : { name: state.teamB, score: state.scoreB, sets: state.setsB, serving: state.serving === "B" };
+    ? { name: state.teamA, score: state.scoreA, sets: state.setsA, serving: state.serving === "A", color: state.colorA }
+    : { name: state.teamB, score: state.scoreB, sets: state.setsB, serving: state.serving === "B", color: state.colorB };
   const showPoint8 = point8SwitchDue(state);
 
   return (
@@ -1421,6 +1501,8 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         setMessage(t(locale, "Ejemplo cargado: set decisivo 22-20.", "Example loaded: decider 22-20.", "Exemplo carregado: set decisivo 22-20."));
       }}
     >
+      {uiMode === "pro" ? (
+      <>
       <div className="mb-2 flex flex-wrap gap-1">
         <button type="button" onClick={() => startPicadito()} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "picadito" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>⚡ {t(locale, "Picadito", "Pickup", "Rachinha")}</button>
         <button type="button" onClick={() => setPreset("king")} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "king" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>👑 {t(locale, "Ganador en cancha", "Winner stays", "Vencedor fica")}</button>
@@ -1507,6 +1589,8 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           <button type="button" onClick={() => { setMatchFormat("bo5"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 5, { matchFormat: "bo5" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo5" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 5 (25/15)", "Best of 5 (25/15)", "Melhor de 5 (25/15)")}</button>
         </div>
       ) : null}
+      </>
+      ) : null}
       <div className="mb-2 grid grid-cols-2 gap-1">
         <select
           aria-label={t(locale, "Equipo local", "Home team", "Time da casa")}
@@ -1532,11 +1616,13 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           <option value="">{t(locale, "Equipo B", "Team B", "Time B")}</option>
           {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
         </select>
-        <button type="button" className={`${BTN} col-span-2`} onClick={() => setRosterOpen((open) => !open)}>
-          {t(locale, "Administrar plantillas", "Manage rosters", "Gerenciar elencos")}
-        </button>
+        {uiMode === "pro" ? (
+          <button type="button" className={`${BTN} col-span-2`} onClick={() => setRosterOpen((open) => !open)}>
+            {t(locale, "Administrar plantillas", "Manage rosters", "Gerenciar elencos")}
+          </button>
+        ) : null}
       </div>
-      {rosterOpen ? (
+      {rosterOpen && uiMode === "pro" ? (
         <div className="mb-2 space-y-1 rounded-xl border border-white/10 bg-obsidian/80 p-2">
           <div className="grid grid-cols-[1fr_4rem] gap-1">
             <input value={rosterName} onChange={(event) => setRosterName(event.target.value)} placeholder={t(locale, "Nombre del equipo", "Team name", "Nome do time")} className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px]" />
@@ -1583,26 +1669,147 @@ ${name}` : name))} testId="cancha-player-chips" />
           triggerCourtHaptics(next ? [40, 30, 40] : 20);
         }}
         className={`${BTN} mb-2 w-full ${hardwareMode ? "border-volt bg-volt/15 text-volt" : ""}`}
-      >
-        🔒 {t(locale, "Modo Partido (botones de volumen)", "Match mode (volume keys)", "Modo Partida (botões de volume)")}
+      >        🔒 {t(locale, "Modo Partido (botones de volumen)", "Match mode (volume keys)", "Modo Partida (botões de volume)")}
       </button>
-      <div className={`rounded-xl border border-white/10 bg-obsidian/80 p-3 ${flashSwap ? "vos-flash" : ""}`}>
+      <div className="mb-2 flex gap-1">
+        <button
+          type="button"
+          data-testid="solo-teams-toggle"
+          aria-pressed={soloTeams}
+          onClick={toggleSoloTeams}
+          className={`${BTN} flex-1 ${soloTeams ? "border-volt text-volt" : ""}`}
+        >
+          👥 {t(locale, "Solo equipos", "Teams only", "Só equipes")}: {soloTeams ? "ON" : "OFF"}
+        </button>
+        <button
+          type="button"
+          data-testid="ui-mode-toggle"
+          aria-pressed={uiMode === "simple"}
+          onClick={toggleUiMode}
+          className={`${BTN} flex-1 ${uiMode === "simple" ? "border-volt text-volt" : ""}`}
+        >
+          {uiMode === "simple"
+            ? `⚡ ${t(locale, "Modo Simple", "Simple mode", "Modo Simples")}`
+            : `🛠️ ${t(locale, "Modo Pro", "Pro mode", "Modo Pro")}`}
+        </button>
+      </div>
+      <div className={`rounded-xl border border-white/10 bg-obsidian/80 p-3 ${flashSwap ? " vos-flash" : ""}`}>
         <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/50">
           <span>Set {state.setNumber} / {state.bestOf} {state.matchFormat === "short15" ? "(15)" : state.setNumber === state.bestOf || state.isDecider ? "(15 TB)" : "(25)"}</span>
           <span>{state.status === "finished" ? "FINAL" : `${state.streak} ${t(locale, "en racha", "run", "em sequência")}`}</span>
         </div>
         <div className="vos-oled-keep mt-2 grid grid-cols-2 gap-2 text-center">
-          <div className={`rounded-lg py-2 ${left.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
+          <div data-side-color={left.color} className={`rounded-lg py-2 ${left.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
             <p className="truncate text-xs font-bold">{left.name}</p>
             <p data-testid={swapped ? "score-b" : "score-a"} className="text-4xl font-black tabular-nums">{left.score}</p>
             <p className="text-[10px] text-volt">Sets {left.sets}</p>
           </div>
-          <div className={`rounded-lg py-2 ${right.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
+          <div data-side-color={right.color} className={`rounded-lg py-2 ${right.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
             <p className="truncate text-xs font-bold">{right.name}</p>
             <p data-testid={swapped ? "score-a" : "score-b"} className="text-4xl font-black tabular-nums">{right.score}</p>
             <p className="text-[10px] text-volt">Sets {right.sets}</p>
           </div>
         </div>
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-1">
+          <button
+            type="button"
+            data-testid="score-edit-open"
+            aria-expanded={editingScore !== null}
+            className={BTN}
+            onClick={() => setEditingScore(editingScore === null ? "A" : null)}
+          >
+            ✏️ {t(locale, "Editar tantos", "Edit score", "Editar pontos")}
+          </button>
+          <button
+            type="button"
+            data-testid="team-edit-open"
+            aria-expanded={editingTeams}
+            className={BTN}
+            onClick={() => (editingTeams ? setEditingTeams(false) : openTeamEditor())}
+          >
+            🏷️ {t(locale, "Equipos", "Teams", "Times")}
+          </button>
+        </div>
+        {editingScore !== null ? (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <input
+              data-testid="score-edit-a"
+              type="number"
+              min={0}
+              max={99}
+              defaultValue={state.scoreA}
+              aria-label={t(locale, "Ajustar tantos de Equipo A", "Adjust Team A points", "Ajustar pontos do Time A")}
+              onBlur={(event) => editScoreTo("A", event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+              }}
+              className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-center text-sm font-bold"
+            />
+            <input
+              data-testid="score-edit-b"
+              type="number"
+              min={0}
+              max={99}
+              defaultValue={state.scoreB}
+              aria-label={t(locale, "Ajustar tantos de Equipo B", "Adjust Team B points", "Ajustar pontos do Time B")}
+              onBlur={(event) => editScoreTo("B", event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+              }}
+              className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-center text-sm font-bold"
+            />
+            <button type="button" data-testid="score-edit-done" className={`${BTN} col-span-2`} onClick={() => setEditingScore(null)}>
+              ✓ {t(locale, "Listo", "Done", "Pronto")}
+            </button>
+          </div>
+        ) : null}
+        {editingTeams ? (
+          <div className="mt-2 space-y-1">
+            <input
+              data-testid="team-edit-a"
+              value={teamDraft.a}
+              aria-label={t(locale, "Nombre del Equipo A", "Team A name", "Nome do Time A")}
+              onChange={(event) => setTeamDraft((draft) => ({ ...draft, a: event.target.value }))}
+              className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[12px]"
+            />
+            <input
+              data-testid="team-edit-b"
+              value={teamDraft.b}
+              aria-label={t(locale, "Nombre del Equipo B", "Team B name", "Nome do Time B")}
+              onChange={(event) => setTeamDraft((draft) => ({ ...draft, b: event.target.value }))}
+              className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[12px]"
+            />
+            <div className="flex items-center gap-3 text-[10px] text-white/50">
+              <label className="flex items-center gap-1">
+                {t(locale, "Color A", "Color A", "Cor A")}
+                <input
+                  data-testid="team-color-a"
+                  type="color"
+                  aria-label={t(locale, "Color del Equipo A", "Team A color", "Cor do Time A")}
+                  value={state.colorA ?? "#e11d48"}
+                  onChange={(event) =>
+                    setHistory((previous) => commitScoreboard(previous, { ...previous.present, colorA: event.target.value }))
+                  }
+                />
+              </label>
+              <label className="flex items-center gap-1">
+                {t(locale, "Color B", "Color B", "Cor B")}
+                <input
+                  data-testid="team-color-b"
+                  type="color"
+                  aria-label={t(locale, "Color del Equipo B", "Team B color", "Cor do Time B")}
+                  value={state.colorB ?? "#3b82f6"}
+                  onChange={(event) =>
+                    setHistory((previous) => commitScoreboard(previous, { ...previous.present, colorB: event.target.value }))
+                  }
+                />
+              </label>
+            </div>
+            <button type="button" data-testid="team-edit-save" className={`${BTN} w-full`} onClick={commitTeamDraft}>
+              ✓ {t(locale, "Guardar nombres", "Save names", "Salvar nomes")}
+            </button>
+          </div>
+        ) : null}
         <div className="mt-2 flex flex-col items-center gap-1">
           <button type="button" className={BTN} onClick={swapSides}>
             🔄 {t(locale, "Cambio de Cancha", "Swap Sides", "Troca de Lado")}
@@ -1631,20 +1838,40 @@ ${name}` : name))} testId="cancha-player-chips" />
             type="button"
             aria-pressed={crowdOn}
             onClick={toggleCrowd}
-            data-testid="crowd-toggle"
+            data-testid="sound-crowd"
             className={crowdOn ? `${BTN} border-emerald text-emerald` : BTN}
           >
             🔉 {t(locale, "Público", "Crowd", "Torcida")}: {crowdOn ? "ON" : "OFF"}
           </button>
           <button type="button" className={BTN} onClick={undo} disabled={history.past.length === 0}>[Z] {t(locale, "Deshacer", "Undo", "Desfazer")} ({history.past.length})</button>
           <button type="button" className={BTN} onClick={redo} disabled={history.future.length === 0}>[Y] {t(locale, "Rehacer", "Redo", "Refazer")}</button>
-          <button type="button" className={BTN} onClick={() => playWhistle("short")}>[W] {t(locale, "Silbato", "Whistle", "Apito")}</button>
-          <button type="button" className={BTN} onClick={() => playBuzzer()}>[B] {t(locale, "Buzzer", "Buzzer", "Buzzer")}</button>
+          <button type="button" data-testid="sound-whistle" className={BTN} onClick={() => playWhistle("short")}>[W] 😗 {t(locale, "Silbato", "Whistle", "Apito")}</button>
+          <button type="button" data-testid="sound-buzzer" className={BTN} onClick={() => playBuzzer()}>[B] 🚨 {t(locale, "Chicharra", "Buzzer", "Buzina")}</button>
           <button type="button" className={BTN} onClick={() => {
             const next = !document.documentElement.classList.contains("high-contrast");
             document.documentElement.classList.toggle("high-contrast", next);
             window.localStorage.setItem("volleyos.contrast", next ? "1" : "0");
           }}>[C] {t(locale, "Contraste", "Contrast", "Contraste")}</button>
+          <button
+            type="button"
+            data-testid="sound-pass"
+            className={BTN}
+            onClick={() => {
+              const whistled = playWhistle("short");
+              const spoken = announceScoreTTS(
+                `${state.scoreA} a ${state.scoreB}`,
+                true,
+                locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : "es-ES",
+              );
+              setMessage(
+                whistled || spoken
+                  ? t(locale, "🔊 Audio listo en este dispositivo.", "🔊 Audio ready on this device.", "🔊 Áudio pronto neste dispositivo.")
+                  : t(locale, "🔇 Sin audio en este dispositivo.", "🔇 No audio on this device.", "🔇 Sem áudio neste dispositivo."),
+              );
+            }}
+          >
+            🔊 {t(locale, "Probar audio", "Test audio", "Testar áudio")}
+          </button>
           <button
             type="button"
             data-testid="live-cast-open"
@@ -1672,6 +1899,8 @@ ${name}` : name))} testId="cancha-player-chips" />
                     seq: seqRef.current,
                     mode: castMode,
                     hostSecret: secretRef.current,
+                    homeColor: state.colorA,
+                    awayColor: state.colorB,
                   });
                   const text = await encodeWhatsAppFreePulse(packet);
                   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
@@ -1730,7 +1959,7 @@ ${name}` : name))} testId="cancha-player-chips" />
         </div>
       ) : null}
       <p className="mt-2 text-[11px] text-white/60">{message}</p>
-      {scoutAlert ? (
+      {scoutAlert && uiMode === "pro" && !soloTeams ? (
         <p
           data-testid="tactical-alert"
           className="mt-2 rounded-lg border border-crimson/50 bg-crimson/10 p-2 text-[11px] font-semibold leading-snug text-white"
@@ -1738,6 +1967,7 @@ ${name}` : name))} testId="cancha-player-chips" />
           {bleedingAlertMessage(scoutAlert, locale)}
         </p>
       ) : null}
+      {uiMode === "pro" && !soloTeams ? (
       <button
         type="button"
         data-testid="box-score-toggle"
@@ -1747,7 +1977,8 @@ ${name}` : name))} testId="cancha-player-chips" />
       >
         📊 {t(locale, "Box Score & Eficiencia por Rotación (R1–R6)", "Box Score & Rotation Efficiency (R1–R6)", "Box Score & Eficiência por Rotação (R1–R6)")} {boxOpen ? "▾" : "▸"}
       </button>
-      {boxOpen ? (
+      ) : null}
+      {boxOpen && uiMode === "pro" && !soloTeams ? (
         <div data-testid="box-score" className="mt-2 space-y-2 rounded-xl border border-white/10 bg-obsidian/80 p-2">
           {([["A", state.teamA], ["B", state.teamB]] as const).map(([side, teamName], index) => (
             <div key={side}>
@@ -1779,6 +2010,7 @@ ${name}` : name))} testId="cancha-player-chips" />
           ))}
         </div>
       ) : null}
+      {uiMode === "pro" && !soloTeams ? (
       <div className="mt-2 grid grid-cols-6 gap-1 text-center text-[10px]">
         {state.lineupA.map((player, index) => (
           <div key={`zone-${index + 1}`} className={`rounded ${index === 0 ? "bg-volt/20 text-volt" : "bg-white/5"}`}>
@@ -1787,6 +2019,7 @@ ${name}` : name))} testId="cancha-player-chips" />
           </div>
         ))}
       </div>
+      ) : null}
       <p className="mt-1 text-[9px] uppercase tracking-widest text-white/30">A/L punto · Z undo · W silbato · B buzzer · C contraste</p>
       {hardwareMode ? (
         <div className="absolute inset-0 z-30 grid place-items-center rounded-xl bg-obsidian/95 p-4 text-center">
@@ -1868,7 +2101,7 @@ ${name}` : name))} testId="cancha-player-chips" />
           ↶ {t(locale, "Deshacer último punto", "Undo last point", "Desfazer último ponto")}
         </button>
       ) : null}
-      {scoutBar ? (
+      {scoutBar && uiMode === "pro" && !soloTeams ? (
         <div
           data-testid="micro-scout"
           className="fixed bottom-36 left-1/2 z-40 w-[min(94vw,26rem)] -translate-x-1/2 rounded-2xl border border-white/15 bg-obsidian/95 p-2 shadow-2xl backdrop-blur"
@@ -2895,7 +3128,7 @@ export function RefereeConsoleStation({ meta, locale, onSave }: StationProps) {
         <button type="button" className={BTN} onClick={() => add({ team: "A", player: 4, kind: "WARNING_YELLOW" })}>🟨🟥 A #4</button>
         <button type="button" className={BTN} onClick={() => add({ team: "B", kind: "DELAY_WARNING" })}>⏱ B demora</button>
         <button type="button" className={BTN} onClick={() => add({ team: "B", player: 7, kind: "EXPULSION_JOINT" })}>🟥 B #7</button>
-        <button type="button" className={BTN} onClick={() => playWhistle("double")}>🔊 {t(locale, "Silbato", "Whistle", "Apito")}</button>
+        <button type="button" className={BTN} onClick={() => playCourtWhistle("double")}>🔊 {t(locale, "Silbato", "Whistle", "Apito")}</button>
       </div>
       <div className="mt-3 space-y-1">
         {report.sanctions.map((sanction) => (
@@ -4801,7 +5034,7 @@ export function BlindCourtCoach({ locale }: { locale: Locale }) {
       const phrase = pick[locale];
       setCue(phrase);
       playSneakerSqueak();
-      playWhistle("short");
+      playCourtWhistle("short");
       try {
         const synth = window.speechSynthesis;
         const Utterance = window.SpeechSynthesisUtterance;
@@ -4888,15 +5121,15 @@ export function IsometricTendonTimer({ locale }: { locale: Locale }) {
     if (remaining > 0) return;
     if (phase === "hold") {
       if (set >= TENDON_SETS) {
-        playWhistle("double");
+        playCourtWhistle("double");
         setPhase("done");
       } else {
-        playWhistle("long");
+        playCourtWhistle("long");
         setPhase("rest");
         setRemaining(TENDON_REST_SECONDS);
       }
     } else {
-      playWhistle("short");
+      playCourtWhistle("short");
       setSet((value) => value + 1);
       setPhase("hold");
       setRemaining(TENDON_HOLD_SECONDS);
@@ -4907,10 +5140,10 @@ export function IsometricTendonTimer({ locale }: { locale: Locale }) {
     if (phase === "idle" || phase === "done") {
       setSet(1);
       setRemaining(TENDON_HOLD_SECONDS);
-      playWhistle("short");
+      playCourtWhistle("short");
       setPhase("hold");
     } else if (phase === "paused") {
-      playWhistle("short");
+      playCourtWhistle("short");
       setPhase(pausedFromRef.current);
     }
   };

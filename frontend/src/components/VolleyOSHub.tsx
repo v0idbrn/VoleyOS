@@ -280,8 +280,19 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [pinned, setPinned] = useState<string[]>([]);
   const [recent, setRecent] = useState<string[]>([]);
   const [solar, setSolar] = useState(false);
+  const [uiMode, setUiMode] = useState<"simple" | "pro">(() =>
+    window.localStorage.getItem("volleyos.uiMode") === "simple" ? "simple" : "pro",
+  );
   const [voice, setVoice] = useState(false);
   const [courtAudio, setCourtAudio] = useState(true);
+
+  const toggleUiMode = (): void => {
+    const next: "simple" | "pro" = uiMode === "simple" ? "pro" : "simple";
+    setUiMode(next);
+    window.localStorage.setItem("volleyos.uiMode", next);
+    window.dispatchEvent(new CustomEvent("volleyos:uimode", { detail: { mode: next } }));
+    triggerCourtHaptics(14);
+  };
   const [awake, setAwake] = useState(false);
   const [creator, setCreator] = useState(false);
   const [onboarding, setOnboarding] = useState(false);
@@ -1425,6 +1436,18 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   onClick={reopenOnboarding}
                 />
 
+                <button
+                  type="button"
+                  data-testid="hub-mode-toggle"
+                  aria-pressed={uiMode === "simple"}
+                  onClick={toggleUiMode}
+                  className="mt-4 flex w-full items-center justify-between rounded-2xl border border-volt/40 bg-volt/10 px-4 py-3"
+                >
+                  <span className="text-[13px] font-semibold text-white">⚡ {t(locale, "Modo Simple", "Simple mode", "Modo Simples")}</span>
+                  <span data-testid="hub-mode-state" className="text-[12px] font-black text-volt">
+                    {uiMode === "simple" ? "ON" : "OFF"} · {uiMode === "simple" ? "Simple" : "Pro"}
+                  </span>
+                </button>
                 <h2 className="mt-5 px-1 pb-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.theme}</h2>
                 <SwitchRow
                   label={shell.theme}
