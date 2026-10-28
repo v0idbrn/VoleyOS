@@ -280,9 +280,10 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [pinned, setPinned] = useState<string[]>([]);
   const [recent, setRecent] = useState<string[]>([]);
   const [solar, setSolar] = useState(false);
-  const [uiMode, setUiMode] = useState<"simple" | "pro">(() =>
-    window.localStorage.getItem("volleyos.uiMode") === "simple" ? "simple" : "pro",
-  );
+  const [uiMode, setUiMode] = useState<"simple" | "pro">(() => {
+    if (typeof window === "undefined") return "pro";
+    return window.localStorage.getItem("volleyos.uiMode") === "simple" ? "simple" : "pro";
+  });
   const [voice, setVoice] = useState(false);
   const [courtAudio, setCourtAudio] = useState(true);
   const [shareMsg, setShareMsg] = useState<string | null>(null);

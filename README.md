@@ -2,7 +2,7 @@
 
 [English](README.md) · [Español](README.es.md) · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v10.0.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v10.1.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Modules](https://img.shields.io/badge/modules-61-FF3B5C?style=for-the-badge&color=EAB308)](#encyclopedia-of-the-61-modules)
 [![Offline](https://img.shields.io/badge/100%25-offline--first-FF3B5C?style=for-the-badge&color=EAB308)](#why-volleyos-exists)
 [![Android](https://img.shields.io/badge/Android%20APK-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -13,6 +13,16 @@
 [![Download APK](https://img.shields.io/badge/APK-voleyos--universal.apk-FF3B5C?style=for-the-badge&logo=android)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
 
 Signed universal APK built by GitHub Actions on every `v*` tag. Android 7.0+ (minSdk 24), trilingual, offline-first, no accounts and no telemetry. F-Droid ready.
+
+## 🆕 What's new in v10.1.0 — Court-Ready Edition
+
+- **⚡ Simple / Pro scoreboard**: one top-level switch (in ⚙️ Ajustes or right on the board) strips presets, box score, rotation grid and scouting chrome down to a clean, giant-score match board — or brings every panel back. The choice persists and all tabs exist in both modes.
+- **👥 Teams-only board**: Solo Equipos hides player-level scouting, jersey numbers and the box score with one tap.
+- **✏️ On-board corrections**: fix a partial score, a timeout or a corrected call, and rename/recolor both teams straight from the court — undo history intact, no menus.
+- **🔊 Universal audio & voice**: Fox 40/FIVB whistle and buzzer as PCM on any device (RIFF WAV + WebAudio dual engine, native AudioTrack on Android) with a 4-tier voice announcer (native TTS → matched web voice → any web voice → formant cadence) and a one-tap 🔊 audio test.
+- **🔙 Back-gesture guard**: an accidental browser back or hardware back press cannot wipe a live match — web and Android both bounce it with a warning.
+- **📲 Share + offline polish**: a Web Share card in Ajustes with clipboard fallback, a v10.1.0 service-worker cache precaching the apple icon, the manifest tracking all 61 modules and a 16px anti-zoom floor for touch keyboards.
+- **Keeps everything from v10.0.x**: Olympus Titan vault, live micro-scout, TV overlay and the obsidian/crimson adaptive icon.
 
 ## 🆕 What's new in v10.0.0 — Olympus Titan Edition
 

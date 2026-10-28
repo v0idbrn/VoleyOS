@@ -1,0 +1,1 @@
+Scoreboard Simple/Pro switch and Teams-only mode. On-board editing of points, team names and colours. Universal PCM whistle/buzzer with 4-tier voice and a one-tap audio test. Web & Android back-gesture guard and a refreshed offline PWA.

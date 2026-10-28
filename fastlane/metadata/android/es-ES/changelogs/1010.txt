@@ -1,0 +1,1 @@
+Modo Simple/Pro en el tablero y modo Solo Equipos. Edición de tantos, nombres y colores de equipo en la cancha. Silbato y chicharra PCM universales con voz de 4 niveles y test de audio. Guardia antirretroceso web/Android y PWA offline renovada.

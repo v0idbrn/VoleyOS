@@ -1,0 +1,1 @@
+Alternador Simples/Pro no placar e modo Só Equipes. Edição de pontos, cores e nomes dos times na quadra. Apito e buzina PCM universais com voz de 4 níveis e teste de áudio. Guarda de voltar web/Android e PWA offline renovada.

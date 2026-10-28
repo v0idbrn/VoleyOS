@@ -1,6 +1,6 @@
 /** On-demand GitHub release checker: fires only when the user taps it. */
 
-export const APP_VERSION = "10.0.0";
+export const APP_VERSION = "10.1.0";
 
 export const RELEASES_URL = "https://api.github.com/repos/v0idbrn/VoleyOS/releases/latest";
 export const RELEASES_PAGE = "https://github.com/v0idbrn/VoleyOS/releases";
