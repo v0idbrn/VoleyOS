@@ -1,0 +1,4 @@
+Brand-new icon: the full VoleyOS crest replaces the placeholder circle.
+Volleyball with curved seams, central white-and-red V spike and the VOLEYOS wordmark.
+Applied to the Android adaptive icon, all 10 density PNGs and the web icons.
+versionCode 1023.

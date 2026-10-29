@@ -1,0 +1,4 @@
+Icono nuevo: escudo completo de VoleyOS en lugar del círculo de relleno.
+Pelota de vóley con costuras, pico V central blanco y rojo, y wordmark VOLEYOS.
+Aplicado a los íconos adaptativos de Android, los 10 PNG de densidad y los iconos web.
+versionCode 1023.
