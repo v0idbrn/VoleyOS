@@ -1,6 +1,6 @@
 {
   "name": "volleyos-frontend",
-  "version": "10.1.3",
+  "version": "10.2.3",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "scripts": {
