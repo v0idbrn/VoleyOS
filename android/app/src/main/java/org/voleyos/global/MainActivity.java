@@ -84,6 +84,12 @@ public class MainActivity extends Activity {
         private volatile ServerSocket liveServer;
         /** v10.0.0 — 4-digit bench PIN gating /state ("" = open, legacy). */
         private volatile String livePin = "";
+        /** v10.2.2 — room access mode gating POST /co-admin-action. */
+        private volatile String coAdminMode = "spectator";
+        /** Actions a co-admin may push over :8765 (whitelist, never free-form). */
+        private static final java.util.Set<String> ALLOWED_CO_ACTIONS = new java.util.HashSet<>(java.util.Arrays.asList(
+                "home_plus", "home_minus", "away_plus", "away_minus",
+                "reset_set", "reset_match", "swap_serve"));
 
         VosleyOSBridge(MainActivity activity) {
             this.activity = activity;
@@ -597,6 +603,15 @@ public class MainActivity extends Activity {
             livePin = pin == null ? "" : pin.trim();
         }
 
+        /**
+         * v10.2.2 — the JS scoreboard mirrors its room access mode here so the
+         * :8765 server knows whether "Todos Anotan" lets strangers score.
+         */
+        @JavascriptInterface
+        public void setCoAdminMode(String mode) {
+            coAdminMode = mode == null ? "spectator" : mode.trim();
+        }
+
         private void serveLoop(ServerSocket server) {
             while (!server.isClosed()) {
                 try (Socket client = server.accept()) {
@@ -611,16 +626,29 @@ public class MainActivity extends Activity {
         private void handle(Socket client) throws IOException {
             String requestLine = readRequestLine(client);
             if (requestLine == null) return;
-            // Read-only scoreboard: reject PUT/POST/DELETE before touching state.
-            if (!requestLine.startsWith("GET ")) {
-                writeError(client, "405 Method Not Allowed");
-                return;
-            }
             String[] parts = requestLine.split(" ");
+            String method = parts.length > 0 ? parts[0] : "GET";
             String target = parts.length > 1 ? parts[1] : "/";
             int query = target.indexOf('?');
             String path = query >= 0 ? target.substring(0, query) : target;
             String queryString = query >= 0 ? target.substring(query + 1) : "";
+            int contentLength = readHeaders(client);
+
+            // v10.2.2 — browser friends score from the served page: answer the
+            // CORS preflight and the new co-admin write endpoint.
+            if (method.equals("OPTIONS")) {
+                writePreflight(client);
+                return;
+            }
+            if (method.equals("POST") && path.equals("/co-admin-action")) {
+                handleCoAdminAction(client, contentLength);
+                return;
+            }
+            // Read-only scoreboard: reject every other write verb.
+            if (!method.equals("GET")) {
+                writeError(client, "405 Method Not Allowed");
+                return;
+            }
 
             byte[] body;
             String type;
@@ -689,6 +717,116 @@ public class MainActivity extends Activity {
             out.flush();
         }
 
+        /** Drains the request headers, returning Content-Length (0 when absent). */
+        private static int readHeaders(Socket client) throws IOException {
+            InputStream in = client.getInputStream();
+            int contentLength = 0;
+            for (int lines = 0; lines < 64; lines++) {
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream(128);
+                int read = -1;
+                while ((read = in.read()) != -1) {
+                    if (read == '\n') break;
+                    if (read != '\r') buffer.write(read);
+                }
+                if (read == -1) break;
+                String line = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+                if (line.isEmpty()) break; // blank line ends the header block
+                int colon = line.indexOf(':');
+                if (colon > 0 && line.substring(0, colon).trim().equalsIgnoreCase("Content-Length")) {
+                    try {
+                        contentLength = Integer.parseInt(line.substring(colon + 1).trim());
+                    } catch (NumberFormatException ignored) {
+                        contentLength = 0;
+                    }
+                }
+            }
+            return Math.max(0, Math.min(contentLength, 4096));
+        }
+
+        /** Bounded body read for the co-admin JSON action (max 4 KB). */
+        private static String readBody(Socket client, int contentLength) throws IOException {
+            if (contentLength <= 0) return "";
+            InputStream in = client.getInputStream();
+            byte[] body = new byte[contentLength];
+            int offset = 0;
+            while (offset < contentLength) {
+                int read = in.read(body, offset, contentLength - offset);
+                if (read < 0) break;
+                offset += read;
+            }
+            return new String(body, 0, offset, StandardCharsets.UTF_8);
+        }
+
+        private static void writePreflight(Socket client) throws IOException {
+            String head = "HTTP/1.1 204 No Content\r\n"
+                    + "Access-Control-Allow-Origin: *\r\n"
+                    + "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+                    + "Access-Control-Allow-Headers: Content-Type\r\n"
+                    + "Content-Length: 0\r\n"
+                    + "Connection: close\r\n"
+                    + "\r\n";
+            OutputStream out = client.getOutputStream();
+            out.write(head.getBytes(StandardCharsets.UTF_8));
+            out.flush();
+        }
+
+        /** First match of `"name":"value"` — action/actor/pin are sanitized. */
+        private static String jsonStringField(String json, String name) {
+            if (json == null || json.isEmpty()) return null;
+            java.util.regex.Matcher matcher = java.util.regex.Pattern
+                    .compile("\\\"" + name + "\\\"\\s*:\\s*\\\"([^\\\"]*)\\\"")
+                    .matcher(json);
+            return matcher.find() ? matcher.group(1) : null;
+        }
+
+        /**
+         * v10.2.2 — POST /co-admin-action: a friend on the hotspot scores the
+         * shared match. Open-table mode or the room's 4-digit Admin PIN unlocks
+         * it; the whitelisted action is forwarded to the WebView on the UI
+         * thread as window.__vosApplyCoAdminAction({...}).
+         */
+        private void handleCoAdminAction(Socket client, int contentLength) throws IOException {
+            String body = readBody(client, contentLength);
+            String action = jsonStringField(body, "action");
+            String pin = jsonStringField(body, "pin");
+            String actor = jsonStringField(body, "actor");
+            boolean authorized = "open".equals(coAdminMode)
+                    || (!livePin.isEmpty() && livePin.equals(pin));
+            if (action == null || !ALLOWED_CO_ACTIONS.contains(action)) {
+                writeError(client, "400 Bad Request");
+                return;
+            }
+            if (!authorized) {
+                writeError(client, "403 Forbidden");
+                return;
+            }
+            String safeActor = actor == null ? "" : actor.replaceAll("[^\\p{L}\\p{N} _-]", "").trim();
+            if (safeActor.length() > 24) safeActor = safeActor.substring(0, 24);
+            if (safeActor.isEmpty()) safeActor = "Mesa";
+            final String payload = "{\"action\":\"" + action + "\",\"actor\":\"" + safeActor + "\"}";
+            final MainActivity host = activity;
+            host.runOnUiThread(() -> {
+                WebView page = host.webView;
+                if (page != null) {
+                    page.evaluateJavascript(
+                            "window.__vosApplyCoAdminAction && window.__vosApplyCoAdminAction(" + payload + ")",
+                            null);
+                }
+            });
+            byte[] outBody = "{\"ok\":true}".getBytes(StandardCharsets.UTF_8);
+            String head = "HTTP/1.1 200 OK\r\n"
+                    + "Content-Type: application/json; charset=utf-8\r\n"
+                    + "Content-Length: " + outBody.length + "\r\n"
+                    + "Access-Control-Allow-Origin: *\r\n"
+                    + "Cache-Control: no-store\r\n"
+                    + "Connection: close\r\n"
+                    + "\r\n";
+            OutputStream out = client.getOutputStream();
+            out.write(head.getBytes(StandardCharsets.UTF_8));
+            out.write(outBody);
+            out.flush();
+        }
+
         /**
          * Self-contained VoleyOS Live spectator giant scoreboard. Polls /state
          * every 400ms, renders team colors, huge digits, sets won, the serving
@@ -713,6 +851,9 @@ public class MainActivity extends Activity {
                         + "#foot{text-align:center;font-size:2.7vmin;color:#64748b;padding-bottom:1vmin}"
                         + "#badge{position:fixed;top:2vmin;right:3vmin;background:#ff3b5c;border-radius:99px;padding:.7vmin 2.4vmin;font-size:2.6vmin;font-weight:900;letter-spacing:.1em;animation:blink 1.6s infinite}"
                         + "@keyframes blink{0%,100%{opacity:1}50%{opacity:.55}}"
+                        + "#pad{display:grid;grid-template-columns:repeat(4,1fr);gap:1.5vmin;margin-top:1vmin}"
+                        + "#pad button{font-size:3vmin;font-weight:900;padding:2.2vmin 0;border:0;border-radius:2vmin;background:#1e293b;color:#fff;cursor:pointer}"
+                        + "#pad button:active{background:#eab308;color:#07070c}"
                         + "</style></head><body><div id='wrap'>"
                         + "<div id='hdr'><span id='room'>VoleyOS LIVE</span><span id='mode'></span></div>"
                         + "<div id='board'>"
@@ -722,7 +863,13 @@ public class MainActivity extends Activity {
                         + "<div class='team'><div class='name' id='bn'>B</div>"
                         + "<div class='score' id='bs'>0</div><div class='serve' id='bserve'></div></div>"
                         + "</div>"
-                        + "<div id='foot'>Conectado al Wi-Fi de la cancha · 0 MB de datos</div>"
+                        + "<div id='pad'>"
+                        + "<button data-a='home_plus'>+1 Local</button>"
+                        + "<button data-a='home_minus'>-1 Local</button>"
+                        + "<button data-a='away_plus'>+1 Visitante</button>"
+                        + "<button data-a='away_minus'>-1 Visitante</button>"
+                        + "</div>"
+                        + "<div id='foot'>Conectado al Wi-Fi de la cancha · 0 MB de datos · Puntuá desde acá</div>"
                         + "</div><div id='badge'>EN VIVO</div><script>\n"
                         + "(function(){\n"
                         + "var lastTotal=-1,lastSets=-1,ctx=null;\n"
@@ -747,6 +894,10 @@ public class MainActivity extends Activity {
                         + "var pin=(location.search.match(/[?&]pin=([0-9]{4})/)||[])[1]||'';\n"
                         + "function tick(){fetch('/state'+(pin?'?pin='+encodeURIComponent(pin):''),{cache:'no-store'}).then(function(r){return r.json();}).then(function(p){if(p&&typeof p.homeScore==='number'){render(p);}}).catch(function(){});}\n"
                         + "setInterval(tick,400);tick();\n"
+                        + "var pad=document.getElementById('pad');\n"
+                        + "if(pad){pad.addEventListener('click',function(e){var b=e.target;if(!b||!b.getAttribute||!b.getAttribute('data-a'))return;"
+                        + "fetch('/co-admin-action',{method:'POST',headers:{'Content-Type':'application/json'},"
+                        + "body:JSON.stringify({action:b.getAttribute('data-a'),actor:'Mesa',pin:pin})}).catch(function(){});});}\n"
                         + "})();\n"
                         + "</script></body></html>";
     }

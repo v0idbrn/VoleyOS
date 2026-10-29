@@ -9,14 +9,19 @@ import {
   buildPacket,
   createBenchJoinUrl,
   createBenchPin,
+  createCoAdminUrl,
   createHandoverUrl,
+  createHostSecret,
   createSpectatorUrl,
   decodeWhatsAppFreePulse,
   encodeWhatsAppFreePulse,
+  publishLiveUpdate,
   setLocalLivePin,
+  signPacket,
   startLocalHotspotServer,
   subscribeLiveRoom,
   type LiveMatchPacket,
+  type RoomAccessMode,
 } from "@/lib/live-cast-engine";
 import { newScoreboard, type Locale, type ScoreboardState } from "@/lib/local-engines";
 import { persistLiveScoreboard } from "@/lib/court-ux";
@@ -47,7 +52,23 @@ interface LiveCastModalProps {
   initialTab?: CastTab;
   /** Spectator entry: a `CANCHA-XXXX` room (e.g. from a scanned `?room=` QR). */
   initialJoin?: string | null;
+  /** v10.2.2 multi-admin: room access mode, scorer nickname and Admin PIN. */
+  accessMode?: RoomAccessMode;
+  onAccessModeChange?: (mode: RoomAccessMode) => void;
+  actorName?: string;
+  onActorNameChange?: (name: string) => void;
+  adminPin?: string;
 }
+
+/** v10.2.2 — every write a co-admin can push into the shared match. */
+type CoAdminAction =
+  | "home_plus"
+  | "home_minus"
+  | "away_plus"
+  | "away_minus"
+  | "reset_set"
+  | "reset_match"
+  | "swap_serve";
 
 /** Best-effort offline clone of a received packet back into a live scoreboard. */
 function packetToState(packet: LiveMatchPacket): ScoreboardState {
@@ -114,6 +135,11 @@ export function LiveCastModal({
   onRelayChange,
   initialTab = 1,
   initialJoin = null,
+  accessMode = "spectator",
+  onAccessModeChange,
+  actorName = "",
+  onActorNameChange,
+  adminPin,
 }: LiveCastModalProps) {
   const [tab, setTab] = useState<CastTab>(initialJoin ? 3 : initialTab);
   const [serverUrl, setServerUrl] = useState<string | null>(null);
@@ -131,7 +157,13 @@ export function LiveCastModal({
   const [joinError, setJoinError] = useState<string | null>(null);
   const [qr, setQr] = useState<{ target: string; svg: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [joinPin, setJoinPin] = useState("");
+  const [coAdminUrl, setCoAdminUrl] = useState("");
   const seqRef = useRef(0);
+  /** Joiner-side writer identity: co-admins publish their own revisions. */
+  const joinerSecretRef = useRef("");
+  const joinerSeqRef = useRef(0);
+  if (!joinerSecretRef.current) joinerSecretRef.current = createHostSecret();
 
   const castMode = state.matchFormat === "short15" ? "picadito" : "oficial";
 
@@ -158,9 +190,14 @@ export function LiveCastModal({
       void (async () => {
         try {
           const packet = await makePacket();
-          if (alive) setCloudUrl(createSpectatorUrl(packet));
+          if (!alive) return;
+          setCloudUrl(createSpectatorUrl(packet));
+          setCoAdminUrl(accessMode !== "spectator" ? createCoAdminUrl(packet, accessMode, adminPin) : "");
         } catch {
-          if (alive) setCloudUrl("");
+          if (alive) {
+            setCloudUrl("");
+            setCoAdminUrl("");
+          }
         }
       })();
     } else if (tab === 4) {
@@ -178,7 +215,7 @@ export function LiveCastModal({
     };
     // makePacket closes over state; the effect re-runs on every score change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, state, roomId, hostSecret, castMode]);
+  }, [tab, state, roomId, hostSecret, castMode, accessMode, adminPin]);
 
   const benchUrl = serverUrl && benchPin ? createBenchJoinUrl(serverUrl, benchPin) : null;
 
@@ -222,8 +259,8 @@ export function LiveCastModal({
   const startHotspot = (): void => {
     const url = startLocalHotspotServer();
     if (url) {
-      // v10.0.0 bench mesh: arm a fresh 4-digit PIN before spectators arrive.
-      const pin = createBenchPin();
+      // v10.0.0 bench mesh + v10.2.2 co-admin gate: one shared 4-digit PIN.
+      const pin = adminPin ?? createBenchPin();
       setLocalLivePin(pin);
       setBenchPin(pin);
       setServerUrl(url);
@@ -285,6 +322,68 @@ export function LiveCastModal({
     setJoinCode(code);
   };
 
+  // v10.2.2 — "Todos Anotan" unlocks every joiner at once; Co-Admin rooms
+  // unlock once the 4-digit Admin PIN from the invite matches the room's.
+  const spectatorUnlocked = Boolean(
+    spectator && (spectator.accessMode === "open" || (joinPin.length === 4 && joinPin === spectator.adminPin)),
+  );
+
+  /** Joins the room's write stream with a bumped revision + my nickname. */
+  const applyCoAction = (action: CoAdminAction): void => {
+    const current = spectator;
+    if (!current) return;
+    const next: LiveMatchPacket = { ...current };
+    switch (action) {
+      case "home_plus": next.homeScore += 1; break;
+      case "home_minus": next.homeScore = Math.max(0, next.homeScore - 1); break;
+      case "away_plus": next.awayScore += 1; break;
+      case "away_minus": next.awayScore = Math.max(0, next.awayScore - 1); break;
+      case "swap_serve": next.servingSide = next.servingSide === "A" ? "B" : "A"; break;
+      case "reset_set": next.homeScore = 0; next.awayScore = 0; break;
+      case "reset_match":
+        next.homeScore = 0;
+        next.awayScore = 0;
+        next.homeSets = 0;
+        next.awaySets = 0;
+        next.setHistory = "";
+        next.servingSide = "A";
+        break;
+      default: return;
+    }
+    joinerSeqRef.current += 1;
+    next.seq = joinerSeqRef.current;
+    next.timestamp = Date.now();
+    next.revision = (current.revision ?? 0) + 1;
+    next.updatedAt = Date.now();
+    next.lastActor = actorName.trim() ? actorName.trim() : undefined;
+    next.accessMode = current.accessMode;
+    next.adminPin = current.adminPin;
+    void (async () => {
+      try {
+        const signed = await signPacket(next, joinerSecretRef.current);
+        await publishLiveUpdate(signed);
+        setSpectator(signed);
+      } catch {
+        /* offline: the optimistic board below still shows the tap */
+        setSpectator(next);
+      }
+    })();
+  };
+
+  /** 🎮 hand this room's board over to the full ⏱️ Cancha scoreboard here. */
+  const openInCancha = (): void => {
+    const current = spectator;
+    if (!current) return;
+    const adopted = packetToState(current);
+    persistLiveScoreboard(adopted);
+    window.dispatchEvent(
+      new CustomEvent("voleyos:coadopt", {
+        detail: { state: adopted, revision: current.revision ?? 0, actor: actorName.trim() || undefined },
+      }),
+    );
+    onClose();
+  };
+
   const TABS: { id: CastTab; label: string }[] = [
     { id: 1, label: `📶 ${t3(locale, "1. Hotspot Cancha (0% Internet)", "1. Court Hotspot (0% Internet)", "1. Hotspot da Quadra (0% Internet)")}` },
     { id: 2, label: `💬 ${t3(locale, '2. WhatsApp Gratis (VOS1:)', '2. Free WhatsApp (VOS1:)', '2. WhatsApp Grátis (VOS1:)')}` },
@@ -316,8 +415,42 @@ export function LiveCastModal({
           </button>
         </div>
         <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">
-          {t3(locale, `Sala ${roomId}`, `Room ${roomId}`, `Sala ${roomId}`)} · {t3(locale, "3 caminos + relevo de batería", "3 transports + battery handover", "3 transportes + troca de bateria")}
+          {t3(locale, `Sala ${roomId}`, `Room ${roomId}`, `Sala ${roomId}`)} ·            {t3(locale, "3 caminos + relevo de batería", "3 transports + battery handover", "3 transportes + troca de bateria")}
         </p>
+
+        <div className="mt-2 space-y-1.5 rounded-xl border border-white/10 bg-obsidian/60 p-2" data-testid="live-access-controls">
+          <label className="block">
+            <span className={LEGEND}>👤 {t3(locale, "Tu Nombre en la Mesa", "Your Name at the Table", "Seu Nome na Mesa")}</span>
+            <input
+              data-testid="live-actor-name"
+              value={actorName}
+              maxLength={24}
+              onChange={(event) => onActorNameChange?.(event.target.value)}
+              placeholder={t3(locale, "Tano, Amiga, Mesa 1…", "Tano, Amiga, Table 1…", "Tano, Amiga, Mesa 1…")}
+              className={`${FIELD} mt-1`}
+            />
+          </label>
+          <div className="grid grid-cols-3 gap-1">
+            {([
+              ["spectator", `👁️ ${t3(locale, "Solo Mirar", "Watch Only", "Só Ver")}`],
+              ["coadmin", `🤝 ${t3(locale, "Co-Admins", "Co-Admins", "Co-Admins")}`],
+              ["open", `🍻 ${t3(locale, "Todos Anotan", "Everyone Scores", "Todos Anotam")}`],
+            ] as const).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                data-testid={`live-access-mode-${mode}`}
+                aria-pressed={accessMode === mode}
+                onClick={() => onAccessModeChange?.(mode)}
+                className={`tap rounded-lg border px-1 py-1.5 text-[9px] font-black leading-tight ${
+                  accessMode === mode ? "border-volt bg-volt/15 text-volt" : "border-white/10 text-white/55"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="mt-3 grid grid-cols-2 gap-1.5">
           {TABS.map((entry) => (
@@ -416,6 +549,19 @@ export function LiveCastModal({
                     {relaying ? "🔴 EN VIVO" : `📡 ${t3(locale, "Activar nube", "Go live", "Ativar nuvem")}`}
                   </button>
                 </div>
+                {accessMode !== "spectator" && coAdminUrl ? (
+                  <div className="space-y-1 text-left">
+                    <button
+                      type="button"
+                      data-testid="coadmin-link-btn"
+                      className={`${BTN} border border-emerald/50 bg-emerald/10 text-emerald`}
+                      onClick={() => void copyUrl(coAdminUrl)}
+                    >
+                      🔗 {t3(locale, "Copiar Link para Anotar Juntos", "Copy Link to Score Together", "Copiar Link para Anotar Juntos")}
+                    </button>
+                    <p data-testid="coadmin-url" className="break-all font-mono text-[9px] text-emerald">{coAdminUrl}</p>
+                  </div>
+                ) : null}
               </div>
               <p className={LEGEND}>👀 {t3(locale, "Unirse a sala (escribir código CANCHA-XXXX)", "Join room (type CANCHA-XXXX)", "Entrar na sala (digite CANCHA-XXXX)")}</p>
               <div className="grid grid-cols-[1fr_auto] gap-1.5">
@@ -431,6 +577,39 @@ export function LiveCastModal({
                 </button>
               </div>
               {joinCode && spectator ? <SpectatorBoard packet={spectator} locale={locale} /> : null}
+              {joinCode && spectator ? (
+                <label className="block">
+                  <span className={LEGEND}>🔑 {t3(locale, "PIN de Admin (si la sala es Co-Admin)", "Admin PIN (co-admin rooms)", "PIN de Admin (se sala Co-Admin)")}</span>
+                  <input
+                    data-testid="join-pin"
+                    value={joinPin}
+                    onChange={(event) => setJoinPin(event.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+                    inputMode="numeric"
+                    maxLength={4}
+                    placeholder="0000"
+                    className={`${FIELD} mt-1 text-center font-mono`}
+                  />
+                </label>
+              ) : null}
+              {spectatorUnlocked && spectator ? (
+                <div data-testid="coadmin-controls" className="space-y-1.5 rounded-xl border border-emerald/40 bg-emerald/5 p-2">
+                  <p className={LEGEND}>✏️ {t3(locale, "Anotar juntos (en vivo)", "Score together (live)", "Anotar juntos (ao vivo)")}</p>
+                  <div className="grid grid-cols-4 gap-1">
+                    <button type="button" data-testid="co-home-plus" className="tap rounded-lg bg-volt/20 px-1 py-1.5 text-[10px] font-black text-volt" onClick={() => applyCoAction("home_plus")}>+1 {t3(locale, "Local", "Home", "Casa")}</button>
+                    <button type="button" data-testid="co-home-minus" className="tap rounded-lg border border-white/15 px-1 py-1.5 text-[10px] font-black text-white/70" onClick={() => applyCoAction("home_minus")}>−1</button>
+                    <button type="button" data-testid="co-away-plus" className="tap rounded-lg bg-crimson/30 px-1 py-1.5 text-[10px] font-black text-white" onClick={() => applyCoAction("away_plus")}>+1 {t3(locale, "Visitante", "Away", "Visitante")}</button>
+                    <button type="button" data-testid="co-away-minus" className="tap rounded-lg border border-white/15 px-1 py-1.5 text-[10px] font-black text-white/70" onClick={() => applyCoAction("away_minus")}>−1</button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <button type="button" data-testid="co-serve" className="tap rounded-lg border border-white/15 px-1 py-1.5 text-[10px] font-black text-white/80" onClick={() => applyCoAction("swap_serve")}>🏐 {t3(locale, "Saque", "Serve", "Saque")}</button>
+                    <button type="button" data-testid="co-reset-set" className="tap rounded-lg border border-white/15 px-1 py-1.5 text-[10px] font-black text-white/80" onClick={() => applyCoAction("reset_set")}>↺ {t3(locale, "Reiniciar Set", "Reset Set", "Reiniciar Set")}</button>
+                    <button type="button" data-testid="co-reset-match" className="tap rounded-lg border border-crimson/50 px-1 py-1.5 text-[10px] font-black text-crimson" onClick={() => applyCoAction("reset_match")}>🔄 {t3(locale, "Nuevo Partido", "New Match", "Nova Partida")}</button>
+                  </div>
+                  <button type="button" data-testid="open-in-cancha" className={`${BTN} bg-volt text-obsidian`} onClick={openInCancha}>
+                    🎮 {t3(locale, "Abrir en mi Cancha como Co-Admin", "Open in my Court as Co-Admin", "Abrir na minha Quadra como Co-Admin")}
+                  </button>
+                </div>
+              ) : null}
               {joinCode && !spectator ? (
                 <p data-testid="join-waiting" className="text-center text-[10px] text-white/50">
                   ⏳ {t3(locale, "Esperando el marcador del anotador…", "Waiting for the scorer's board…", "Aguardando o placar do anotador…")}

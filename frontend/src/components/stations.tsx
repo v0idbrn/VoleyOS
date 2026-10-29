@@ -38,12 +38,16 @@ import {
 } from "@/lib/athlete-records";
 import {
   buildPacket,
+  createBenchPin,
   createHostSecret,
   createRoomId,
   encodeWhatsAppFreePulse,
   publishLiveUpdate,
   pushLocalLiveServer,
+  subscribeLiveRoom,
   type CastMode,
+  type LiveMatchPacket,
+  type RoomAccessMode,
 } from "@/lib/live-cast-engine";
 import { loadSeason, saveSeasonMatch, seasonMatchFromState, seasonStats } from "@/lib/season-vault";
 import { syncWidgetSnapshot } from "@/lib/widget-bridge";
@@ -910,6 +914,36 @@ function rebuildSetHistory(existing: SetHistoryEntry[], home: number, away: numb
   return keep.map((entry, index) => ({ ...entry, setNumber: index + 1 }));
 }
 
+/** v10.2.2 — rebuilds a scorable board from a room packet (co-admin sync). */
+function stateFromPacket(packet: LiveMatchPacket): ScoreboardState {
+  const entries = packet.setHistory
+    .split(",")
+    .map((row) => row.trim())
+    .filter((row) => row.length > 0)
+    .map((row, index) => {
+      const parts = row.split("-");
+      const scoreA = Number.parseInt(parts[0] ?? "", 10);
+      const scoreB = Number.parseInt(parts[1] ?? "", 10);
+      if (!Number.isFinite(scoreA) || !Number.isFinite(scoreB)) return null;
+      return { setNumber: index + 1, scoreA, scoreB };
+    })
+    .filter((entry): entry is { setNumber: number; scoreA: number; scoreB: number } => entry !== null);
+  return newScoreboard(packet.homeName, packet.awayName, 3, {
+    matchFormat: packet.mode === "picadito" ? "short15" : "bo3",
+    scoreA: packet.homeScore,
+    scoreB: packet.awayScore,
+    setsA: packet.homeSets,
+    setsB: packet.awaySets,
+    serving: packet.servingSide,
+    isCourtSwapped: packet.isCourtSwapped,
+    colorA: packet.homeColor,
+    colorB: packet.awayColor,
+    setHistory: entries,
+    status: "live",
+    winner: null,
+  });
+}
+
 export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [matchFormat, setMatchFormat] = useState<"bo3" | "bo5" | "short15">("bo3");
   const [preset, setPreset] = useState<"picadito" | "king" | "oficial">("oficial");
@@ -989,6 +1023,21 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const seqRef = useRef(0);
   if (!roomRef.current) roomRef.current = createRoomId();
   if (!secretRef.current) secretRef.current = createHostSecret();
+  // v10.2.2 multi-admin co-scoring: room access mode, my table nickname and
+  // the 4-digit Admin PIN shared by the co-admin link and the hotspot mesh.
+  const [accessMode, setAccessMode] = useState<RoomAccessMode>(() => {
+    const saved = window.localStorage.getItem("volleyos.accessMode");
+    return saved === "coadmin" || saved === "open" ? saved : "spectator";
+  });
+  const [actorName, setActorName] = useState(() => window.localStorage.getItem("volleyos.actorName") ?? "");
+  const [adminPin] = useState(() => createBenchPin());
+  const [coActor, setCoActor] = useState<string | null>(null);
+  /** Monotonic writer counter: higher revision always wins the room. */
+  const revisionRef = useRef(0);
+  /** Set right after a higher-revision packet is applied so we never echo it. */
+  const remoteAppliedRef = useRef(false);
+  const coActorTimerRef = useRef<number | null>(null);
+  const bootedRef = useRef(false);
   // v9.4 physical-court ergonomics: pocket lock, outdoor sun mode, OLED saver.
   const [pocketLock, setPocketLock] = useState(() => window.localStorage.getItem("volleyos.pocketLock") === "1");
   const [sunMode, setSunMode] = useState(() => window.localStorage.getItem("volleyos.sunMode") === "1");
@@ -1035,12 +1084,46 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
 
   // v9.3.0: every point/set/side change streams to the active transports — the
   // pure-Java LAN server, local tabs, and (when armed) the ntfy cloud relay.
+  // v10.2.2: each broadcast carries a monotonic `revision` + `lastActor` so
+  // every phone in the room can write and still converge conflict-free.
+  const flashCoActor = (actor: string | null): void => {
+    setCoActor(actor);
+    if (coActorTimerRef.current) window.clearTimeout(coActorTimerRef.current);
+    coActorTimerRef.current = window.setTimeout(() => setCoActor(null), 6000);
+  };
+
+  // Restore this room's revision counter after a tab/module remount so our
+  // next local write still outranks packets the room already saw.
+  useEffect(() => {
+    if (bootedRef.current) return;
+    bootedRef.current = true;
+    try {
+      const saved = Number.parseInt(window.sessionStorage.getItem("volleyos.roomRevision") ?? "0", 10);
+      if (Number.isFinite(saved) && saved > revisionRef.current) revisionRef.current = saved;
+    } catch {
+      /* private mode: start the counter from zero */
+    }
+  }, []);
+
+  // The native :8765 server gates POST /co-admin-action on this mode.
+  useEffect(() => {
+    const bridge = (window as Window & { VoleyOSBridge?: { setCoAdminMode?: (mode: string) => void } }).VoleyOSBridge;
+    bridge?.setCoAdminMode?.(accessMode);
+  }, [accessMode]);
+
   useEffect(() => {
     if (!castActive) return;
     let alive = true;
+    // A higher-revision packet from another admin just landed on this board:
+    // never echo it back into the room (everyone already has it).
+    if (remoteAppliedRef.current) {
+      remoteAppliedRef.current = false;
+      return;
+    }
     void (async () => {
       try {
         seqRef.current += 1;
+        revisionRef.current += 1;
         const castMode: CastMode = state.matchFormat === "short15" ? "picadito" : "oficial";
         const packet = await buildPacket(state, {
           roomId: roomRef.current,
@@ -1049,11 +1132,21 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           hostSecret: secretRef.current,
           homeColor: state.colorA,
           awayColor: state.colorB,
+          revision: revisionRef.current,
+          updatedAt: Date.now(),
+          accessMode,
+          adminPin,
+          lastActor: actorName.trim() ? actorName.trim() : undefined,
         });
         if (!alive) return;
         pushLocalLiveServer(packet);
         const skipCloud = async (): Promise<{ ok: boolean }> => ({ ok: false });
         await publishLiveUpdate(packet, cloudRelay ? undefined : skipCloud);
+        try {
+          window.sessionStorage.setItem("volleyos.roomRevision", String(revisionRef.current));
+        } catch {
+          /* private mode: in-memory counter is enough for this session */
+        }
       } catch {
         /* the LAN server keeps serving even if every relay is offline */
       }
@@ -1061,7 +1154,76 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     return () => {
       alive = false;
     };
-  }, [state, castActive, cloudRelay]);
+  }, [state, castActive, cloudRelay, accessMode, adminPin, actorName]);
+
+  // v10.2.2 — every phone in the room (host included) follows newer
+  // revisions from co-admins and "Todos Anotan" scorers: apply + badge.
+  useEffect(() => {
+    if (!castActive) return;
+    let alive = true;
+    const stop = subscribeLiveRoom(roomRef.current, (packet) => {
+      if (!alive) return;
+      const incoming = packet.revision ?? 0;
+      if (incoming <= revisionRef.current) return;
+      revisionRef.current = incoming;
+      remoteAppliedRef.current = true;
+      try {
+        window.sessionStorage.setItem("volleyos.roomRevision", String(incoming));
+      } catch {
+        /* private mode */
+      }
+      setHistory((previous) => commitScoreboard(previous, stateFromPacket(packet)));
+      flashCoActor(packet.lastActor ?? null);
+    });
+    return () => {
+      alive = false;
+      stop();
+    };
+  }, [castActive]);
+
+  // v10.2.2 — "🎮 Abrir en mi Cancha como Co-Admin": a joiner hands its room
+  // board over to this scoreboard with the revision it already reached.
+  useEffect(() => {
+    const onAdopt = (event: Event): void => {
+      const detail = (event as CustomEvent<{ state?: ScoreboardState; revision?: number; actor?: string }>).detail;
+      const adopted = detail?.state;
+      if (!adopted) return;
+      revisionRef.current = Math.max(revisionRef.current, detail?.revision ?? 0);
+      setHistory((previous) => commitScoreboard(previous, adopted));
+      flashCoActor(detail.actor ?? null);
+      setMessage(
+        t(locale, "🎮 Sala abierta en Cancha como Co-Admin.", "🎮 Room opened in Court as Co-Admin.", "🎮 Sala aberta na Quadra como Co-Admin."),
+      );
+      triggerCourtHaptics(25);
+    };
+    window.addEventListener("voleyos:coadopt", onAdopt);
+    return () => window.removeEventListener("voleyos:coadopt", onAdopt);
+  });
+
+  // v10.2.2 — native hotspot friends (:8765 POST /co-admin-action) score
+  // straight into this board; re-registered every render for fresh closures.
+  useEffect(() => {
+    type CoAction = { action?: string; actor?: string };
+    const target = window as unknown as { __vosApplyCoAdminAction?: (payload: CoAction) => void };
+    target.__vosApplyCoAdminAction = (payload) => {
+      const rawActor = typeof payload?.actor === "string" ? payload.actor.trim().slice(0, 24) : "";
+      const actor = rawActor || t(locale, "Mesa", "Table", "Mesa");
+      const action = payload?.action;
+      if (action === "home_plus") point("A");
+      else if (action === "away_plus") point("B");
+      else if (action === "home_minus") subtractPoint("A");
+      else if (action === "away_minus") subtractPoint("B");
+      else if (action === "reset_set") resetSet();
+      else if (action === "reset_match") resetMatch();
+      else if (action === "swap_serve") setServe(state.serving === "A" ? "B" : "A");
+      else return;
+      flashCoActor(actor);
+      triggerCourtHaptics([25, 20, 25]);
+    };
+    return () => {
+      target.__vosApplyCoAdminAction = undefined;
+    };
+  });
 
   const flashScoutBar = (): void => {
     setScoutBar(true);
@@ -1157,8 +1319,28 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
       if (burstTimerRef.current) window.clearTimeout(burstTimerRef.current);
       if (scoutTimerRef.current) window.clearTimeout(scoutTimerRef.current);
+      if (coActorTimerRef.current) window.clearTimeout(coActorTimerRef.current);
     };
   }, []);
+
+  // v10.2.2 — room access mode + table nickname, persisted for every match.
+  const changeAccessMode = (mode: RoomAccessMode): void => {
+    setAccessMode(mode);
+    window.localStorage.setItem("volleyos.accessMode", mode);
+    triggerCourtHaptics(14);
+    setMessage(
+      mode === "open"
+        ? t(locale, "🍻 Todos Anotan: cualquier celular de la sala puede puntuar.", "🍻 Open Table: any phone in the room can score.", "🍻 Mesa Aberta: qualquer celular da sala pode pontuar.")
+        : mode === "coadmin"
+          ? t(locale, "🤝 Co-Admins: anotan los que tengan el link o el PIN.", "🤝 Co-Admins: link or PIN holders can score.", "🤝 Co-Admins: quem tem link ou PIN pontua.")
+          : t(locale, "👁️ Solo espectadores: solo el Host anota.", "👁️ Spectators only: only the Host scores.", "👁️ Só espectadores: só o Host pontua."),
+    );
+  };
+
+  const changeActorName = (name: string): void => {
+    setActorName(name);
+    window.localStorage.setItem("volleyos.actorName", name);
+  };
 
   const ttsLang = locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : "es-ES";
 
@@ -2441,6 +2623,11 @@ ${name}` : name))} testId="cancha-player-chips" />
         </div>
       ) : null}
       <p className="mt-2 text-[11px] text-white/60">{message}</p>
+      {coActor ? (
+        <p data-testid="coadmin-badge" className="mt-1 rounded-lg border border-emerald/40 bg-emerald/10 px-2 py-1 text-center text-[11px] font-black text-emerald">
+          ⚡ {t(locale, `Actualizado por ${coActor}`, `Updated by ${coActor}`, `Atualizado por ${coActor}`)}
+        </p>
+      ) : null}
       {scoutAlert && uiMode === "pro" && !soloTeams ? (
         <p
           data-testid="tactical-alert"
@@ -2565,6 +2752,11 @@ ${name}` : name))} testId="cancha-player-chips" />
           state={state}
           roomId={roomRef.current}
           hostSecret={secretRef.current}
+          accessMode={accessMode}
+          onAccessModeChange={changeAccessMode}
+          actorName={actorName}
+          onActorNameChange={changeActorName}
+          adminPin={adminPin}
           onClose={() => setCastOpen(false)}
           onActiveChange={setCastActive}
           onRelayChange={setCloudRelay}

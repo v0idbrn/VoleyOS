@@ -21,6 +21,9 @@ import { safeJsonParse } from "@/lib/security-shield";
 
 export type CastMode = "picadito" | "rey" | "oficial";
 
+/** v10.2.2 — who is allowed to score in a room. */
+export type RoomAccessMode = "spectator" | "coadmin" | "open";
+
 export interface LiveMatchPacket {
   roomId: string;
   seq: number;
@@ -43,6 +46,12 @@ export interface LiveMatchPacket {
   pubHash: string;
   /** 16-char SHA-256 signature computed with the hostSecret. */
   sig: string;
+  /** v10.2.2 — multi-admin co-scoring sync (optional, absent on old packets). */
+  revision?: number;
+  updatedAt?: number;
+  accessMode?: RoomAccessMode;
+  adminPin?: string;
+  lastActor?: string;
 }
 
 export const LAN_PORT = 8765;
@@ -164,6 +173,12 @@ export interface PacketOptions {
   homeColor?: string;
   awayColor?: string;
   lastEvent?: string;
+  /** v10.2.2 multi-admin fields. */
+  revision?: number;
+  updatedAt?: number;
+  accessMode?: RoomAccessMode;
+  adminPin?: string;
+  lastActor?: string;
 }
 
 /** Build + sign a packet from the live scoreboard state. */
@@ -188,6 +203,11 @@ export async function buildPacket(state: ScoreboardState, options: PacketOptions
       lastEvent: options.lastEvent ?? "",
       pubHash: "",
       sig: "",
+      ...(options.revision !== undefined ? { revision: options.revision } : {}),
+      ...(options.updatedAt !== undefined ? { updatedAt: options.updatedAt } : {}),
+      ...(options.accessMode !== undefined ? { accessMode: options.accessMode } : {}),
+      ...(options.adminPin !== undefined ? { adminPin: options.adminPin } : {}),
+      ...(options.lastActor !== undefined ? { lastActor: options.lastActor } : {}),
     },
     options.hostSecret,
   );
@@ -630,6 +650,27 @@ export function createHandoverUrl(packet: LiveMatchPacket, hostSecret: string): 
     snap: compactSnapshot(packet),
     secret: hostSecret,
   });
+  return `${PAGES_ORIGIN}/?${params.toString()}`;
+}
+
+/**
+ * v10.2.2 — 1-tap Co-Admin / Open-Table invite: the same room URL plus
+ * `role` + `mode` (and the 4-digit Admin PIN) so the joiner lands with
+ * scoring controls unlocked instead of a read-only spectator view.
+ */
+export function createCoAdminUrl(
+  packet: LiveMatchPacket,
+  accessMode: RoomAccessMode,
+  adminPin?: string,
+): string {
+  const params = new URLSearchParams({
+    room: packet.roomId,
+    pub: packet.pubHash,
+    snap: compactSnapshot(packet),
+    role: accessMode,
+    mode: accessMode === "open" ? "open" : "coadmin",
+  });
+  if (adminPin && /^\d{4}$/u.test(adminPin)) params.set("pin", adminPin);
   return `${PAGES_ORIGIN}/?${params.toString()}`;
 }
 

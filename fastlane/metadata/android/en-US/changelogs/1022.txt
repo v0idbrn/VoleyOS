@@ -1,0 +1,5 @@
+Multi-Admin: several phones score the same match at once (Co-Admins).
+🍻 "Everyone Scores" (Open Table): any connected phone can score, switch serve or undo.
+👤 Name at the Table + "⚡ Updated by who" badge on every remote play.
+Co-Admin link/QR with a 4-digit PIN; hotspot friends score from their browser on :8765.
+Conflict-free sync by revision counter across cloud rooms and the local court.

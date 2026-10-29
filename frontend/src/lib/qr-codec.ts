@@ -1,9 +1,39 @@
+export type RoomRole = "spectator" | "coadmin" | "open";
+
 export type ScannedPayload =
-  | { type: "live_room"; roomId: string; pubHash?: string; snap?: string }
+  | {
+      type: "live_room";
+      roomId: string;
+      pubHash?: string;
+      snap?: string;
+      /** v10.2.2 — `&role=coadmin` / `&mode=open` grant scoring on join. */
+      role?: RoomRole;
+      adminPin?: string;
+    }
   | { type: "handover"; roomId: string; handoverSecret?: string; snap?: string }
   | { type: "hotspot_url"; url: string }
   | { type: "device_id"; deviceId: string }
   | { type: "license_key"; licenseKey: string };
+
+/** v10.2.2 — extracts `role`/`mode`/`pin` from a live-room invite URL. */
+function roomExtras(params: URLSearchParams): { role?: RoomRole; adminPin?: string } {
+  const role = params.get("role");
+  const mode = params.get("mode");
+  const pin = params.get("pin") ?? params.get("adminPin");
+  const resolved: RoomRole | undefined =
+    mode === "open" || role === "open"
+      ? "open"
+      : role === "coadmin"
+        ? "coadmin"
+        : role === "spectator"
+          ? "spectator"
+          : undefined;
+  const cleanPin = pin && /^\d{4}$/u.test(pin) ? pin : undefined;
+  return {
+    ...(resolved ? { role: resolved } : {}),
+    ...(cleanPin ? { adminPin: cleanPin } : {}),
+  };
+}
 
 // ---- helpers shared across screens ----
 
@@ -59,6 +89,7 @@ export function parseScannedVoleyOSPayload(raw: string): ScannedPayload | null {
           roomId,
           pubHash: parsed.searchParams.get("pub") ?? undefined,
           snap: parsed.searchParams.get("snap") ?? undefined,
+          ...roomExtras(parsed.searchParams),
         };
       }
     }
@@ -66,7 +97,7 @@ export function parseScannedVoleyOSPayload(raw: string): ScannedPayload | null {
     // generic live-room code inside a URL (fallback)
     const code = parsed.searchParams.get("room");
     if (code && isValidRoomCode(code)) {
-      return { type: "live_room", roomId: code };
+      return { type: "live_room", roomId: code, ...roomExtras(parsed.searchParams) };
     }
   } catch {
     /* not a valid URL */

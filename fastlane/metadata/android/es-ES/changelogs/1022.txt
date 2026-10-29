@@ -1,0 +1,5 @@
+Multi-Admin: varias teléfonos anotan el mismo partido a la vez (Co-Admins).
+🍻 "Todos Anotan" (Mesa Abierta): cualquier celular conectado puede puntuar, cambiar el saque o deshacer.
+👤 Nombre en la Mesa + badge "⚡ Actualizado por quién" en cada jugada remota.
+Link/QR de Co-Admin con PIN de 4 dígitos; los amigos del hotspot puntúan desde su navegador en :8765.
+Sincronización sin conflictos por número de revisión en salas nube y en la cancha local.

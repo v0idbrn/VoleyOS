@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScoreboardStation } from "./stations";
 import { VolleyOSHub } from "./VolleyOSHub";
 import { MODULE_BY_SLUG } from "@/lib/modules";
+import { parseScannedVoleyOSPayload } from "@/lib/qr-codec";
 
 vi.mock("@/lib/sound-effects", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/sound-effects")>();
@@ -324,6 +325,7 @@ describe("v10.2 Cancha: hard-reset engine, set sync and native volume keys", () 
   });
 
   it("🔊 volume-key scoring arms the native bridge and window.__vosHardwareVolumeKey scores both columns", () => {
+    // kept below the v10.2.2 multi-admin suite
     const setVolumeKeyScoring = vi.fn();
     (window as unknown as { VoleyOSBridge?: unknown }).VoleyOSBridge = { setVolumeKeyScoring };
     renderBoard();
@@ -346,5 +348,88 @@ describe("v10.2 Cancha: hard-reset engine, set sync and native volume keys", () 
       win.__vosHardwareVolumeKey?.("down");
     });
     expect(screen.getByTestId("score-b").textContent).toContain("1");
+  });
+});
+
+describe("v10.2.2 multi-admin co-scoring & Todos Anotan", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.clearAllMocks();
+    Object.defineProperty(window, "speechSynthesis", {
+      value: { speak: vi.fn(), cancel: vi.fn() },
+      configurable: true,
+    });
+    Object.defineProperty(window, "SpeechSynthesisUtterance", { value: FakeUtterance, configurable: true });
+  });
+
+  afterEach(() => {
+    cleanup();
+    delete (window as unknown as { __vosApplyCoAdminAction?: unknown }).__vosApplyCoAdminAction;
+  });
+
+  it("switches the room between 👁️ Solo Mirar, 🤝 Co-Admins and 🍻 Todos Anotan", () => {
+    renderBoard();
+    fireEvent.click(screen.getByTestId("live-cast-open"));
+    expect(screen.getByTestId("live-cast-modal")).toBeTruthy();
+    expect(screen.getByTestId("live-access-mode-spectator").getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(screen.getByTestId("live-access-mode-open"));
+    expect(screen.getByTestId("live-access-mode-open").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("live-access-mode-spectator").getAttribute("aria-pressed")).toBe("false");
+    expect(window.localStorage.getItem("volleyos.accessMode")).toBe("open");
+
+    fireEvent.click(screen.getByTestId("live-access-mode-coadmin"));
+    expect(screen.getByTestId("live-access-mode-coadmin").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("live-access-mode-open").getAttribute("aria-pressed")).toBe("false");
+    expect(window.localStorage.getItem("volleyos.accessMode")).toBe("coadmin");
+
+    fireEvent.change(screen.getByTestId("live-actor-name"), { target: { value: "Tano" } });
+    expect(window.localStorage.getItem("volleyos.actorName")).toBe("Tano");
+  });
+
+  it("applies a higher-revision co-admin action and badges the co-scorer by name", () => {
+    renderBoard();
+    const win = window as unknown as {
+      __vosApplyCoAdminAction?: (payload: { action?: string; actor?: string }) => void;
+    };
+    expect(typeof win.__vosApplyCoAdminAction).toBe("function");
+
+    act(() => {
+      win.__vosApplyCoAdminAction?.({ action: "home_plus", actor: "Tano" });
+    });
+    expect(screen.getByTestId("score-a").textContent).toContain("1");
+    expect(screen.getByTestId("coadmin-badge").textContent).toContain("Tano");
+
+    act(() => {
+      win.__vosApplyCoAdminAction?.({ action: "away_plus", actor: "Amiga" });
+    });
+    expect(screen.getByTestId("score-b").textContent).toContain("1");
+
+    act(() => {
+      win.__vosApplyCoAdminAction?.({ action: "swap_serve", actor: "Mesa 1" });
+    });
+    act(() => {
+      win.__vosApplyCoAdminAction?.({ action: "reset_set", actor: "Mesa 1" });
+    });
+    expect(screen.getByTestId("score-a").textContent).toContain("0");
+    expect(screen.getByTestId("score-b").textContent).toContain("0");
+    expect(screen.getByTestId("coadmin-badge").textContent).toContain("Mesa 1");
+  });
+
+  it("parseScannedVoleyOSPayload preserves role=coadmin and mode=open", () => {
+    expect(
+      parseScannedVoleyOSPayload("https://voleyos.app/?room=CANCHA-ABCD&role=coadmin&pin=4321"),
+    ).toEqual({ type: "live_room", roomId: "CANCHA-ABCD", role: "coadmin", adminPin: "4321" });
+    expect(parseScannedVoleyOSPayload("https://voleyos.app/?room=CANCHA-EFGH&mode=open")).toEqual({
+      type: "live_room",
+      roomId: "CANCHA-EFGH",
+      role: "open",
+    });
+    expect(parseScannedVoleyOSPayload("https://example.com/invite?room=CANCHA-JKLM&role=coadmin&pin=0007")).toEqual({
+      type: "live_room",
+      roomId: "CANCHA-JKLM",
+      role: "coadmin",
+      adminPin: "0007",
+    });
   });
 });
