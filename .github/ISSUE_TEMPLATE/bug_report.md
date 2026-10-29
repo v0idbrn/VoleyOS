@@ -1,6 +1,6 @@
 ---
 name: Bug report / Reporte de error / Relato de erro
-about: Something is broken in VolleyOS
+about: Something is broken in VolleyOS / Algo falla en VolleyOS / Algo quebrou no VolleyOS
 title: "[bug] "
 labels: bug
 ---

@@ -2,7 +2,7 @@
 
 [English](README.md) · [Español](README.es.md) · **Português**
 
-[![Version](https://img.shields.io/badge/version-v10.1.2-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v10.2.3-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Módulos](https://img.shields.io/badge/módulos-61-FF3B5C?style=for-the-badge&color=EAB308)](#enciclopédia-dos-61-módulos)
 [![Offline](https://img.shields.io/badge/100%25-offline--primeiro-FF3B5C?style=for-the-badge&color=EAB308)](#por-que-o-volleyos-existe)
 [![Android](https://img.shields.io/badge/APK%20Android-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -13,6 +13,15 @@
 [![Download APK](https://img.shields.io/badge/APK-voleyos--universal.apk-FF3B5C?style=for-the-badge&logo=android)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
 
 APK universal assinado, construído pelo GitHub Actions a cada tag `v*`. Android 7.0+ (minSdk 24), trilíngue, offline primeiro, sem contas e sem telemetria. Pronto para F-Droid.
+
+## 🆕 Novidades da v10.2.3 — Escudo e quadra conectada
+
+- **🏆 Escudo completo do VoleyOS**: acabou o círculo de preenchimento — losango obsidiana, medalhão carmesim, bola de vôlei com costuras, pico V branco e vermelho e a pílula VOLEY/OS no ícone adaptativo, nos 10 PNGs de densidade e nos ícones web.
+- **🛡️ Play Protect 100% limpo**: sumiu a permissão CÂMERA e todos os hooks de permissão da WebView; o leitor QR abre direto em *Enviar Foto do QR* e *Colar Código / ID em 1 Toque*, e a pontuação pelas teclas de volume usa `onKeyDown`/`onKeyUp` padrão (v10.2.1).
+- **📱 Um "Modo Simple" de verdade**: em celulares e navegadores começa com 3 abas (Cancha, Picadito & Amigos, Ajustes) e oculta a grade de 61 módulos, o Quadro, o Lab & IA, as faixas de perfil e a barra de busca técnica; o *Modo Pro* devolve o app completo. Também corrige o ícone que faltava no launcher do Android 8–14 (v10.1.3).
+- **🖍️ Placar da Cancha renovado**: Novo Jogo e Reiniciar Set com um toque sempre no topo, editor de pontos/sets sincronizado com o contador e o histórico, banners de vencedor e de set vencido com Revanche / Nova Partida / Desfazer, além do distintivo SACA, botões −1 e chips rápidos (v10.2.0).
+- **👥 Co-arbitragem multi-admin**: vários celulares anotam o mesmo jogo ao mesmo tempo, ou você abre a sala para *Todos Anotam* (Mesa Aberta) e qualquer celular conectado anota, troca o saque ou desfaz — em salas na nuvem ou no hotspot `:8765`, com sincronização sem conflitos por número de revisão (v10.2.2).
+- **Mantém tudo do v10.1.2/v10.1.0/v10.0.x**: leitor QR nativo, desbloqueio PRO tela a tela, áudio unificado da quadra, placar Simples/Pro, cofre Olympus Titan, micro-scout ao vivo e overlay de TV.
 
 ## 🆕 Novidades da v10.1.2 — Edição pronta para a quadra
 

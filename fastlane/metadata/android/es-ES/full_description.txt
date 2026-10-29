@@ -31,12 +31,12 @@ QUÉ INCLUYE
 • Pase de plantilla: 6-14 jugadores, hasta dos líberos, dorsales únicos y control de capitán.
 • Inspector de equipo: alturas FIVB de red, tolerancia por lado, presión indoor/playa y apilado de balones.
 • Póster de partido: SVG escapado en 1080x1920 y 1080x1080 con temas y sello HMAC.
-- Radar de saque: velocidad inicial, clase de saque y margen de reaccion.
-- Matriz de matchup 6x6: mejor y peor rotacion inicial.
+- Radar de saque: velocidad inicial, clase de saque y margen de reacción.
+- Matriz de matchup 6x6: mejor y peor rotación inicial.
 - Laboratorio de block-out: mano afuera, costura y reciclaje con EV.
-- Planificador de practicas: bloques y grupos para 4-24 jugadores.
+- Planificador de prácticas: bloques y grupos para 4-24 jugadores.
 - Narrador play-by-play: feed clutch y resumen ES/EN/PT.
-- Pasaporte de progreso: deltas atleticos, indice y cuello de botella.
+- Pasaporte de progreso: deltas atléticos, índice y cuello de botella.
 • Salas en vivo: persistencia SQLite WAL, token de administración y lectura pública.
 
 HECHO PARA CANCHAS REALES

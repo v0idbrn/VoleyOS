@@ -1,4 +1,4 @@
-- APK universal firmada con el keystore de produccion persistente: las actualizaciones se instalan encima sin desinstalar.
-- Corregido el recuento de modulos en el hub y en la ficha de la tienda: 48 en ES, EN y PT.
-- Build reproducible: verificacion automatica del payload web (chunks de Next.js) y de la huella SHA-256 del certificado.
-- 48 modulos, 74 pruebas frontend y 440+ pruebas backend.
+- APK universal firmada con el keystore de producción persistente: las actualizaciones se instalan encima sin desinstalar.
+- Corregido el recuento de módulos en el hub y en la ficha de la tienda: 48 en ES, EN y PT.
+- Build reproducible: verificación automática del payload web (chunks de Next.js) y de la huella SHA-256 del certificado.
+- 48 módulos, 74 pruebas frontend y 440+ pruebas backend.

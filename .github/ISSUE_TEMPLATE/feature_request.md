@@ -1,6 +1,6 @@
 ---
 name: Feature request / Solicitud de función / Pedido de recurso
-about: Suggest a volleyball workflow or improvement
+about: Suggest a volleyball workflow or improvement / Propón un flujo de vóley o una mejora / Sugira um fluxo de vôlei ou uma melhoria
 title: "[feat] "
 labels: enhancement
 ---

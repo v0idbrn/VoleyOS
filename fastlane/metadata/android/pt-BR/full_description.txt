@@ -31,12 +31,12 @@ O QUE INCLUI
 • Passe de elenco: 6-14 jogadores, até dois líberos, números únicos e checagem de capitão.
 • Inspetor de equipamento: alturas FIVB de rede, tolerância por lado, pressão indoor/praia e empilhamento de bolas.
 • Pôster de partida: SVG escapado em 1080x1920 e 1080x1080 com temas e selo HMAC.
-- Radar de saque: velocidade inicial, classe e margem de reacao.
-- Matriz de matchup 6x6: melhor e pior rotacao inicial.
-- Laboratorio de block-out: mao fora, costura e reciclagem com EV.
+- Radar de saque: velocidade inicial, classe e margem de reação.
+- Matriz de matchup 6x6: melhor e pior rotação inicial.
+- Laboratorio de block-out: mão fora, costura e reciclagem com EV.
 - Planejador de treinos: blocos e grupos para 4-24 jogadores.
 - Narrador play-by-play: feed clutch e resumo ES/EN/PT.
-- Passaporte de progresso: deltas, indice e gargalo.
+- Passaporte de progresso: deltas, índice e gargalo.
 • Salas ao vivo: persistência SQLite WAL, token de administração e leitura pública.
 
 FEITO PARA QUADRAS REAIS

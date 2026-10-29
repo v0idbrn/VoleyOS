@@ -1,5 +1,5 @@
-Multi-Admin: varios celulares anotam o mesmo jogo ao vivo (Co-Admins).
+Multi-Admin: vários celulares anotam o mesmo jogo ao vivo (Co-Admins).
 🍻 "Todos Anotam" (Mesa Aberta): qualquer celular conectado pode pontuar, trocar o saque ou desfazer.
 👤 Nome na Mesa + selo "⚡ Atualizado por quem" em cada jogada remota.
-Link/QR de Co-Admin com PIN de 4 digitos; amigos do hotspot pontuam pelo navegador em :8765.
-Sincronizacao sem conflitos por numero de revisao em salas cloud e na quadra local.
+Link/QR de Co-Admin com PIN de 4 dígitos; amigos do hotspot pontuam pelo navegador em :8765.
+Sincronização sem conflitos por número de revisão em salas cloud e na quadra local.

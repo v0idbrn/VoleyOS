@@ -2,7 +2,7 @@ blank_issues_enabled: false
 contact_links:
   - name: Security advisory / Aviso de seguridad / Aviso de segurança
     url: https://github.com/v0idbrn/VoleyOS/security/advisories/new
-    about: Report vulnerabilities privately. No abras un issue público.
+    about: Report vulnerabilities privately. No abras un issue público. Não abra um issue público.
   - name: Documentation / Documentación / Documentação
     url: https://github.com/v0idbrn/VoleyOS#readme
-    about: Setup, gates, API and module docs. English, Español, Português.
+    about: Setup, gates, API and module docs / Configuración, compuertas, API y módulos / Configuração, gates, API e módulos — English, Español, Português.

@@ -1,5 +1,5 @@
-Auditoria E2E completa: 61 modulos verificados um a um, zero botoes mortos.
+Auditoria E2E completa: 61 módulos verificados um a um, zero botões mortos.
 Ponte nativa de copiar e baixar dentro do APK.
-Dialogos JS (alert/confirm/prompt) visiveis no WebView e permissoes de camera tratadas.
-Normalizacao do Device ID no Keygen para nenhuma licenca falhar.
+Diálogos JS (alert/confirm/prompt) visíveis no WebView e permissões de câmera tratadas.
+Normalização do Device ID no Keygen para nenhuma licença falhar.
 Testes interativos automatizados dos fluxos principais.

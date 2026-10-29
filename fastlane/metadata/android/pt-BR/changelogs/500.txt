@@ -1,4 +1,4 @@
-- Seis modulos novos: radar de saque, matriz de matchup, block-out, planejador, narrador e passaporte.
+- Seis módulos novos: radar de saque, matriz de matchup, block-out, planejador, narrador e passaporte.
 - UI movel world-class: telemetria, dock de perfis, vista bento/lista, wake lock, voz e haptica.
 - APK universal assinado gerado pelo GitHub Actions.
-- 36 modulos, 62 testes frontend e mais de 360 testes backend.
+- 36 módulos, 62 testes frontend e mais de 360 testes backend.

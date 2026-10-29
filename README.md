@@ -2,7 +2,7 @@
 
 [English](README.md) · [Español](README.es.md) · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v10.1.2-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v10.2.3-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Modules](https://img.shields.io/badge/modules-61-FF3B5C?style=for-the-badge&color=EAB308)](#encyclopedia-of-the-61-modules)
 [![Offline](https://img.shields.io/badge/100%25-offline--first-FF3B5C?style=for-the-badge&color=EAB308)](#why-volleyos-exists)
 [![Android](https://img.shields.io/badge/Android%20APK-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -13,6 +13,15 @@
 [![Download APK](https://img.shields.io/badge/APK-voleyos--universal.apk-FF3B5C?style=for-the-badge&logo=android)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
 
 Signed universal APK built by GitHub Actions on every `v*` tag. Android 7.0+ (minSdk 24), trilingual, offline-first, no accounts and no telemetry. F-Droid ready.
+
+## 🆕 What's new in v10.2.3 — Crest Edition
+
+- **🏆 Full VoleyOS crest icon**: the placeholder circle is gone — obsidian diamond, crimson medallion, seamed volleyball, white-and-red V-spike and the VOLEY/OS wordmark on the adaptive icon, all 10 density PNGs and the web icons.
+- **🛡️ 100% Play Protect clean**: the CAMERA permission and every WebView permission-granting hook are gone; the QR scanner opens straight into *Upload QR Photo* / *Paste Code in 1 Tap*, and volume-key scoring runs on standard `onKeyDown`/`onKeyUp` (v10.2.1).
+- **📱 A really simple 'Modo Simple'**: phones and browsers now start with a 3-tab experience (Cancha, Picadito & Amigos, Ajustes) and hide the 61-module grid, Pizarra, Lab & IA, role banners and the technical search bar; 'Modo Pro' restores the full app. It also fixes the missing launcher icon on Android 8–14 (v10.1.3).
+- **🖍️ Renovated Cancha scoreboard**: New Match and Reset Set one tap away at the top, a points/sets editor synced with the set counter and set history, match-winner and set-won banners with Rematch / New Match / Undo, plus the SACA badge, −1 buttons and quick chips (v10.2.0).
+- **👥 Multi-admin co-scoring**: several phones score the same match at once, or open the room to *Everyone Scores* (Open Table) so any connected phone can score, switch serve or undo — over cloud rooms or the `:8765` hotspot, with conflict-free revision-number sync (v10.2.2).
+- **Keeps everything from v10.1.2/v10.1.0/v10.0.x**: native QR scanner, screen-to-screen PRO unlock, unified court audio, Simple/Pro board, Olympus Titan vault, live micro-scout and the TV overlay.
 
 ## 🆕 What's new in v10.1.2 — Court-Ready Edition
 

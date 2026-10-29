@@ -357,9 +357,9 @@ export function QRScannerModal({ locale, onScanSuccess, onClose }: QRScannerModa
           <p className="text-[10px] leading-relaxed text-white/50">
             {t(
               locale,
-              "Se escanean los códigos en vivo cada 180 ms.\nAparece pantalla completa en el teléfono y, en el navegador, solo se abre tras que el usuario acepte la cámara.",
+              "Se escanean los códigos en vivo cada 180 ms.\nAparece pantalla completa en el teléfono y, en el navegador, solo se abre cuando el usuario acepta la cámara.",
               "Codes are scanned live every 180 ms.\nOn the phone it opens fullscreen; in the browser it only opens after the user accepts the camera.",
-              "Os códigos escáneranse en vivo a cada 180 ms.\nNo telemóvel abrese a pantalla cheia e, no navegador, só aberse derrda o usuário acepta a cámara.",
+              "Os códigos são escaneados ao vivo a cada 180 ms.\nAbre em tela cheia no celular e, no navegador, só abre depois que o usuário aceita a câmera.",
             )}
           </p>
         </div>

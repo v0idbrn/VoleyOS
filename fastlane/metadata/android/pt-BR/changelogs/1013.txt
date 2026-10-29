@@ -1,8 +1,8 @@
-v10.1.3 — Android 14 adaptive launcher icon and truly simple 'Modo Simple' UI.
+v10.1.3 — Ícone adaptativo no Android 14 e uma "Modo Simple" realmente simples.
 
-- Fix missing app launcher icon on Android 8–14: regenerate adaptive icon foreground bitmap and restamp mipmap-anydpi-v26 wiring.
-- Make 'Modo Simple' actually simple: on phones and browsers it now defaults to a 3-tab experience (Cancha, Picadito & Amigos, Ajustes) and hides the 61-module grid, Pizarra, Lab & IA, role banners and technical search bar.
-- In Cancha, 'Modo Simple' hides the 6-player rotation diagram, scouting tagger, telemetry drawers and pro rule panels by default; 'Modo Pro' restores the full 61-module app.
-- Default mode on real devices and browsers is now Simple; automated tests keep Pro on first mount so existing coverage still passes.
+- Corrige o ícone da tela inicial ausente no Android 8–14: regenera o bitmap de primeiro plano do ícone adaptativo e reestampa a ligação do mipmap-anydpi-v26.
+- Deixa o "Modo Simple" realmente simples: em celulares e navegadores ele agora abre por padrão em 3 abas (Cancha, Picadito & Amigos, Ajustes) e oculta a grade de 61 módulos, o Quadro, o Lab & IA, as faixas de perfil e a barra de busca técnica.
+- Na Cancha, o "Modo Simple" oculta por padrão o diagrama de rotação de 6 jogadores, o etiquetador de scouting, as gavetas de telemetria e os painéis de regras pro; o "Modo Pro" devolve o app completo com 61 módulos.
+- O modo padrão em aparelhos e navegadores reais agora é o Simple; os testes automatizados mantêm o Pro na primeira montagem para que a cobertura existente continue passando.
 
-Código: AGPL-3.0-or-later · Sin telemetría · Offline primero
+Código: AGPL-3.0-or-later · Sem telemetria · Offline primeiro

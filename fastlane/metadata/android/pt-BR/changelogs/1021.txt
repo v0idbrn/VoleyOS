@@ -1,5 +1,5 @@
-100% Play Protect limpo: o app nao solicita nem modifica permissoes do Android.
-Removida a permissao CAMERA e todos os hooks de permissao da WebView.
-O leitor QR agora abre direto em Enviar Foto do QR e Colar Codigo / ID em 1 Toque.
-A pontuacao pelas teclas de volume continua igual, agora com onKeyDown/onKeyUp padrao.
+100% Play Protect limpo: o app não solicita nem modifica permissões do Android.
+Removida a permissão CÂMERA e todos os hooks de permissão da WebView.
+O leitor QR agora abre direto em Enviar Foto do QR e Colar Código / ID em 1 Toque.
+A pontuação pelas teclas de volume continua igual, agora com onKeyDown/onKeyUp padrão.
 versionCode 1021.

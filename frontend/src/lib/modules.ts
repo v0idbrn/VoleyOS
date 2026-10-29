@@ -607,7 +607,7 @@ export const MODULES: ModuleMeta[] = [
     tagline: {
       es: "Acta A4 impresa con sets, cambios, sanciones y firmas.",
       en: "Printable A4 acta with sets, subs, sanctions and signatures.",
-      pt: "Ata A4 impressa com sets, subs, sancoes e assinaturas.",
+      pt: "Ata A4 impressa com sets, subs, sanções e assinaturas.",
     },
   },
   {
@@ -663,9 +663,9 @@ export const MODULES: ModuleMeta[] = [
     number: 55,
     icon: "🛡️",
     profiles: ["coaches"],
-    name: { es: "Prehab de Lesiones", en: "Injury Prehab", pt: "Prehab de Lesoes" },
+    name: { es: "Prehab de Lesiones", en: "Injury Prehab", pt: "Prehab de Lesões" },
     tagline: {
-      es: "Riesgo de hombro y rodilla con carga, sueno y dolor.",
+      es: "Riesgo de hombro y rodilla con carga, sueño y dolor.",
       en: "Shoulder and knee risk from load, sleep and pain.",
       pt: "Risco de ombro e joelho com carga, sono e dor.",
     },
@@ -691,7 +691,7 @@ export const MODULES: ModuleMeta[] = [
     tagline: {
       es: "Siembra por ranking y llaves hasta la final sin cruces repetidos.",
       en: "Rank seeding and brackets to the final without repeat pairings.",
-      pt: "Sementeira por ranking e chaves ate a final sem cruzamentos repetidos.",
+      pt: "Sementeira por ranking e chaves até a final sem cruzamentos repetidos.",
     },
   },
   {
@@ -703,7 +703,7 @@ export const MODULES: ModuleMeta[] = [
     tagline: {
       es: "Impresiones, alcance y valor por formato en moneda local.",
       en: "Impressions, reach and value per format in local currency.",
-      pt: "Impressoes, alcance e valor por formato em moeda local.",
+      pt: "Impressões, alcance e valor por formato em moeda local.",
     },
   },
   {

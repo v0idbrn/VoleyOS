@@ -300,7 +300,7 @@ const MODULE_FACTS: Record<string, LArr> = {
     ["Placar gigante em paisagem legível a 30 metros.", "Mostra sets, sets anteriores, saque e cronômetro da partida.", "Abre em tela cheia e respeita o bloqueio de rotação do celular."],
   ),
   "fivb-escoresheet": la(
-    ["Acta electrónica con sets Bo3/Bo5, cambios y sanciones.", "Firmas de capitanes y árbitros en una hoja A4 imprimible.", "Exporta el parte oficial sin conexion."],
+    ["Acta electrónica con sets Bo3/Bo5, cambios y sanciones.", "Firmas de capitanes y árbitros en una hoja A4 imprimible.", "Exporta el parte oficial sin conexión."],
     ["Electronic scoresheet with Bo3/Bo5 sets, subs and sanctions.", "Captain and referee signatures on a printable A4 sheet.", "Exports the official record offline."],
     ["Súmula eletrônica com sets Bo3/Bo5, substituições e sanções.", "Assinaturas de capitães e árbitros em folha A4 imprimível.", "Exporta o registro oficial sem conexão."],
   ),
@@ -310,7 +310,7 @@ const MODULE_FACTS: Record<string, LArr> = {
     ["Carrega video da galeria e avança quadro a quadro.", "Mede tempo de voo e salto com h = 1/8 g t2.", "Desenha vetores e ângulos sobre o video e exporta com selo."],
   ),
   "playbook-animator": la(
-    ["Anima saque, transicao e ataque en tres fases.", "Usa la plantilla activa y las seis zonas del campo.", "Exporta la secuencia como SVG para la pizarra."],
+    ["Anima saque, transición y ataque en tres fases.", "Usa la plantilla activa y las seis zonas del campo.", "Exporta la secuencia como SVG para la pizarra."],
     ["Animates serve, transition and attack in three phases.", "Uses the active roster and the six court zones.", "Exports the sequence as SVG for the chalkboard."],
     ["Anima saque, transição e ataque em três fases.", "Usa o elenco ativo e as seis zonas da quadra.", "Exporta a sequência como SVG para o quadro."],
   ),

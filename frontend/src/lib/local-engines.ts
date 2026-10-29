@@ -2346,7 +2346,7 @@ export const FAN_QUESTIONS: FanQuestion[] = [
     explanation: {
       es: "El set sigue hasta que un equipo saca dos puntos.",
       en: "The set continues until a team leads by two.",
-      pt: "O set continua ate uma equipe abrir dois pontos.",
+      pt: "O set continua até uma equipe abrir dois pontos.",
     },
     rule: "FIVB 6.2",
   },
@@ -4164,8 +4164,8 @@ export function buildArenaCue(input: { event: ArenaEvent }): {
     MONSTER_BLOCK: { frequenciesHz: [110, 82, 55], durationsMs: [180, 180, 260], waveform: "square", visualBannerText: { es: "MURO TOTAL", en: "WALL OF STEEL", pt: "MURO TOTAL" }, intensity: 5 },
     SUPER_SPIKE: { frequenciesHz: [330, 440, 660], durationsMs: [120, 120, 200], waveform: "sawtooth", visualBannerText: { es: "REVISA EL TECHO", en: "CHECK THE ROOF", pt: "OLHA O TETO" }, intensity: 4 },
     ACE_SIREN: { frequenciesHz: [660, 880, 1320], durationsMs: [150, 150, 300], waveform: "sine", visualBannerText: { es: "ACE DIRECTO", en: "ACE INCOMING", pt: "ACE DIRETO" }, intensity: 4 },
-    VIDEO_CHALLENGE_SUSPENSE: { frequenciesHz: [220, 220, 220], durationsMs: [220, 220, 440], waveform: "triangle", visualBannerText: { es: "OJO DE HALCON", en: "HAWK EYE REVIEW", pt: "OLHO DE FALCAO" }, intensity: 3 },
-    SET_POINT_HEARTBEAT: { frequenciesHz: [60, 55, 60], durationsMs: [180, 120, 260], waveform: "sine", visualBannerText: { es: "BALON DE SET", en: "SET POINT", pt: "BOLA DE SET" }, intensity: 5 },
+    VIDEO_CHALLENGE_SUSPENSE: { frequenciesHz: [220, 220, 220], durationsMs: [220, 220, 440], waveform: "triangle", visualBannerText: { es: "OJO DE HALCÓN", en: "HAWK EYE REVIEW", pt: "OLHO DE FALCÃO" }, intensity: 3 },
+    SET_POINT_HEARTBEAT: { frequenciesHz: [60, 55, 60], durationsMs: [180, 120, 260], waveform: "sine", visualBannerText: { es: "BALÓN DE SET", en: "SET POINT", pt: "BOLA DE SET" }, intensity: 5 },
   };
   return { ...table[input.event], event: input.event, message: `Cue ${input.event}.` };
 }

@@ -1,4 +1,4 @@
 - Doze motores novos: aerodinamica, cortador de highlights, dossie, simulador de sistemas, leitor de engano, regulamento adaptado, ELO, tesouraria, regras da casa, Arena DJ, girias e QR.
-- Favoritos fixados, dock de perfis e hub de 48 modulos em ES, EN e PT.
+- Favoritos fixados, dock de perfis e hub de 48 módulos em ES, EN e PT.
 - APK universal assinada pelo GitHub Actions.
-- 48 modulos, 74 testes frontend e 440+ testes backend.
+- 48 módulos, 74 testes frontend e 440+ testes backend.

@@ -1,5 +1,5 @@
 Placar Cancha renovado: botões de novo jogo e reiniciar set com um toque, sempre no topo.
-O editor de pontos/sets sincroniza o contador de set (SET = sets + 1) e o histórico, entao nunca trava.
+O editor de pontos/sets sincroniza o contador de set (SET = sets + 1) e o histórico, então nunca trava.
 Banners de vencedor e de set vencido com Revanche, Nova Partida e Desfazer.
-Pontue com os botões de volume fisico (Vol+ esquerda, Vol- direita) e setas do teclado; arma sozinho no Modo Bolso.
-Distintivo SACA tocavel em cada time, botoes -1 e chips rapidos de faculdades/clubes.
+Pontue com os botões de volume físico (Vol+ esquerda, Vol- direita) e setas do teclado; arma sozinho no Modo Bolso.
+Distintivo SACA tocável em cada time, botões -1 e chips rápidos de faculdades/clubes.
