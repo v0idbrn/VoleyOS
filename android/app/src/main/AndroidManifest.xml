@@ -3,16 +3,11 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="org.voleyos.global">
 
+    <!-- v10.2.1: Play Protect compliance. Only normal, install-time
+         permissions — no CAMERA, no runtime permission requests anywhere. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Offline QR scanner + telestrator: camera capture inside the WebView. -->
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:allowBackup="false"

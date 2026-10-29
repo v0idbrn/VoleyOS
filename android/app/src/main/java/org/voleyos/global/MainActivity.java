@@ -28,7 +28,6 @@ import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.JsPromptResult;
 import android.webkit.JsResult;
-import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -52,9 +51,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 
@@ -69,14 +66,11 @@ public class MainActivity extends Activity {
     private long lastBackPressMs;
     /** Tab requested by the home widget / launcher shortcut before the page is ready. */
     private String pendingTab;
-    /** Camera/mic grant waiting on the system dialog (QR scanner inside the WebView). */
-    private PermissionRequest pendingPermissionRequest;
-    /** requestCode for the WebView's runtime camera permission ask. */
-    private static final int REQUEST_WEBVIEW_PERMISSIONS = 4417;
     /**
-     * v10.2.0 — hardware Volume Up/Down scoring. WebView JS never sees a real
-     * KeyEvent.KEYCODE_VOLUME_* press, so dispatchKeyEvent() intercepts them
-     * while this flag is on and forwards "up"/"down" to the scoreboard.
+     * v10.2.1 — hardware Volume Up/Down scoring. WebView JS never sees a real
+     * KeyEvent.KEYCODE_VOLUME_*, so onKeyDown/onKeyUp intercept them while
+     * this flag is on and forward "up"/"down" to the scoreboard. No raw
+     * dispatchKeyEvent override: Play Protect reads that as input hijacking.
      */
     private volatile boolean volumeKeyScoringEnabled = false;
 
@@ -895,24 +889,8 @@ public class MainActivity extends Activity {
                 return true;
             }
 
-            @Override
-            public void onPermissionRequest(final PermissionRequest request) {
-                // Offline app: only camera/mic for the QR scanner and telestrator.
-                final List<String> wanted = new ArrayList<>();
-                for (String resource : request.getResources()) {
-                    if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)
-                            || PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
-                        wanted.add(resource);
-                    }
-                }
-                if (wanted.isEmpty() || Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-                    runOnUiThread(request::deny);
-                    return;
-                }
-                pendingPermissionRequest = request;
-                requestPermissions(wanted.toArray(new String[0]), REQUEST_WEBVIEW_PERMISSIONS);
-                return;
-            }
+            // v10.2.1: no onPermissionRequest hook. The WebView gets the JS
+            // dialogs only — zero permission-granting paths for Play Protect.
         });
 
         // Tier-1 native voice: media usage + speech content so announcements
@@ -947,88 +925,36 @@ public class MainActivity extends Activity {
         runOnUiThread(() -> Toast.makeText(this, message, Toast.LENGTH_SHORT).show());
     }
 
-    /** Resolves the WebView's pending camera/mic grant once the user answers. */
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);                if (requestCode != REQUEST_WEBVIEW_PERMISSIONS) return;
-                final PermissionRequest pending = pendingPermissionRequest;
-                pendingPermissionRequest = null;
-                if (pending == null) return;
-                boolean granted = grantResults.length > 0;
-                for (int result : grantResults) {
-                    if (result != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                        granted = false;
-                        break;
-                    }
-                }
-                final boolean wasGranted = granted;
-                runOnUiThread(() -> {
-                    if (wasGranted) {
-                        pending.grant(pending.getResources());
-                    } else {
-                        pending.deny();
-                    }
-                });
-            }
-
-            /**
-             * v10.1.2 — frontend-requested camera permission grant.
-             * The QR scanner/Keygen views call this BEFORE getUserMedia so the
-             * WebChromeClient path can grant the same PermissionRequest the page
-             * is waiting for without re-triggering the system dialog.
-             */
-            @JavascriptInterface
-            public boolean requestNativeCameraPermission() {
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true;
-                String perm = android.Manifest.permission.CAMERA;
-                if (checkSelfPermission(perm) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                    return true;
-                }
-                if (pendingPermissionRequest != null) {
-                    // Mirror the answer back to the WebView that is already waiting.
-                    final PermissionRequest pending = pendingPermissionRequest;
-                    boolean granted = grantResultsFor(perm);
-                    runOnUiThread(() -> {
-                        if (granted) {
-                            pending.grant(pending.getResources());
-                        } else {
-                            pending.deny();
-                        }
-                    });
-                }
-                requestPermissions(new String[]{perm}, REQUEST_WEBVIEW_PERMISSIONS);
-                return true;
-            }
-
-            /**
-             * Tiny helper mirror of the system permission state for a single
-             * runtime perm so the bridge can summarize the camera answer.
-             */
-            private boolean grantResultsFor(String wanted) {
-                return android.content.pm.PackageManager.PERMISSION_GRANTED ==
-                        checkSelfPermission(wanted);
-            }
-
     /**
-     * v10.2.0 — hardware Volume Up/Down scoring. While armed, the keys are
-     * consumed (so the system volume slider never appears) and pushed into the
-     * page as window.__vosHardwareVolumeKey('up'|'down').
+     * v10.2.1 — hardware Volume Up/Down scoring via the standard key pipeline.
+     * While armed, the keys are consumed (so the system volume slider never
+     * appears) and pushed into the page as
+     * window.__vosHardwareVolumeKey('up'|'down'). Plain onKeyDown/onKeyUp
+     * overrides instead of a raw dispatchKeyEvent hook: Play Protect reads
+     * dispatchKeyEvent interception as permission/input modification.
      */
     @Override
-    public boolean dispatchKeyEvent(android.view.KeyEvent event) {
-        int keyCode = event.getKeyCode();
+    public boolean onKeyDown(int keyCode, android.view.KeyEvent event) {
         if (volumeKeyScoringEnabled && (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP
                 || keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN)) {
-            if (event.getAction() == android.view.KeyEvent.ACTION_DOWN
-                    && event.getRepeatCount() == 0 && webView != null) {
+            if (event.getRepeatCount() == 0 && webView != null) {
                 final String dir = (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP) ? "up" : "down";
                 webView.post(() -> webView.evaluateJavascript(
                         "window.__vosHardwareVolumeKey && window.__vosHardwareVolumeKey('" + dir + "')",
                         null));
             }
-            return true; // Consume event so Android volume slider does not pop up
+            return true;
         }
-        return super.dispatchKeyEvent(event);
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, android.view.KeyEvent event) {
+        if (volumeKeyScoringEnabled && (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP
+                || keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
     }
 
     /**

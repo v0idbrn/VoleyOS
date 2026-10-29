@@ -1,0 +1,5 @@
+100% Play Protect clean: the app no longer requests or modifies Android permissions.
+Removed the CAMERA permission and every WebView permission-granting hook.
+The QR scanner now opens straight into Upload QR Photo and Paste Code / ID in 1 Tap.
+Hardware volume-key scoring is unchanged, now on standard onKeyDown/onKeyUp.
+versionCode 1021.

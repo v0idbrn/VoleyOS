@@ -12,9 +12,22 @@ type BridgeWindow = Window & {
   VoleyOSBridge?: {
     triggerHapticPattern?: (pattern: string) => void;
     playScorePop?: (volume: number) => void;
-    requestNativeCameraPermission?: () => boolean;
   };
+  VosleyOSBridge?: unknown;
 };
+
+/**
+ * v10.2.1 — the APK ships without the CAMERA permission (Play Protect
+ * compliance), so inside the native WebView — or anywhere getUserMedia is
+ * missing — we never open a live stream and go straight to the
+ * upload-photo + paste-code interface. No permission prompt, no error.
+ */
+function cameraUnavailableInThisShell(): boolean {
+  if (typeof window === "undefined") return false;
+  const bridge = window as BridgeWindow;
+  if (Boolean(bridge.VoleyOSBridge) || Boolean(bridge.VosleyOSBridge)) return true;
+  return !(typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia));
+}
 
 interface QRScannerModalProps {
   locale: Locale;
@@ -28,6 +41,7 @@ export function QRScannerModal({ locale, onScanSuccess, onClose }: QRScannerModa
   const [scanned, setScanned] = useState<string | null>(null);
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [cameraSkipped, setCameraSkipped] = useState(false);
   const frameRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const lastId = useRef("");
@@ -42,6 +56,11 @@ export function QRScannerModal({ locale, onScanSuccess, onClose }: QRScannerModa
     stop();
     setScanError(null);
     setScanned(null);
+    if (cameraUnavailableInThisShell()) {
+      setCameraSkipped(true);
+      return;
+    }
+    setCameraSkipped(false);
     try {
       const media = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: facing } },
@@ -178,17 +197,20 @@ export function QRScannerModal({ locale, onScanSuccess, onClose }: QRScannerModa
 
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  const takePhotoOrUpload = useCallback(() => {
-    fileRef.current = document.createElement("input");
-    fileRef.current.type = "file";
-    fileRef.current.accept = "image/*";
-    fileRef.current.capture = "environment";
-    fileRef.current.onchange = (e) => {
+  const takePhotoOrUpload = useCallback((withCapture = true) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    // v10.2.1: no capture hint inside the permission-less APK — the plain
+    // gallery/file picker is the path there, never a camera intent.
+    if (withCapture) input.capture = "environment";
+    input.onchange = (e) => {
       const entry = e.target as HTMLInputElement;
       const file = entry.files?.[0];
       if (file) handleFile(file);
     };
-    fileRef.current.click();
+    input.click();
+    fileRef.current = input;
   }, [handleFile]);
 
   const pasteNow = useCallback(async () => {
@@ -279,6 +301,31 @@ export function QRScannerModal({ locale, onScanSuccess, onClose }: QRScannerModa
                 🔄 {t(locale, "Cambiar cámara", "Flip camera", "Mutar câmera")}
               </button>
             </>
+          ) : cameraSkipped ? (
+            <div data-testid="qr-manual-fallback" className="flex h-full flex-col items-center justify-center gap-2 px-4">
+              <button
+                type="button"
+                onClick={() => takePhotoOrUpload(false)}
+                className="w-full rounded-xl border border-volt/50 bg-volt/15 px-3 py-3 text-[12px] font-black uppercase tracking-wider text-volt"
+              >
+                📤 {t(locale, "Subir Foto del QR", "Upload QR Photo", "Enviar Foto do QR")}
+              </button>
+              <button
+                type="button"
+                onClick={pasteNow}
+                className="w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2.5 text-[12px] font-black uppercase tracking-wider text-white"
+              >
+                📋 {t(locale, "Pegar Código / ID en 1 Toque", "Paste Code / ID in 1 Tap", "Colar Código / ID em 1 Toque")}
+              </button>
+              <p className="text-center text-[9px] leading-snug text-white/45">
+                {t(
+                  locale,
+                  "Sin cámara: subí una foto del QR o pegá el código.",
+                  "No camera: upload a QR photo or paste the code.",
+                  "Sem câmera: envie uma foto do QR ou cole o código.",
+                )}
+              </p>
+            </div>
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-white/60">
               <p className="text-[11px] font-bold uppercase tracking-wider">{t(locale, "Cámara no senalizada", "No camera signal", "Câmera sem sinal")}</p>
@@ -289,7 +336,7 @@ export function QRScannerModal({ locale, onScanSuccess, onClose }: QRScannerModa
 
         <div className="border-t border-white/10 px-3 py-2">
           <div className="flex gap-1.5">
-            <button type="button" onClick={takePhotoOrUpload} className="flex-1 rounded-lg border border-white/15 bg-white/5 px-2 py-1.5 text-[10px] font-bold text-white">
+            <button type="button" onClick={() => takePhotoOrUpload(!cameraSkipped)} className="flex-1 rounded-lg border border-white/15 bg-white/5 px-2 py-1.5 text-[10px] font-bold text-white">
               📸 {t(locale, "Tomar foto / subir", "Take photo / upload", "Tirar foto / enviar")}
             </button>
             <button type="button" onClick={pasteNow} className="flex-1 rounded-lg border border-white/15 bg-white/5 px-2 py-1.5 text-[10px] font-bold text-white">

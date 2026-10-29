@@ -1,0 +1,5 @@
+Play Protect 100% limpio: la app ya no pide ni modifica permisos de Android.
+Se eliminó el permiso CAMARA y todos los puenteados de permisos del WebView.
+El escáner QR ahora abre directo con "Subir Foto del QR" y "Pegar Código / ID en 1 Toque".
+El puntaje por botones de volumen sigue igual, ahora con onKeyDown/onKeyUp estándar.
+versionCode 1021.
