@@ -73,6 +73,12 @@ public class MainActivity extends Activity {
     private PermissionRequest pendingPermissionRequest;
     /** requestCode for the WebView's runtime camera permission ask. */
     private static final int REQUEST_WEBVIEW_PERMISSIONS = 4417;
+    /**
+     * v10.2.0 — hardware Volume Up/Down scoring. WebView JS never sees a real
+     * KeyEvent.KEYCODE_VOLUME_* press, so dispatchKeyEvent() intercepts them
+     * while this flag is on and forwards "up"/"down" to the scoreboard.
+     */
+    private volatile boolean volumeKeyScoringEnabled = false;
 
     /** Exposed to JavaScript as VoleyOSBridge. */
     public static class VosleyOSBridge {
@@ -88,6 +94,18 @@ public class MainActivity extends Activity {
         VosleyOSBridge(MainActivity activity) {
             this.activity = activity;
             this.context = activity;
+        }
+
+        /** v10.2.0 — JS turns hardware volume scoring on/off from the Cancha strip. */
+        @JavascriptInterface
+        public void setVolumeKeyScoring(boolean enabled) {
+            activity.volumeKeyScoringEnabled = enabled;
+        }
+
+        /** v10.2.0 — JS reads back whether hardware volume scoring is armed. */
+        @JavascriptInterface
+        public boolean isVolumeKeyScoring() {
+            return activity.volumeKeyScoringEnabled;
         }
 
         /**
@@ -990,6 +1008,28 @@ public class MainActivity extends Activity {
                 return android.content.pm.PackageManager.PERMISSION_GRANTED ==
                         checkSelfPermission(wanted);
             }
+
+    /**
+     * v10.2.0 — hardware Volume Up/Down scoring. While armed, the keys are
+     * consumed (so the system volume slider never appears) and pushed into the
+     * page as window.__vosHardwareVolumeKey('up'|'down').
+     */
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        if (volumeKeyScoringEnabled && (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP
+                || keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            if (event.getAction() == android.view.KeyEvent.ACTION_DOWN
+                    && event.getRepeatCount() == 0 && webView != null) {
+                final String dir = (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP) ? "up" : "down";
+                webView.post(() -> webView.evaluateJavascript(
+                        "window.__vosHardwareVolumeKey && window.__vosHardwareVolumeKey('" + dir + "')",
+                        null));
+            }
+            return true; // Consume event so Android volume slider does not pop up
+        }
+        return super.dispatchKeyEvent(event);
+    }
 
     /**
      * v10.1 back-gesture guard: swiping back never kills the Activity behind

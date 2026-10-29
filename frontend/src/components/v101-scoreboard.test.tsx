@@ -227,8 +227,13 @@ describe("v10.1 hub: top-level Simple/Pro toggle keeps every tab", () => {
     fireEvent.click(toggle);
     expect(window.localStorage.getItem("volleyos.uiMode")).toBe("simple");
     expect(screen.getByTestId("hub-mode-toggle").getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(screen.getAllByRole("tab", { name: /Inicio/ }).at(-1)!);
-    audit(); // Simple — nothing is removed
+    // v10.1.3: Simple Mode intentionally collapses the strip to 3 tabs…
+    expect(screen.getAllByRole("tab").length).toBeLessThan(6);
+    expect(screen.getAllByRole("tab", { name: /Cancha/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("tab", { name: /Ajustes/ }).length).toBeGreaterThan(0);
+    // …while the full launcher stays reachable from its home tab.
+    fireEvent.click(screen.getAllByRole("tab", { name: /Picadito & Amigos/ }).at(-1)!);
+    expect(screen.getAllByTestId("module-card").length).toBeGreaterThan(47);
   });
 
   it("shares the app through the Web Share API", async () => {
@@ -241,5 +246,105 @@ describe("v10.1 hub: top-level Simple/Pro toggle keeps every tab", () => {
     expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: "https://volleyos.app" }));
     expect(screen.getByTestId("share-result")).toBeTruthy();
     Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+  });
+});
+
+describe("v10.2 Cancha: hard-reset engine, set sync and native volume keys", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.clearAllMocks();
+    Object.defineProperty(window, "speechSynthesis", {
+      value: { speak: vi.fn(), cancel: vi.fn() },
+      configurable: true,
+    });
+    Object.defineProperty(window, "SpeechSynthesisUtterance", { value: FakeUtterance, configurable: true });
+    delete (window as unknown as { VoleyOSBridge?: unknown }).VoleyOSBridge;
+  });
+
+  afterEach(() => {
+    cleanup();
+    delete (window as unknown as { VoleyOSBridge?: unknown }).VoleyOSBridge;
+    delete (window as unknown as { __vosHardwareVolumeKey?: unknown }).__vosHardwareVolumeKey;
+  });
+
+  const edit = (values: { a?: string; b?: string; sa?: string; sb?: string }): void => {
+    fireEvent.click(screen.getByTestId("score-edit-open"));
+    const patch: Record<string, string> = {};
+    if (values.a !== undefined) patch["score-edit-a"] = values.a;
+    if (values.b !== undefined) patch["score-edit-b"] = values.b;
+    if (values.sa !== undefined) patch["sets-edit-a"] = values.sa;
+    if (values.sb !== undefined) patch["sets-edit-b"] = values.sb;
+    for (const [id, value] of Object.entries(patch)) {
+      fireEvent.change(screen.getByTestId(id), { target: { value } });
+    }
+    fireEvent.click(screen.getByTestId("score-edit-apply"));
+  };
+
+  it("🔄 Nuevo Partido (0-0) wipes points, sets and setHistory after a finished match and undoes cleanly", () => {
+    renderBoard();
+    edit({ sa: "2", sb: "0" });
+    expect(screen.getByTestId("match-winner-banner")).toBeTruthy();
+    expect(screen.getByTestId("set-badge").textContent).toContain("SET 3");
+
+    fireEvent.click(screen.getByTestId("reset-match-btn"));
+    expect(screen.getByTestId("score-a").textContent).toContain("0");
+    expect(screen.getByTestId("score-b").textContent).toContain("0");
+    expect(screen.getByTestId("set-badge").textContent).toContain("SET 1");
+    expect(screen.queryByTestId("match-winner-banner")).toBeNull();
+    expect(document.body.textContent).toContain("Sets 0");
+
+    fireEvent.click(screen.getByRole("button", { name: /\[Z\] Deshacer/ }));
+    expect(screen.getByTestId("set-badge").textContent).toContain("SET 3");
+    expect(screen.getByTestId("match-winner-banner")).toBeTruthy();
+  });
+
+  it("↺ Reiniciar Set zeroes the points but keeps homeSets, awaySets and setHistory", () => {
+    renderBoard();
+    edit({ a: "14", b: "11", sa: "1", sb: "0" });
+    expect(screen.getByTestId("score-a").textContent).toContain("14");
+    expect(screen.getByTestId("set-badge").textContent).toContain("SET 2");
+
+    fireEvent.click(screen.getByTestId("reset-set-btn"));
+    expect(screen.getByTestId("score-a").textContent).toContain("0");
+    expect(screen.getByTestId("score-b").textContent).toContain("0");
+    expect(screen.getByText("Sets 1")).toBeTruthy();
+    expect(screen.getByTestId("set-badge").textContent).toContain("SET 2");
+    expect(screen.queryByTestId("match-winner-banner")).toBeNull();
+  });
+
+  it("✏️ Apply syncs setHistory so the badge jumps to SET 3 and scoring keeps flowing", () => {
+    renderBoard();
+    edit({ a: "14", b: "11", sa: "1", sb: "1" });
+    expect(screen.getByTestId("set-badge").textContent).toContain("SET 3");
+    expect(screen.getByTestId("set-indicator").textContent).toContain("SET 3");
+    expect(screen.queryByTestId("match-winner-banner")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "+ Tiburones [A]" }));
+    expect(screen.getByTestId("score-a").textContent).toContain("15");
+  });
+
+  it("🔊 volume-key scoring arms the native bridge and window.__vosHardwareVolumeKey scores both columns", () => {
+    const setVolumeKeyScoring = vi.fn();
+    (window as unknown as { VoleyOSBridge?: unknown }).VoleyOSBridge = { setVolumeKeyScoring };
+    renderBoard();
+    expect(setVolumeKeyScoring).toHaveBeenLastCalledWith(false);
+
+    const toggle = screen.getByTestId("volume-scoring-toggle");
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    expect(window.localStorage.getItem("volleyos.volumeScoring")).toBe("1");
+    expect(setVolumeKeyScoring).toHaveBeenLastCalledWith(true);
+
+    const win = window as unknown as { __vosHardwareVolumeKey?: (dir: "up" | "down") => void };
+    expect(typeof win.__vosHardwareVolumeKey).toBe("function");
+    act(() => {
+      win.__vosHardwareVolumeKey?.("up");
+    });
+    expect(screen.getByTestId("score-a").textContent).toContain("1");
+    act(() => {
+      win.__vosHardwareVolumeKey?.("down");
+    });
+    expect(screen.getByTestId("score-b").textContent).toContain("1");
   });
 });

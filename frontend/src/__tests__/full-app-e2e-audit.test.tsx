@@ -81,21 +81,21 @@ describe("hub E2E", () => {
     render(<VolleyOSHub locale="es" />);
     fireEvent.click(screen.getAllByRole("tab", { name: /Ajustes/ }).at(-1)!);
     const toggle = screen.getByTestId("hub-mode-toggle");
-    const state = screen.getByTestId("hub-mode-state");
 
-    // Default is Pro.
-    expect(state.textContent).toContain("OFF");
-    expect(state.textContent).toContain("Pro");
+    // Default is Pro: the toggle reports Simple Mode as not pressed.
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
     expect(window.localStorage.getItem("volleyos.uiMode")).toBeNull();
 
     fireEvent.click(toggle);
-    expect(state.textContent).toContain("ON");
-    expect(state.textContent).toContain("Simple");
+    expect(screen.getByTestId("hub-mode-toggle").getAttribute("aria-pressed")).toBe("true");
     expect(window.localStorage.getItem("volleyos.uiMode")).toBe("simple");
+    // v10.1.3: Simple Mode ships its intentional 3-tab strip.
+    expect(screen.getAllByRole("tab").length).toBeLessThan(6);
 
-    fireEvent.click(toggle);
-    expect(state.textContent).toContain("OFF");
+    fireEvent.click(screen.getByTestId("hub-mode-toggle"));
+    expect(screen.getByTestId("hub-mode-toggle").getAttribute("aria-pressed")).toBe("false");
     expect(window.localStorage.getItem("volleyos.uiMode")).toBe("pro");
+    expect(screen.getAllByRole("tab").length).toBeGreaterThan(4);
   });
 
   it(

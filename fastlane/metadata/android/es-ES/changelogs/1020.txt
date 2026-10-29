@@ -1,0 +1,5 @@
+Marcador Cancha renovado: reinicios de partido y de set a un toque, siempre arriba.
+El editor de puntos/sets sincroniza el contador de set (SET = sets + 1) y el historial: nunca te quedás trabado.
+Banners de ganador y de set ganado con Revancha, Nuevo Partido y Deshacer.
+Puntuá con los botones de volumen físico (Vol+ izquierda · Vol- derecha) y flechas del teclado; se arma solo en Modo Bolsillo.
+Insignia SACA conmutable en cada tarjeta de equipo, botones −1 y chips rápidos de facultades/clubes.

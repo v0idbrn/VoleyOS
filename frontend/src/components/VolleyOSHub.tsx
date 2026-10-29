@@ -1,8 +1,7 @@
 "use client";
 
-import { copyTextUniversal } from "@/lib/security-shield";
-
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { copyTextUniversal } from "@/lib/security-shield";
 
 import { LOCALE_NAMES, SHELL, t } from "@/lib/i18n";
 import { awardIndoorPoint, buildTarget, jumpLoad, newScoreboard, paywallEnabled, swapCourt, type Locale, type Profile, type ScoreboardState } from "@/lib/local-engines";
@@ -265,23 +264,6 @@ export function StickyMiniScoreboard({
 
 export function VolleyOSHub({ locale }: { locale: Locale }) {
   const shell = SHELL[locale];
-  const [tab, setTab] = useState<Tab>("home");
-  const [activeSlug, setActiveSlug] = useState<string | null>(null);
-  const [tabPick, setTabPick] = useState<Record<string, string>>({
-    court: TAB_GROUP.court[0] ?? "",
-    board: TAB_GROUP.board[0] ?? "",
-    lab: TAB_GROUP.lab[0] ?? "",
-  });
-  const [teamColor, setTeamColor] = useState<string>("#eab308");
-  const [profile, setProfile] = useState<Profile | "all">("all");
-  const [favOnly, setFavOnly] = useState(false);
-  const [guidedMode, setGuidedMode] = useState<GuidedModeId | null>(null);
-  const [casualOpen, setCasualOpen] = useState(false);
-  const [openDrawers, setOpenDrawers] = useState<Record<string, boolean>>({});
-  const [query, setQuery] = useState("");
-  const [pinned, setPinned] = useState<string[]>([]);
-  const [recent, setRecent] = useState<string[]>([]);
-  const [solar, setSolar] = useState(false);
   const isTestEnv = typeof process !== "undefined" && (process.env.NODE_ENV === "test" || Boolean(process.env.VITEST));
   const [uiMode, setUiMode] = useState<"simple" | "pro">(() => {
     if (typeof window === "undefined" || isTestEnv) return "pro";
@@ -290,11 +272,42 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     if (saved === "pro") return "pro";
     return "simple";
   });
-  const [modeButtonPressed, setModeButtonPressed] = useState(false);
-  const [tab, setTab] = useState<Tab>(() => {
-    if (typeof window === "undefined") return "home";
-    return isTestEnv ? "home" : "court";
+  // Precomputed outside the JSX ternary so both toggle branches can read the
+  // Simple flag without TypeScript narrowing uiMode to "pro".
+  const uiIsSimple = uiMode === "simple";
+  const initialActiveTab = useMemo(() => {
+    if (!isTestEnv && uiMode === "simple") return ("court" as const);
+    return ("home" as const);
+  }, [isTestEnv, uiMode]);
+
+  const [tab, setTab] = useState<Tab>(initialActiveTab);
+  const [activeSlug, setActiveSlug] = useState<string | null>(null);
+  const [tabPick, setTabPick] = useState<Record<string, string>>(() => {
+    if (typeof window !== "undefined" && !window.localStorage.getItem("volleyos.uiMode") && uiMode === "simple") {
+      return {
+        court: "scoreboard",
+        board: TAB_GROUP.board[0] ?? "",
+        lab: TAB_GROUP.lab[0] ?? "",
+      };
+    }
+    return {
+      court: TAB_GROUP.court[0] ?? "",
+      board: TAB_GROUP.board[0] ?? "",
+      lab: TAB_GROUP.lab[0] ?? "",
+    };
   });
+  const [teamColor, setTeamColor] = useState<string>("#eab308");
+  const [profile, setProfile] = useState<Profile | "all">("all");
+  const [favOnly, setFavOnly] = useState(false);
+  const [guidedMode, setGuidedMode] = useState<GuidedModeId | null>(null);
+  const [casualOpen, setCasualOpen] = useState(false);
+  const [openDrawers, setOpenDrawers] = useState<Record<string, boolean>>({});
+
+  const [query, setQuery] = useState("");
+  const [pinned, setPinned] = useState<string[]>([]);
+  const [recent, setRecent] = useState<string[]>([]);
+  const [solar, setSolar] = useState(false);
+
   const [voice, setVoice] = useState(false);
   const [courtAudio, setCourtAudio] = useState(true);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
@@ -1467,7 +1480,9 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                       </a>
                     );
                   })}
-                </div>                 <ValueRow
+                </div>
+
+                <ValueRow
                   label={t(locale, "Asistente inicial", "Setup assistant", "Assistente inicial")}
                   value={t(locale, "3 toques", "3 taps", "3 toques")}
                   onClick={reopenOnboarding}
@@ -1475,14 +1490,14 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
 
                 <div className="relative mt-3 flex items-center gap-2">
                   <span className="sr-only">{t(locale, "Modo de interfaz", "Interface mode", "Modo de interface")}</span>
-                  {uiMode === "simple" ? (
+                  {uiIsSimple ? (
                     <button
                       type="button"
                       data-testid="hub-mode-toggle"
-                      aria-pressed={uiMode === "simple"}
+                      aria-pressed={uiIsSimple}
                       aria-label={t(locale, "Activar modo profesional", "Activate pro mode", "Ativar modo profissional")}
                       onClick={toggleUiMode}
-                      className="tap inline-flex items-center gap-2 rounded-2xl border border-crimson/70 bg-emerald/20 px-4 py-2.5 text-[13px] font-black uppercase tracking-wider text-emerald shadow& transition-colors"
+                      className="tap inline-flex items-center gap-2 rounded-2xl border border-crimson/70 bg-emerald/20 px-4 py-2.5 text-[13px] font-black uppercase tracking-wider text-emerald shadow transition-colors"
                     >
                       <span aria-hidden className="text-base leading-none">⚡</span>
                       {t(locale, "Modo Simple", "Simple mode", "Modo Simples")}
@@ -1491,7 +1506,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                     <button
                       type="button"
                       data-testid="hub-mode-toggle"
-                      aria-pressed={uiMode === "pro"}
+                      aria-pressed={uiIsSimple}
                       aria-label={t(locale, "Activar modo simple", "Activate simple mode", "Ativar modo simples")}
                       onClick={toggleUiMode}
                       className="tap inline-flex items-center gap-2 rounded-2xl border border-volt/60 bg-volt/15 px-4 py-2.5 text-[13px] font-black uppercase tracking-wider text-volt shadow transition-colors"
@@ -1499,7 +1514,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                       <span aria-hidden className="text-base leading-none">🧠</span>
                       {t(locale, "Modo Pro", "Pro mode", "Modo Profissional")} ({shell.allModules})
                     </button>
-                  )
+                  )}
                 </div>
                 <h2 className="mt-5 px-1 pb-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.theme}</h2>
                 <SwitchRow
@@ -1800,14 +1815,16 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
               </div>
             ) : null}
           </div>
-        )}       </div>
-      )}
+         )}
+       </div>
 
-      {!activeMeta ? (        <nav aria-label={shell.tabsLabel} className="safe-bottom z-30 shrink-0 border-t border-white/10 bg-obsidian/95">
+
+      {!activeMeta ? (
+        <nav aria-label={shell.tabsLabel} className="safe-bottom z-30 shrink-0 border-t border-white/10 bg-obsidian/95">
             <div role="tablist" aria-label={shell.tabsLabel} className="mx-auto grid h-16 max-w-3xl grid-cols-3">
               {uiMode === "simple"
                 ? (["court", "home", "settings"] as const).map((value) => {
-                    const labels: Record<Tab, string> = {
+                    const labels: Record<"court" | "home" | "settings", string> = {
                       court: shell.tabCourt,
                       home: t(locale, "Picadito & Amigos", "Pickup & Friends", "Picadito & Amigos"),
                       settings: shell.tabSettings,
@@ -1822,7 +1839,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                         onClick={() => goTab(value)}
                         className={`tap flex flex-col items-center justify-center gap-0.5 ${active ? "text-volt" : "text-white/45"}`}
                       >
-                        <span aria-hidden className="text-lg leading-none">{TAB_ICON[value]}</span>            <span className="text-[9px] font-black uppercase tracking-wider">{labels[value]}</span>
+                        <span aria-hidden className="text-lg leading-none">{TAB_ICON[value]}</span>
+                        <span className="text-[9px] font-black uppercase tracking-wider">{labels[value]}</span>
                       </button>
                     );
                   })

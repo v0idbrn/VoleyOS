@@ -1,0 +1,5 @@
+Renovated Cancha scoreboard: one-tap new-match and reset-set buttons, always at the top.
+The points/sets editor syncs the set counter (SET = sets + 1) and set history, so you can never get stuck.
+Match-winner and set-won banners with Rematch, New Match and Undo.
+Score with the physical volume keys (Vol+ left, Vol- right) plus arrow-key fallback; auto-armed in Pocket mode.
+Tappable SACA serve badge on each team card, -1 buttons and faculty/club quick chips.

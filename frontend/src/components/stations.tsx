@@ -205,6 +205,7 @@ import {
   type BlockoutDecision,
   type PracticeFocus,
   type ScoreboardState,
+  type SetHistoryEntry,
   type TeamRoster,
   type TelestrationPoint,
   loadTeams,
@@ -875,8 +876,38 @@ export function ScoutingStation({ meta, locale, onSave }: StationProps) {
 
 function pressurePoint(state: ScoreboardState): boolean {
   if (state.status !== "live") return false;
-  const target = state.setNumber === state.bestOf ? 15 : 25;
+  // v10.2.0: the active set is always derived from the set tally, never from
+  // the (possibly stale) setNumber counter.
+  const currentSet = state.setsA + state.setsB + 1;
+  const target = state.targetPoints ?? (state.matchFormat === "short15" || currentSet === state.bestOf ? 15 : 25);
   return (state.scoreA >= target - 1 && state.scoreA - state.scoreB >= 0) || (state.scoreB >= target - 1 && state.scoreB - state.scoreA >= 0);
+}
+
+/**
+ * v10.2.0 — keeps the set pills in lockstep with an edited set tally: the
+ * result always holds exactly `home` sets won by A and `away` won by B, so
+ * the `SET home+away+1` badge is instantly truthful after a manual edit.
+ */
+function rebuildSetHistory(existing: SetHistoryEntry[], home: number, away: number): SetHistoryEntry[] {
+  const keep: SetHistoryEntry[] = [];
+  const take = (winner: "A" | "B", count: number): void => {
+    let pending = count;
+    for (const entry of existing) {
+      if (pending <= 0) break;
+      const homeWon = entry.scoreA > entry.scoreB;
+      if (homeWon === (winner === "A") && !keep.includes(entry)) {
+        keep.push(entry);
+        pending -= 1;
+      }
+    }
+    while (pending > 0) {
+      keep.push(winner === "A" ? { setNumber: 0, scoreA: 25, scoreB: 0 } : { setNumber: 0, scoreA: 0, scoreB: 25 });
+      pending -= 1;
+    }
+  };
+  take("A", Math.max(0, home));
+  take("B", Math.max(0, away));
+  return keep.map((entry, index) => ({ ...entry, setNumber: index + 1 }));
 }
 
 export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
@@ -905,6 +936,13 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [rosterSheet, setRosterSheet] = useState("");
   const [rosterError, setRosterError] = useState<string | null>(null);
   const state = history.present;
+  // v10.2.0 — every set-dependent read derives from the tally, so a manual
+  // edit can never leave a stale set counter or a stuck match behind.
+  const currentSet = state.setsA + state.setsB + 1;
+  const swapped = state.isCourtSwapped === true;
+  const matchDone = state.status === "finished" && state.winner !== null;
+  const continuousSets = state.matchFormat === "short15" && preset !== "king";
+  const setTarget = state.targetPoints ?? (state.matchFormat === "short15" || currentSet === state.bestOf ? 15 : 25);
   const [serveCap, setServeCap] = useState<ServeCapLimit>(0);
   const [serveCapBanner, setServeCapBanner] = useState<string | null>(null);
   const [undoPill, setUndoPill] = useState(false);
@@ -919,6 +957,10 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [editingTeams, setEditingTeams] = useState(false);
   const [teamDraft, setTeamDraft] = useState({ a: "", b: "" });
   const [editingScore, setEditingScore] = useState<ScoreboardState["serving"] | null>(null);
+  // Draft backing the ✏️ editor: typed here, committed on blur or Apply.
+  const [scoreDraft, setScoreDraft] = useState({ a: "0", b: "0", sa: "0", sb: "0" });
+  // v10.2.0 — native hardware volume keys score through MainActivity.
+  const [volumeScoring, setVolumeScoring] = useState(() => window.localStorage.getItem("volleyos.volumeScoring") === "1");
 
   // The hub toggle and this board share one persisted mode; both dispatch the
   // same event so a switch made on either side stays in sync.
@@ -1338,6 +1380,42 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     return () => window.removeEventListener("voleyos:hardware-key", onHardwareKey);
   }, [hardwareMode, locale, point]);
 
+  // v10.2.0 — native hardware volume scoring. MainActivity consumes Vol± in
+  // dispatchKeyEvent and calls back into this handler; desktop browsers never
+  // deliver those keys, so the arrow keys stand in as a fallback.
+  useEffect(() => {
+    type VolumeWindow = Window & {
+      __vosHardwareVolumeKey?: (dir: "up" | "down") => void;
+      VoleyOSBridge?: { setVolumeKeyScoring?: (enabled: boolean) => void };
+    };
+    const target = window as VolumeWindow;
+    target.VoleyOSBridge?.setVolumeKeyScoring?.(volumeScoring);
+    if (!volumeScoring) {
+      target.__vosHardwareVolumeKey = undefined;
+      return;
+    }
+    const onVolumeDir = (dir: "up" | "down"): void => {
+      // "up" always feeds the team shown on the left, "down" the right one,
+      // so the physical buttons mirror the columns on screen after a swap.
+      const leftIsTeamA = !(state.isCourtSwapped === true);
+      const side = dir === "up" ? (leftIsTeamA ? "A" : "B") : leftIsTeamA ? "B" : "A";
+      point(side);
+    };
+    target.__vosHardwareVolumeKey = onVolumeDir;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      const el = event.target;
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return;
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      event.preventDefault();
+      onVolumeDir(event.key === "ArrowUp" ? "up" : "down");
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      if (target.__vosHardwareVolumeKey === onVolumeDir) target.__vosHardwareVolumeKey = undefined;
+    };
+  }, [volumeScoring, state.isCourtSwapped, point]);
+
   const redo = (): void => {
     setHistory((previous) => redoScoreboard(previous));
     setScout((previous) => redoScoutPoint(previous));
@@ -1384,6 +1462,12 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     const next = !pocketLock;
     setPocketLock(next);
     window.localStorage.setItem("volleyos.pocketLock", next ? "1" : "0");
+    // v10.2.0: pocket mode is scored from the physical Vol± keys, so it arms
+    // native volume scoring automatically.
+    if (next) {
+      setVolumeScoring(true);
+      window.localStorage.setItem("volleyos.volumeScoring", "1");
+    }
     triggerCourtHaptics(20);
     setMessage(
       next
@@ -1439,27 +1523,194 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     setEditingTeams(false);
   };
 
+  /**
+   * v10.2.0 — single normalization pass for every manual edit. One undo entry
+   * per change, the active set is re-derived from the tally, setHistory is
+   * rebuilt to match, and the match is re-opened or closed from the edited
+   * sets so scoring can never get stuck behind a stale banner.
+   */
+  const manualCommit = (patch: Partial<ScoreboardState>): void => {
+    setHistory((previous) => {
+      const base: ScoreboardState = { ...previous.present, ...patch };
+      const totalSets = Math.max(0, base.setsA) + Math.max(0, base.setsB);
+      const setsNeeded = base.matchFormat === "bo5" ? 3 : 2;
+      const decided =
+        base.setsA >= setsNeeded ||
+        base.setsB >= setsNeeded ||
+        base.setsA > Math.floor(base.bestOf / 2) ||
+        base.setsB > Math.floor(base.bestOf / 2);
+      const next: ScoreboardState = {
+        ...base,
+        setNumber: Math.max(1, totalSets + 1),
+        setHistory: rebuildSetHistory(previous.present.setHistory ?? [], base.setsA, base.setsB),
+        status: decided ? "finished" : "live",
+        winner: decided ? (base.setsA > base.setsB ? "A" : "B") : null,
+        isDecider: totalSets + 1 === base.bestOf,
+        streak: Math.max(1, base.streak),
+      };
+      return commitScoreboard(previous, next);
+    });
+  };
+
+  const toggleScoreEditor = (): void => {
+    if (editingScore !== null) {
+      setEditingScore(null);
+      return;
+    }
+    setScoreDraft({
+      a: String(state.scoreA),
+      b: String(state.scoreB),
+      sa: String(state.setsA),
+      sb: String(state.setsB),
+    });
+    setEditingScore("A");
+  };
+
+  /** ✏️ Apply: commit the whole draft at once, synced and undoable. */
+  const applyManualScore = (): void => {
+    const parse = (raw: string, max: number): number => {
+      const value = Number.parseInt(raw, 10);
+      return Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : 0;
+    };
+    manualCommit({
+      scoreA: parse(scoreDraft.a, 99),
+      scoreB: parse(scoreDraft.b, 99),
+      setsA: parse(scoreDraft.sa, 9),
+      setsB: parse(scoreDraft.sb, 9),
+    });
+    setEditingScore(null);
+    setMessage(
+      t(locale, "✏️ Marcador ajustado — seguí jugando.", "✏️ Score adjusted — keep playing.", "✏️ Placar ajustado — continue jogando."),
+    );
+    triggerCourtHaptics(20);
+  };
+
+  /** 🔄 Nuevo Partido (0-0): full reset, one undo away from restoring it. */
+  const resetMatch = (): void => {
+    setHistory((previous) =>
+      commitScoreboard(previous, {
+        ...previous.present,
+        scoreA: 0,
+        scoreB: 0,
+        setsA: 0,
+        setsB: 0,
+        setNumber: 1,
+        serving: previous.present.firstServing,
+        streak: 1,
+        status: "live",
+        winner: null,
+        setHistory: [],
+        isCourtSwapped: false,
+        isDecider: false,
+        isTieBreak: false,
+        sideSwitchedAt8: false,
+      }),
+    );
+    setBurst(null);
+    setMessage(
+      t(locale, "🔄 Partido nuevo 0-0 — ↶ Deshacer lo restaura.", "🔄 New match 0-0 — ↶ Undo restores it.", "🔄 Partida nova 0-0 — ↶ Desfazer restaura."),
+    );
+    triggerCourtHaptics([30, 25, 30]);
+  };
+
+  /** ↺ Reiniciar Set: points only — sets, setHistory and sides stay put. */
+  const resetSet = (): void => {
+    setHistory((previous) =>
+      commitScoreboard(previous, { ...previous.present, scoreA: 0, scoreB: 0, streak: 1, sideSwitchedAt8: false }),
+    );
+    setMessage(t(locale, "↺ Set reiniciado 0-0 — los sets se mantienen.", "↺ Set reset 0-0 — sets preserved.", "↺ Set zerado 0-0 — sets mantidos."));
+    triggerCourtHaptics(20);
+  };
+
+  /** ▶️ picadito/king: close the set banner and keep the rally counting. */
+  const followNextSet = (): void => {
+    setHistory((previous) => {
+      const base = previous.present;
+      return commitScoreboard(previous, {
+        ...base,
+        scoreA: 0,
+        scoreB: 0,
+        status: "live",
+        winner: null,
+        setNumber: Math.max(1, base.setsA + base.setsB + 1),
+        serving: base.firstServing,
+        streak: 1,
+        sideSwitchedAt8: false,
+      });
+    });
+    setBurst(null);
+    setMessage(t(locale, "▶️ ¡Siguiente set!", "▶️ Next set!", "▶️ Próximo set!"));
+    triggerCourtHaptics([30, 25, 30]);
+  };
+
+  /** 🆕 Nuevo Partido (Limpiar todo): a brand-new 0-0 board, same teams. */
+  const brandNewMatch = (): void => {
+    setHistory((previous) =>
+      commitScoreboard(
+        previous,
+        newScoreboard(previous.present.teamA, previous.present.teamB, previous.present.bestOf, {
+          matchFormat: previous.present.matchFormat,
+          targetPoints: previous.present.targetPoints,
+          goldenPoint: previous.present.goldenPoint,
+          colorA: previous.present.colorA,
+          colorB: previous.present.colorB,
+          rosterA: previous.present.rosterA,
+          rosterB: previous.present.rosterB,
+          lineupA: previous.present.lineupA,
+          lineupB: previous.present.lineupB,
+          firstServing: "A",
+          serving: "A",
+        }),
+      ),
+    );
+    setBurst(null);
+    setMessage(t(locale, "🆕 Partido nuevo — tablero limpio 0-0.", "🆕 New match — clean 0-0 board.", "🆕 Partida nova — placar limpo 0-0."));
+    triggerCourtHaptics([30, 25, 30]);
+  };
+
+  /** One-tap serve handover from the 🏐 SACA badge on either team card. */
+  const setServe = (side: ScoreboardState["serving"]): void => {
+    setHistory((previous) => commitScoreboard(previous, { ...previous.present, serving: side }));
+    triggerCourtHaptics(14);
+  };
+
+  /** −1: never blocked, even right after a set rollover. */
+  const subtractPoint = (side: ScoreboardState["serving"]): void => {
+    setHistory((previous) => {
+      const base = previous.present;
+      return commitScoreboard(previous, {
+        ...base,
+        scoreA: side === "A" ? Math.max(0, base.scoreA - 1) : base.scoreA,
+        scoreB: side === "B" ? Math.max(0, base.scoreB - 1) : base.scoreB,
+      });
+    });
+    triggerCourtHaptics(14);
+  };
+
+  const toggleVolumeScoring = (): void => {
+    const next = !volumeScoring;
+    setVolumeScoring(next);
+    window.localStorage.setItem("volleyos.volumeScoring", next ? "1" : "0");
+    triggerCourtHaptics(next ? [30, 25, 30] : 18);
+    setMessage(
+      next
+        ? t(locale, "🔊 Vol+ suma a la izquierda · Vol- a la derecha.", "🔊 Vol+ scores left · Vol- right.", "🔊 Vol+ soma à esquerda · Vol- à direita.")
+        : t(locale, "🔉 Puntaje por volumen apagado.", "🔉 Volume scoring off.", "🔉 Pontuação por volume desligada."),
+    );
+  };
+
   const editScoreTo = (side: ScoreboardState["serving"], raw: string): void => {
     const value = Number.parseInt(raw, 10);
     if (!Number.isFinite(value)) return;
     const clamped = Math.max(0, Math.min(99, value));
-    setHistory((previous) =>
-      commitScoreboard(
-        previous,
-        side === "A"
-          ? { ...previous.present, scoreA: clamped }
-          : { ...previous.present, scoreB: clamped },
-      ),
-    );
+    manualCommit(side === "A" ? { scoreA: clamped } : { scoreB: clamped });
   };
 
   const editSetsTo = (side: ScoreboardState["serving"], raw: string): void => {
     const value = Number.parseInt(raw, 10);
     if (!Number.isFinite(value)) return;
     const clamped = Math.max(0, Math.min(9, value));
-    setHistory((previous) =>
-      commitScoreboard(previous, side === "A" ? { ...previous.present, setsA: clamped } : { ...previous.present, setsB: clamped }),
-    );
+    manualCommit(side === "A" ? { setsA: clamped } : { setsB: clamped });
   };
 
   // Quick faculty chips for tournament days: one tap renames the side and the
@@ -1523,13 +1774,14 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     };
   }, []);
 
-  const swapped = state.isCourtSwapped === true;
   const left = swapped
     ? { name: state.teamB, score: state.scoreB, sets: state.setsB, serving: state.serving === "B", color: state.colorB }
     : { name: state.teamA, score: state.scoreA, sets: state.setsA, serving: state.serving === "A", color: state.colorA };
   const right = swapped
     ? { name: state.teamA, score: state.scoreA, sets: state.setsA, serving: state.serving === "A", color: state.colorA }
     : { name: state.teamB, score: state.scoreB, sets: state.setsB, serving: state.serving === "B", color: state.colorB };
+  const leftSide: ScoreboardState["serving"] = swapped ? "B" : "A";
+  const rightSide: ScoreboardState["serving"] = swapped ? "A" : "B";
   const showPoint8 = point8SwitchDue(state);
 
   return (
@@ -1543,6 +1795,104 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         setMessage(t(locale, "Ejemplo cargado: set decisivo 22-20.", "Example loaded: decider 22-20.", "Exemplo carregado: set decisivo 22-20."));
       }}
     >
+      <div className="mb-2 flex flex-wrap items-center gap-1" data-testid="cancha-topbar">
+        <span
+          data-testid="set-badge"
+          className="rounded-full border border-volt/40 bg-volt/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-volt"
+        >
+          SET {currentSet} · {t(locale, `Meta: ${setTarget} pts`, `Target: ${setTarget} pts`, `Meta: ${setTarget} pts`)} ·{" "}
+          {state.goldenPoint
+            ? t(locale, "Punto de oro", "Golden point", "Ponto de ouro")
+            : t(locale, "Dif de 2", "Win by 2", "Dif de 2")}
+        </span>
+        <button
+          type="button"
+          data-testid="reset-match-btn"
+          onClick={resetMatch}
+          className="rounded-lg border border-crimson/60 bg-crimson/20 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-crimson/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-volt"
+        >
+          🔄 {t(locale, "Nuevo Partido (0-0)", "New Match (0-0)", "Nova Partida (0-0)")}
+        </button>
+        <button
+          type="button"
+          data-testid="reset-set-btn"
+          onClick={resetSet}
+          className="rounded-lg border border-white/20 bg-white/5 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white/80 transition hover:border-volt hover:text-volt focus-visible:outline focus-visible:outline-2 focus-visible:outline-volt"
+        >
+          ↺ {t(locale, "Reiniciar Set", "Reset Set", "Reiniciar Set")}
+        </button>
+        <button
+          type="button"
+          data-testid="score-edit-open"
+          aria-expanded={editingScore !== null}
+          className={BTN}
+          onClick={toggleScoreEditor}
+        >
+          ✏️ {t(locale, "Editar Puntos / Sets", "Edit Points / Sets", "Editar Pontos / Sets")}
+        </button>
+      </div>
+      {matchDone && preset !== "king" ? (
+        continuousSets ? (
+          <div data-testid="set-won-banner" className="mb-2 rounded-xl border border-volt/50 bg-volt/10 p-3 text-center">
+            <p className="text-sm font-black text-volt">
+              🎉 {t(locale, `¡Set ganado! ${state.setsA}-${state.setsB}`, `Set won! ${state.setsA}-${state.setsB}`, `Set ganho! ${state.setsA}-${state.setsB}`)}
+            </p>
+            <div className="mt-2 flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                data-testid="next-set-btn"
+                onClick={followNextSet}
+                className="rounded-lg bg-volt px-3 py-2 text-xs font-black uppercase tracking-wider text-obsidian transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-volt"
+              >
+                ▶️ {t(locale, "Seguir Próximo Set", "Continue Next Set", "Seguir Próximo Set")}
+              </button>
+              <button
+                type="button"
+                data-testid="banner-new-match-btn"
+                onClick={brandNewMatch}
+                className={BTN}
+              >
+                🔄 {t(locale, "Nuevo Partido 0-0", "New Match 0-0", "Nova Partida 0-0")}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div data-testid="match-winner-banner" className="mb-2 rounded-xl border border-crimson/60 bg-crimson/10 p-3 text-center">
+            <p className="text-base font-black text-white">
+              🏆 {state.winner === "A" ? state.teamA : state.teamB} · {state.setsA}-{state.setsB}
+            </p>
+            <div className="mt-2 flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                data-testid="rematch-btn"
+                onClick={resetMatch}
+                className="rounded-lg bg-crimson px-3 py-2 text-xs font-black uppercase tracking-wider text-white transition hover:bg-imperial focus-visible:outline focus-visible:outline-2 focus-visible:outline-volt"
+              >
+                🔄 {t(locale, "Jugar Revancha (0-0, mismos equipos)", "Rematch (0-0, same teams)", "Revanche (0-0, mesmos times)")}
+              </button>
+              <button
+                type="button"
+                data-testid="banner-new-match-btn"
+                onClick={brandNewMatch}
+                className={BTN}
+              >
+                🆕 {t(locale, "Nuevo Partido (Limpiar todo)", "New Match (Clear all)", "Nova Partida (Limpar tudo)")}
+              </button>
+              <button
+                type="button"
+                data-testid="banner-undo-btn"
+                onClick={() => {
+                  undo();
+                  setBurst(null);
+                }}
+                className={BTN}
+              >
+                ↶ {t(locale, "Deshacer último punto (Seguir jugando)", "Undo last point (Keep playing)", "Desfazer último ponto (Continuar)")}
+              </button>
+            </div>
+          </div>
+        )
+      ) : null}
       {uiMode === "pro" ? (
       <>
       <div className="mb-2 flex flex-wrap gap-1">
@@ -1741,31 +2091,40 @@ ${name}` : name))} testId="cancha-player-chips" />
       </div>
       <div className={`rounded-xl border border-white/10 bg-obsidian/80 p-3 ${flashSwap ? " vos-flash" : ""}`}>
         <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/50">
-          <span>Set {state.setNumber} / {state.bestOf} {state.matchFormat === "short15" ? "(15)" : state.setNumber === state.bestOf || state.isDecider ? "(15 TB)" : "(25)"}</span>
+          <span data-testid="set-indicator">SET {currentSet} / {state.bestOf} {state.matchFormat === "short15" ? "(15)" : currentSet === state.bestOf || state.isDecider ? "(15 TB)" : "(25)"}</span>
           <span>{state.status === "finished" ? "FINAL" : `${state.streak} ${t(locale, "en racha", "run", "em sequência")}`}</span>
         </div>
         <div className="vos-oled-keep mt-2 grid grid-cols-2 gap-2 text-center">
           <div data-side-color={left.color} className={`rounded-lg py-2 ${left.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
+            <button
+              type="button"
+              data-testid={`serve-badge-${leftSide.toLowerCase()}`}
+              aria-pressed={left.serving}
+              onClick={() => setServe(left.serving ? rightSide : leftSide)}
+              className={`mx-auto mb-0.5 block rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider transition ${left.serving ? "bg-crimson text-white" : "bg-white/10 text-white/50 hover:text-white"}`}
+            >
+              🏐 {left.serving ? t(locale, "SACA", "SERVES", "SAQUE") : t(locale, "SACAR", "SERVE", "SACAR")}
+            </button>
             <p className="truncate text-xs font-bold">{left.name}</p>
             <p data-testid={swapped ? "score-b" : "score-a"} className="text-4xl font-black tabular-nums">{left.score}</p>
             <p className="text-[10px] text-volt">Sets {left.sets}</p>
           </div>
           <div data-side-color={right.color} className={`rounded-lg py-2 ${right.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
+            <button
+              type="button"
+              data-testid={`serve-badge-${rightSide.toLowerCase()}`}
+              aria-pressed={right.serving}
+              onClick={() => setServe(right.serving ? leftSide : rightSide)}
+              className={`mx-auto mb-0.5 block rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider transition ${right.serving ? "bg-crimson text-white" : "bg-white/10 text-white/50 hover:text-white"}`}
+            >
+              🏐 {right.serving ? t(locale, "SACA", "SERVES", "SAQUE") : t(locale, "SACAR", "SERVE", "SACAR")}
+            </button>
             <p className="truncate text-xs font-bold">{right.name}</p>
             <p data-testid={swapped ? "score-a" : "score-b"} className="text-4xl font-black tabular-nums">{right.score}</p>
             <p className="text-[10px] text-volt">Sets {right.sets}</p>
           </div>
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-center gap-1">
-          <button
-            type="button"
-            data-testid="score-edit-open"
-            aria-expanded={editingScore !== null}
-            className={BTN}
-            onClick={() => setEditingScore(editingScore === null ? "A" : null)}
-          >
-            ✏️ {t(locale, "Editar Puntos / Sets", "Edit Points / Sets", "Editar Pontos / Sets")}
-          </button>
           <button
             type="button"
             data-testid="team-edit-open"
@@ -1783,8 +2142,9 @@ ${name}` : name))} testId="cancha-player-chips" />
               type="number"
               min={0}
               max={99}
-              defaultValue={state.scoreA}
+              value={scoreDraft.a}
               aria-label={t(locale, "Ajustar tantos de Equipo A", "Adjust Team A points", "Ajustar pontos do Time A")}
+              onChange={(event) => setScoreDraft((draft) => ({ ...draft, a: event.target.value }))}
               onBlur={(event) => editScoreTo("A", event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") event.currentTarget.blur();
@@ -1796,8 +2156,9 @@ ${name}` : name))} testId="cancha-player-chips" />
               type="number"
               min={0}
               max={99}
-              defaultValue={state.scoreB}
+              value={scoreDraft.b}
               aria-label={t(locale, "Ajustar tantos de Equipo B", "Adjust Team B points", "Ajustar pontos do Time B")}
+              onChange={(event) => setScoreDraft((draft) => ({ ...draft, b: event.target.value }))}
               onBlur={(event) => editScoreTo("B", event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") event.currentTarget.blur();
@@ -1809,8 +2170,9 @@ ${name}` : name))} testId="cancha-player-chips" />
               type="number"
               min={0}
               max={9}
-              defaultValue={state.setsA}
+              value={scoreDraft.sa}
               aria-label={t(locale, "Ajustar Sets de Equipo A", "Adjust Team A sets", "Ajustar Sets do Time A")}
+              onChange={(event) => setScoreDraft((draft) => ({ ...draft, sa: event.target.value }))}
               onBlur={(event) => editSetsTo("A", event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") event.currentTarget.blur();
@@ -1822,16 +2184,20 @@ ${name}` : name))} testId="cancha-player-chips" />
               type="number"
               min={0}
               max={9}
-              defaultValue={state.setsB}
+              value={scoreDraft.sb}
               aria-label={t(locale, "Ajustar Sets de Equipo B", "Adjust Team B sets", "Ajustar Sets do Time B")}
+              onChange={(event) => setScoreDraft((draft) => ({ ...draft, sb: event.target.value }))}
               onBlur={(event) => editSetsTo("B", event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") event.currentTarget.blur();
               }}
               className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-center text-sm font-bold"
             />
+            <button type="button" data-testid="score-edit-apply" className={`${BTN} col-span-2 border-volt text-volt`} onClick={applyManualScore}>
+              ✓ {t(locale, "Aplicar", "Apply", "Aplicar")}
+            </button>
             <button type="button" data-testid="score-edit-done" className={`${BTN} col-span-2`} onClick={() => setEditingScore(null)}>
-              ✓ {t(locale, "Listo", "Done", "Pronto")}
+              ✕ {t(locale, "Cerrar", "Close", "Fechar")}
             </button>
           </div>
         ) : null}
@@ -1845,7 +2211,7 @@ ${name}` : name))} testId="cancha-player-chips" />
               className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[12px]"
             />
             <div className="flex flex-wrap gap-1" data-testid="faculty-chips-a">
-              {(["Ingeniería", "Exactas", "Medicina", "Derecho", "Psicología", "Economía"] as const).map((name) => (
+              {(["Ingeniería", "Exactas", "Económicas", "Salud", "Humanidades", "Naturales", "Equipo A", "Equipo B"] as const).map((name) => (
                 <button
                   key={`fa-${name}`}
                   type="button"
@@ -1865,7 +2231,7 @@ ${name}` : name))} testId="cancha-player-chips" />
               className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[12px]"
             />
             <div className="flex flex-wrap gap-1" data-testid="faculty-chips-b">
-              {(["Ingeniería", "Exactas", "Medicina", "Derecho", "Psicología", "Economía"] as const).map((name) => (
+              {(["Ingeniería", "Exactas", "Económicas", "Salud", "Humanidades", "Naturales", "Equipo A", "Equipo B"] as const).map((name) => (
                 <button
                   key={`fb-${name}`}
                   type="button"
@@ -1919,8 +2285,16 @@ ${name}` : name))} testId="cancha-player-chips" />
           ) : null}
         </div>
         <div className="mt-2 flex justify-center gap-2">
-          <button type="button" className={BTN_PRIMARY} onClick={() => point(swapped ? "B" : "A")}>+ {left.name} [A]</button>
-          <button type="button" className={BTN_PRIMARY} onClick={() => point(swapped ? "A" : "B")}>+ {right.name} [L]</button>
+          <button type="button" className={BTN_PRIMARY} onClick={() => point(leftSide)}>+ {left.name} [A]</button>
+          <button type="button" className={BTN_PRIMARY} onClick={() => point(rightSide)}>+ {right.name} [L]</button>
+        </div>
+        <div className="mt-1 flex justify-center gap-2">
+          <button type="button" data-testid="minus-left" className={`${BTN} text-[10px]`} onClick={() => subtractPoint(leftSide)}>
+            −1 {left.name}
+          </button>
+          <button type="button" data-testid="minus-right" className={`${BTN} text-[10px]`} onClick={() => subtractPoint(rightSide)}>
+            −1 {right.name}
+          </button>
         </div>
         <div className="mt-2 flex flex-wrap justify-center gap-1">
           <button
@@ -2011,6 +2385,15 @@ ${name}` : name))} testId="cancha-player-chips" />
             }}
           >
             💬 {t(locale, "Pulso WhatsApp Gratis", "Free WhatsApp Pulse", "Pulso WhatsApp Grátis")}
+          </button>
+          <button
+            type="button"
+            data-testid="volume-scoring-toggle"
+            aria-pressed={volumeScoring}
+            onClick={toggleVolumeScoring}
+            className={volumeScoring ? `${BTN} border-volt text-volt` : BTN}
+          >
+            🔊 {t(locale, "Sumar con Botones de Volumen", "Score with Volume Buttons", "Somar com Botões de Volume")}: {volumeScoring ? "[ON 🏐]" : "[OFF 🔈]"}
           </button>
           <button
             type="button"
