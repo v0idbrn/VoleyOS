@@ -38,13 +38,6 @@ import {
 } from "@/lib/backup-vos";
 import { loadFlowRoster } from "@/lib/season-vault";
 import { acwrSample } from "@/lib/samples";
-import {
-  captureJourneyEvent,
-  readSessionReplayConsent,
-  sessionReplayConfigured,
-  setSessionReplayConsent,
-  type ReplayConsent,
-} from "@/lib/session-replay";
 
 const FILTERS: Array<Profile | "all"> = ["all", "players", "coaches", "court", "referees", "fans", "tournaments"];
 const LOCALES: Locale[] = ["es", "en", "pt"];
@@ -344,7 +337,6 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [suiteNonce, setSuiteNonce] = useState(0);
   const [reminder, setReminder] = useState<{ time: string; venue: string; acwr: string } | null>(null);
   const [supporter, setSupporter] = useState(false);
-  const [replayConsent, setReplayConsent] = useState<ReplayConsent>("unset");
   const [supportMoment, setSupportMoment] = useState<"match" | "export" | null>(null);
   const [updateState, setUpdateState] = useState<UpdateCheck | null>(null);
   const [checking, setChecking] = useState(false);
@@ -472,7 +464,6 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     setCourtAudio(window.localStorage.getItem(AUDIO_KEY) !== "0");
     setCrowdVolume(loadCrowdAmbience());
     setSupporter(supporterChipActive());
-    setReplayConsent(readSessionReplayConsent());
     setPinned((current) => (current.length > 0 ? current : readStringList(PIN_KEY)));
     setRecent(readStringList(RECENT_KEY));
     const done = window.localStorage.getItem(ONBOARDING_KEY) === "1";
@@ -632,7 +623,6 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const openModule = useCallback((slug: string) => {
     if (!STATIONS[slug]) return;
     setActiveSlug(slug);
-    captureJourneyEvent("module_opened", { module: slug });
     setRecent((current) => {
       const next = [slug, ...current.filter((value) => value !== slug)].slice(0, 6);
       window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
@@ -723,18 +713,6 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     window.localStorage.setItem(VOICE_KEY, next ? "1" : "0");
     setToast(next ? shell.voiceOn : shell.voiceOff);
     announceScoreTTS(next ? shell.voiceOn : shell.voiceOff, next, locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : "es-ES");
-  };
-
-  const toggleSessionReplay = (): void => {
-    const next: Exclude<ReplayConsent, "unset"> = replayConsent === "granted" ? "denied" : "granted";
-    setSessionReplayConsent(next);
-    setReplayConsent(next);
-    setToast(
-      next === "granted"
-        ? t(locale, "▶️ Repeticiones activas (enmascaradas).", "▶️ Replays on (masked).", "▶️ Repetições ativas (mascaradas).")
-        : t(locale, "⏹️ Repeticiones apagadas.", "⏹️ Replays off.", "⏹️ Repetições desligadas."),
-    );
-    triggerCourtHaptics(20);
   };
 
   const handleSave = (slug: string, rows: number): void => {
@@ -857,7 +835,6 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     }
     window.localStorage.setItem(ONBOARDING_KEY, "1");
     window.localStorage.removeItem(ONBOARDING_LANG_KEY);
-    captureJourneyEvent("onboarding_completed", { role: roleChoice ?? "skipped" });
     setOnboarding(false);
     setOnboardingStep(1);
     triggerCourtHaptics([40, 30, 70]);
@@ -1564,18 +1541,6 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                     />
                   </label>
                   <SwitchRow label={shell.voice} checked={voice} onToggle={toggleVoice} />
-                  {sessionReplayConfigured() ? (
-                    <SwitchRow
-                      label={t(locale, "Repeticiones de sesión (opt-in)", "Session replays (opt-in)", "Repetições de sessão (opt-in)")}
-                      hint={
-                        replayConsent === "granted"
-                          ? t(locale, "Grabando: entradas y textos enmascarados", "Recording: inputs and text masked", "Gravando: entradas e textos mascarados")
-                          : t(locale, "Apagado: la app no envía nada", "Off: the app sends nothing", "Desligado: o app não envia nada")
-                      }
-                      checked={replayConsent === "granted"}
-                      onToggle={toggleSessionReplay}
-                    />
-                  ) : null}
                   <SwitchRow
                     label={t(locale, "Pantalla despierta", "Keep screen awake", "Tela acordada")}
                     checked={awake}

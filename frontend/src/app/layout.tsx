@@ -3,7 +3,6 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 import { PwaRegister } from "@/components/PwaRegister";
-import { SessionReplay } from "@/components/SessionReplay";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://volleyos.app"),
@@ -44,7 +43,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="es">
       <body className="min-h-screen antialiased">
         <PwaRegister />
-        <SessionReplay />
         {children}
       </body>
     </html>

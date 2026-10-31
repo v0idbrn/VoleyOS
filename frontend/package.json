@@ -14,7 +14,6 @@
   "dependencies": {
     "jsqr": "^1.4.0",
     "next": "15.1.6",
-    "posthog-js": "1.442.1",
     "qrcode": "^1.5.4",
     "react": "19.0.0",
     "react-dom": "19.0.0",

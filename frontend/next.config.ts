@@ -11,13 +11,10 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "Referrer-Policy", value: "no-referrer" },
-  // PostHog hosts are only contacted after the user opts into session replay;
-  // script-src/connect-src cover its recorder and ingestion, worker-src the
-  // compression worker it spawns.
   {
     key: "Content-Security-Policy",
     value:
-      `default-src 'self'; img-src 'self' data: blob: https://*.posthog.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'${devEval} https://*.posthog.com; connect-src 'self' https: http://127.0.0.1:8000; worker-src 'self' blob: data:; frame-ancestors 'self'`,
+      `default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'${devEval}; connect-src 'self' https: http://127.0.0.1:8000; worker-src 'self' blob: data:; frame-ancestors 'self'`,
   },
   // QR scoreboard cloning needs the camera in this origin; geolocation stays off.
   { key: "Permissions-Policy", value: "camera=(self), geolocation=()" },
