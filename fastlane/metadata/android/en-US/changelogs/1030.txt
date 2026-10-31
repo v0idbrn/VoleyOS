@@ -1,0 +1,5 @@
+Landscape Table Mode: the phone lying sideways becomes a 50/50 giant split scoreboard.
+Courtside DataVolley .dvw suite: import, export and a 1-click demo file.
+Live read-back translates scout shorthand into plain language before Enter.
+Rally linter flags double receptions, missing blocks, illegal attacks and rotation slips.
+Auto-persisted matches, PC shortcuts (A/L/Z/M) and 1-tap boxscore copy.

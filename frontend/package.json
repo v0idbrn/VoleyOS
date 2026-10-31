@@ -1,6 +1,6 @@
 {
   "name": "volleyos-frontend",
-  "version": "10.2.3",
+  "version": "10.3.0",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "scripts": {
@@ -14,6 +14,7 @@
   "dependencies": {
     "jsqr": "^1.4.0",
     "next": "15.1.6",
+    "posthog-js": "1.442.1",
     "qrcode": "^1.5.4",
     "react": "19.0.0",
     "react-dom": "19.0.0",

@@ -2,7 +2,7 @@
 
 [English](README.md) · **Español** · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v10.2.3-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v10.3.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Módulos](https://img.shields.io/badge/módulos-61-FF3B5C?style=for-the-badge&color=EAB308)](#enciclopedia-de-los-61-módulos)
 [![Offline](https://img.shields.io/badge/100%25-offline--primero-FF3B5C?style=for-the-badge&color=EAB308)](#por-qué-existe-volleyos)
 [![Android](https://img.shields.io/badge/APK%20Android-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -13,6 +13,15 @@
 [![Download APK](https://img.shields.io/badge/APK-voleyos--universal.apk-FF3B5C?style=for-the-badge&logo=android)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
 
 APK universal firmado, construido por GitHub Actions en cada tag `v*`. Android 7.0+ (minSdk 24), trilingüe, offline primero, sin cuentas y sin telemetría. Listo para F-Droid.
+
+## 🆕 Novedades de v10.3.0 — Modo Mesa y Courtside
+
+- **📱 Modo Mesa apaisado**: date vuelta en ⏱️ Cancha (o tocá `📱 Modo Mesa`) y toda la pantalla pasa a ser un marcador dividido 50/50 — puntajes gigantes con números tabulares que se suman con un toque, nombre del equipo + insignia `🏐 SACA`, un `−1` en cada esquina exterior y un dock flotante de 5 botones (Deshacer, Cambio de lado, Silbato, Reiniciar 0-0, Salir). El giro de Android es fluido (`configChanges`, sin reiniciar la Activity) y la pantalla nunca se apaga en pleno rally.
+- **⌨️ Consola Courtside DataVolley (Modo Pro)**: escribí siglas como `*14AT#42B2` y leelas en lenguaje claro *antes* de pulsar Enter, anotalas con una tecla, e importá / exportá archivos `.dvw` reales — más una demo en 1 toque para probar sin archivo.
+- **⚠️ Linter de errores de rally**: marca dobles recepciones, ataques bloqueados sin bloqueo rival, atacantes de la fila trasera desde zona frontal y rotaciones desfasadas, en vivo.
+- **🎬 Playlists de clips en el telestrator**: clips con marca de tiempo filtrables por jugador (`#`), habilidad (`S/R/E/A/B/D`) y rotación (`P1..P6`), con edición inline de cada código.
+- **💾 UX a prueba de Reddit**: el partido se persiste solo al recargar, atajos de PC `A/L/Z/S/C/M`, `📋 Copiar Resumen` para copiar el marcador, y ninguna división puede renderizar `NaN%`.
+- **Mantiene todo lo v10.2.3**: ícono de escudo, build limpio para Play Protect, Modo Simple, Cancha renovada y co-arbitraje multi-admin.
 
 ## 🆕 Novedades de v10.2.3 — Escudo y cancha conectada
 

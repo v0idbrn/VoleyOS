@@ -1048,7 +1048,8 @@ export function round4(value: number): number {
 }
 
 export function formatPct(value: number): string {
-  return `${value.toFixed(2)}%`;
+  // v10.3.0 — a NaN/Infinity percentage must never reach the UI.
+  return `${(Number.isFinite(value) ? value : 0).toFixed(2)}%`;
 }
 
 /* --------------------------------------------------------------- module 13 */
@@ -1338,7 +1339,8 @@ export function computeSetterIQ(distributions: SetDistribution[]): SetterIQRepor
   ) as Record<SetTarget, number>;
   const hhi = round2(SET_TARGETS.reduce((sum, target) => sum + shares[target] ** 2, 0) * 100);
   const floor = 1 / SET_TARGETS.length;
-  const unpredictability = Math.max(0, Math.min(100, round2(((1 - hhi / 100) / (1 - floor)) * 100)));
+  const spread = Math.max(1e-9, 1 - floor);
+  const unpredictability = Math.max(0, Math.min(100, round2(((1 - hhi / 100) / spread) * 100)));
   const plus = distributions.filter((item) => item.quality === "+");
   const plusTotal = plus.reduce((sum, item) => sum + item.count, 0);
   let bias: SetTarget | null = null;

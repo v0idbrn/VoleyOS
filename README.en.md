@@ -2,7 +2,7 @@
 
 [English](README.md) · [Español](README.es.md) · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v10.2.3-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v10.3.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Modules](https://img.shields.io/badge/modules-61-FF3B5C?style=for-the-badge&color=EAB308)](#encyclopedia-of-the-61-modules)
 [![Offline](https://img.shields.io/badge/100%25-offline--first-FF3B5C?style=for-the-badge&color=EAB308)](#why-volleyos-exists)
 [![Android](https://img.shields.io/badge/Android%20APK-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -13,6 +13,15 @@
 [![Download APK](https://img.shields.io/badge/APK-voleyos--universal.apk-FF3B5C?style=for-the-badge&logo=android)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
 
 Signed universal APK built by GitHub Actions on every `v*` tag. Android 7.0+ (minSdk 24), trilingual, offline-first, no accounts and no telemetry. F-Droid ready.
+
+## 🆕 What's new in v10.3.0 — Table Mode & Courtside
+
+- **📱 Landscape Table Mode**: turn the phone sideways in ⏱️ Cancha (or tap `📱 Modo Mesa`) and the whole screen becomes a 50/50 split scoreboard — giant tabular scores you tap to score, team name + SACA badge on top, a `−1` in each outer corner and a 5-button floating dock (Undo, Swap side, Whistle, Reset 0-0, Exit). Android rotation is seamless (`configChanges`, no Activity restart) and the screen never dims mid-rally.
+- **⌨️ Courtside DataVolley console (Modo Pro)**: type shorthand like `*14AT#42B2` and read it back in plain language *before* pressing Enter, log it with one key, then import / export real `.dvw` files — plus a 1-click demo sheet so testers need no file.
+- **⚠️ Rally mistake linter**: flags double receptions, attacks marked blocked with no opponent block, back-row players hitting from the front zone and rotation slips, live as you scout.
+- **🎬 Clip playlists in the telestrator**: timestamped clips filterable by player (`#`), skill (`S/R/E/A/B/D`) and rotation (`P1..P6`), each code editable inline.
+- **💾 Reddit-proof UX**: the whole match auto-persists across reloads, PC shortcuts `A/L/Z/S/C/M` work, `📋 Copiar Resumen` copies a boxscore, and no division can ever render `NaN%`.
+- **Keeps everything from v10.2.3**: crest icon, Play Protect-clean build, Modo Simple, renovated Cancha and multi-admin co-scoring.
 
 ## 🆕 What's new in v10.2.3 — Crest Edition
 

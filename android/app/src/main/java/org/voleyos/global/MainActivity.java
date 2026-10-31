@@ -109,6 +109,19 @@ public class MainActivity extends Activity {
         }
 
         /**
+         * v10.3.0 — "Modo Mesa" orientation helper. Zero permissions: it only
+         * flips the Activity's own requested orientation, so the WebView
+         * resizes in place (configChanges) without recreating MainActivity.
+         */
+        @JavascriptInterface
+        public void setTableLandscapeLock(boolean lockLandscape) {
+            activity.runOnUiThread(() -> activity.setRequestedOrientation(
+                    lockLandscape
+                            ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                            : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED));
+        }
+
+        /**
          * Deterministic 8-char uppercase hex device id (XXXX-XXXX) derived from
          * ANDROID_ID via SHA-256. Used to bind licences to one phone.
          */
@@ -949,6 +962,9 @@ public class MainActivity extends Activity {
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        // v10.3.0 — permission-less wake lock: the referee table screen must
+        // never dim mid-rally. Released later only by setKeepScreenAwake(false).
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         // Pure SDK immersive fullscreen; the manifest's screenOrientation keeps
         // the phone's own rotation lock in charge.
         getWindow().getDecorView().setSystemUiVisibility(

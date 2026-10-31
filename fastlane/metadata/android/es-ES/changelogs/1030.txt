@@ -1,0 +1,5 @@
+Modo Mesa apaisado: el teléfono acostado se convierte en un marcador dividido 50/50 gigante.
+Suite Courtside .dvw de DataVolley: importar, exportar y demo en 1 toque.
+Lectura en vivo: traduce las siglas de observación a lenguaje claro antes de Enter.
+El linter detecta dobles recepciones, bloqueos faltantes, ataques ilegales y rotaciones desfasadas.
+Partido que sobrevive al reinicio, atajos de PC (A/L/Z/M) y copiar el marcador en 1 toque.

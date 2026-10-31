@@ -1,0 +1,5 @@
+Modo Mesa apaisado: o celular deitado vira um placar dividido 50/50 gigante.
+Suíte Courtside .dvw do DataVolley: importar, exportar e demo em 1 toque.
+Leitura ao vivo traduz as siglas de observação em português antes do Enter.
+O linter marca duplas recepções, bloqueios faltando, ataques ilegais e rotações desalinhadas.
+Partida que sobrevive ao reinício, atalhos de PC (A/L/Z/M) e copiar o placar em 1 toque.

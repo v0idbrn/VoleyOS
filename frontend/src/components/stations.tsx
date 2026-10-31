@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import jsQR from "jsqr";
@@ -24,6 +24,15 @@ import { announceScoreTTS, isMatchActive, persistLiveScoreboard, readLiveScorebo
 import { clearClonedScoreboard, createQrFrames, emptyIngest, ingestQrFrame, readClonedScoreboard, renderQrSvg, storeClonedScoreboard, type IngestResult, type QrFrame } from "@/lib/qr-transfer";
 import { localizeReactTree } from "@/lib/engine-l10n";
 import { COPY, t } from "@/lib/i18n";
+import {
+  SAMPLE_DEMO_DVW,
+  exportMatchToDvw,
+  lintScoutLogSequence,
+  parseScoutCode,
+  scoutLinesToLogEntries,
+  translateScoutCodeLive,
+  tryParseDvwFile,
+} from "@/lib/datavolley-courtside-engine";
 import { BenchRotator, FlowWizard, PlayerChips } from "@/components/CasualPlayerSuite";
 import { LiveCastModal } from "@/components/LiveCastModal";
 import { bridgeSaveData, sharePng } from "@/lib/png-exporter";
@@ -245,6 +254,77 @@ const BTN_PRIMARY =
 const INPUT =
   "w-full rounded-lg border border-white/15 bg-obsidian px-3 py-2 text-sm text-white outline-none focus:border-volt";
 const LABEL = "text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50";
+
+/**
+ * v10.3.0 — Reddit QA: the active match must survive a tab reload or an app
+ * restart, so the full board (points, sets, set history, names, colours,
+ * format, serve and sides) is mirrored into localStorage under a versioned
+ * key. Skipped under Vitest so every test always boots at 0-0.
+ */
+const TABLE_MATCH_KEY = "voleyos_live_match_state_v1";
+
+const isTestEnv =
+  typeof process !== "undefined" && (process.env.NODE_ENV === "test" || Boolean(process.env.VITEST));
+
+/** A timestamped Courtside clip attached to the telestrator timeline. */
+interface TelestrationClip {
+  id: string;
+  timeMs: number;
+  code: string;
+  rotation: number | null;
+}
+
+/** Bottom dock glass pill shared by the five Modo Mesa controls. */
+const DOCK_BTN: CSSProperties = {
+  padding: "5px 9px",
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.2)",
+  background: "rgba(255,255,255,0.07)",
+  color: "rgba(255,255,255,0.9)",
+  fontSize: 11,
+  fontWeight: 900,
+  whiteSpace: "nowrap",
+  cursor: "pointer",
+};
+
+/** Window surface the Android bridge exposes to the page (v10.3.0 Modo Mesa). */
+type VosBridgeWindow = Window & {
+  VoleyOSBridge?: {
+    setTableLandscapeLock?: (lockLandscape: boolean) => void;
+    setKeepScreenAwake?: (keepAwake: boolean) => void;
+    setVolumeKeyScoring?: (enabled: boolean) => void;
+    setHardwareScoreMode?: (enabled: boolean) => void;
+    triggerHapticPattern?: (patternType: string) => void;
+  };
+  /** Android Back probe: the Activity asks the page before leaving the app. */
+  __vosHandleAndroidBack?: () => string | undefined;
+};
+
+function readTableMatchSnapshot(): ScoreboardState | null {
+  try {
+    const raw = window.localStorage.getItem(TABLE_MATCH_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const snapshot = parsed as Partial<ScoreboardState>;
+    if (typeof snapshot.teamA !== "string" || typeof snapshot.teamB !== "string") return null;
+    if (typeof snapshot.scoreA !== "number" || typeof snapshot.scoreB !== "number") return null;
+    const base = newScoreboard(snapshot.teamA, snapshot.teamB, 3, {
+      matchFormat: snapshot.matchFormat === "short15" || snapshot.matchFormat === "bo5" ? snapshot.matchFormat : "bo3",
+    });
+    return { ...base, ...snapshot } as ScoreboardState;
+  } catch {
+    return null;
+  }
+}
+
+function writeTableMatchSnapshot(state: ScoreboardState): void {
+  try {
+    window.localStorage.setItem(TABLE_MATCH_KEY, JSON.stringify(state));
+  } catch {
+    /* storage unavailable */
+  }
+}
 
 function defaultOpenGuide(): boolean {
   if (typeof window === "undefined") return false;
@@ -960,6 +1040,8 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     if (saved) return newScoreboardHistory(saved);
     const live = readLiveScoreboard();
     if (live) return newScoreboardHistory(live);
+    const snapshot = readTableMatchSnapshot();
+    if (snapshot) return newScoreboardHistory(snapshot);
     return newScoreboardHistory(newScoreboard("Tiburones", "Cóndores", 3, { matchFormat: "bo3" }));
   });
   const [message, setMessage] = useState(t(locale, "Elegí un equipo para sumar.", "Pick a team to score.", "Escolha um time para pontuar."));
@@ -995,6 +1077,11 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [scoreDraft, setScoreDraft] = useState({ a: "0", b: "0", sa: "0", sb: "0" });
   // v10.2.0 — native hardware volume keys score through MainActivity.
   const [volumeScoring, setVolumeScoring] = useState(() => window.localStorage.getItem("volleyos.volumeScoring") === "1");
+  // v10.3.0 — Courtside / DataVolley console (Modo Pro only).
+  const [dvwCommand, setDvwCommand] = useState("");
+  const [dvwLog, setDvwLog] = useState<string[]>([]);
+  const [dvwNotice, setDvwNotice] = useState<string | null>(null);
+  const dvwFileRef = useRef<HTMLInputElement | null>(null);
 
   // The hub toggle and this board share one persisted mode; both dispatch the
   // same event so a switch made on either side stays in sync.
@@ -1011,6 +1098,8 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     return () => window.removeEventListener("volleyos:uimode", onUiMode);
   }, []);
   const undoTimerRef = useRef<number | null>(null);
+  /** v10.3.0 — always holds the freshest keyboard closure (no stale hotkeys). */
+  const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
   const burstTimerRef = useRef<number | null>(null);
   const serveStreakRef = useRef(0);
   const prevPointRef = useRef<{ total: number; serving: ScoreboardState["serving"] } | null>(null);
@@ -1540,6 +1629,12 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     syncWidgetSnapshot();
   }, [state]);
 
+  // v10.3.0 — same snapshot under the versioned key the app boots from.
+  useEffect(() => {
+    if (isTestEnv) return;
+    writeTableMatchSnapshot(state);
+  }, [state]);
+
   useEffect(() => {
     const bridge = (window as Window & { VoleyOSBridge?: { setHardwareScoreMode?: (enabled: boolean) => void } }).VoleyOSBridge;
     // The Android bridge object exists on device but older MainActivity builds
@@ -1604,41 +1699,45 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     setMessage(t(locale, "Jugada rehecha.", "Play redone.", "Jogada refeita."));
   };
 
+  const handleScoreboardKey = (event: KeyboardEvent): void => {
+    const target = event.target;
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+    if (event.metaKey || event.ctrlKey || event.altKey || event.repeat) return;
+    const key = event.key;
+    const lower = key.toLowerCase();
+    // The hardware-volume listener owns the arrows while Vol± scoring is armed.
+    if ((key === "ArrowUp" || key === "ArrowDown") && volumeScoring) return;
+    if (lower === "a" || key === "ArrowUp" || lower === "l" || key === "ArrowDown") {
+      event.preventDefault();
+      point(lower === "a" || key === "ArrowUp" ? leftSide : rightSide);
+    } else if (lower === "z" || key === "Backspace") {
+      event.preventDefault();
+      undo();
+    } else if (lower === "s") {
+      event.preventDefault();
+      setServe(state.serving === "A" ? "B" : "A");
+    } else if (lower === "c") {
+      event.preventDefault();
+      swapSides();
+    } else if (lower === "m") {
+      event.preventDefault();
+      if (isTableLandscapeMode) exitTableMode();
+      else enterTableMode();
+    } else if (lower === "w") {
+      event.preventDefault();
+      playCourtWhistle("short");
+    } else if (lower === "b") {
+      event.preventDefault();
+      playBuzzer();
+    }
+  };
+  keyHandlerRef.current = handleScoreboardKey;
+
   useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      const target = event.target;
-      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
-      if (event.metaKey || event.ctrlKey || event.altKey || event.repeat) return;
-      const key = event.key.toLowerCase();
-      if (key === "a" || key === "l") {
-        event.preventDefault();
-        const team = key === "a" ? "A" : "B";
-        recordScout(state, team, awardIndoorPoint(state, team).rotated);
-        setHistory((previous) => {
-          const result = awardIndoorPoint(previous.present, team);
-          return commitScoreboard(previous, result.state);
-        });
-      } else if (key === "z") {
-        event.preventDefault();
-        setHistory((previous) => undoScoreboard(previous));
-        setScout((previous) => undoScoutPoint(previous));
-      } else if (key === "w") {
-        event.preventDefault();
-        playCourtWhistle("short");
-      } else if (key === "b") {
-        event.preventDefault();
-        playBuzzer();
-      } else if (key === "c") {
-        event.preventDefault();
-        const next = !document.documentElement.classList.contains("high-contrast");
-        document.documentElement.classList.toggle("high-contrast", next);
-        window.localStorage.setItem("volleyos.contrast", next ? "1" : "0");
-        setMessage(t(locale, "Alto contraste alternado.", "High contrast toggled.", "Alto contraste alternado."));
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [locale]);
+    const dispatch = (event: KeyboardEvent): void => keyHandlerRef.current(event);
+    window.addEventListener("keydown", dispatch);
+    return () => window.removeEventListener("keydown", dispatch);
+  }, []);
 
   const togglePocketLock = (): void => {
     const next = !pocketLock;
@@ -1956,6 +2055,60 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     };
   }, []);
 
+  // ------------------------------------------------ v10.3.0 Courtside console
+  const dvwTranslation = translateScoutCodeLive(dvwCommand, locale);
+  const dvwIssues = useMemo(
+    () => lintScoutLogSequence(scoutLinesToLogEntries(dvwLog), locale),
+    [dvwLog, locale],
+  );
+  const dvwLatestIssue = dvwIssues.length > 0 ? dvwIssues[dvwIssues.length - 1] : null;
+
+  const submitDvwCommand = (): void => {
+    if (!dvwTranslation.valid) {
+      setDvwNotice(dvwTranslation.summary);
+      return;
+    }
+    const code = dvwCommand.trim();
+    setDvwLog((previous) => [...previous, code]);
+    setDvwCommand("");
+    setDvwNotice(null);
+    triggerCourtHaptics(10);
+  };
+
+  const loadDvwText = (text: string, label: string): void => {
+    const file = tryParseDvwFile(text);
+    if (!file) {
+      setDvwNotice(t(locale, "Archivo .DVW inválido.", "Invalid .DVW file.", "Arquivo .DVW inválido."));
+      return;
+    }
+    const codes = file.sets.flatMap((set) => set.scout);
+    setHistory((previous) =>
+      commitScoreboard(previous, { ...previous.present, teamA: file.homeTeam, teamB: file.awayTeam }),
+    );
+    setDvwLog(codes);
+    setDvwNotice(
+      `${label} · ${file.sets.length} ${t(locale, "sets", "sets", "sets")} · ${codes.length} ${t(locale, "códigos", "codes", "códigos")}`,
+    );
+    triggerCourtHaptics(14);
+  };
+
+  const exportDvwFile = (): void => {
+    const text = exportMatchToDvw(state, [dvwLog]);
+    try {
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${state.teamA}-${state.teamB}.dvw`.replace(/\s+/g, "_");
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      /* download blocked: the notice below still confirms the export */
+    }
+    setDvwNotice(t(locale, "📤 .DVW exportado.", "📤 .DVW exported.", "📤 .DVW exportado."));
+    triggerCourtHaptics(14);
+  };
+
   const left = swapped
     ? { name: state.teamB, score: state.scoreB, sets: state.setsB, serving: state.serving === "B", color: state.colorB }
     : { name: state.teamA, score: state.scoreA, sets: state.setsA, serving: state.serving === "A", color: state.colorA };
@@ -1965,6 +2118,80 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const leftSide: ScoreboardState["serving"] = swapped ? "B" : "A";
   const rightSide: ScoreboardState["serving"] = swapped ? "A" : "B";
   const showPoint8 = point8SwitchDue(state);
+
+  // ------------------------------------------------------- v10.3.0 Modo Mesa
+  // 50/50 landscape flip scoreboard. It arms itself while the phone lies
+  // horizontal (and was not dismissed for this orientation), and can be forced
+  // from the Cancha top bar on any screen size.
+  const [isTableLandscapeMode, setIsTableLandscapeMode] = useState(false);
+  const [landscapeDismissed, setLandscapeDismissed] = useState(false);
+  const tableModeBootstrappedRef = useRef(false);
+  const tableManualRef = useRef(false);
+
+  const enterTableMode = (): void => {
+    tableManualRef.current = true;
+    setLandscapeDismissed(true);
+    setIsTableLandscapeMode(true);
+    (window as VosBridgeWindow).VoleyOSBridge?.setTableLandscapeLock?.(true);
+    triggerCourtHaptics([20, 15, 20]);
+  };
+
+  const exitTableMode = (): void => {
+    tableManualRef.current = false;
+    setIsTableLandscapeMode(false);
+    (window as VosBridgeWindow).VoleyOSBridge?.setTableLandscapeLock?.(false);
+    triggerCourtHaptics(12);
+  };
+
+  // Auto arm/disarm on rotation: horizontal + short viewport = phone on the
+  // table; back to portrait always leaves the mode and re-arms detection.
+  useEffect(() => {
+    const sync = (): void => {
+      if (window.innerHeight > window.innerWidth) {
+        if (!tableManualRef.current) setIsTableLandscapeMode(false);
+        setLandscapeDismissed(false);
+        return;
+      }
+      if (window.innerHeight <= 560 && !landscapeDismissed) setIsTableLandscapeMode(true);
+    };
+    if (!tableModeBootstrappedRef.current) {
+      tableModeBootstrappedRef.current = true;
+      sync();
+    }
+    window.addEventListener("resize", sync);
+    window.addEventListener("orientationchange", sync);
+    return () => {
+      window.removeEventListener("resize", sync);
+      window.removeEventListener("orientationchange", sync);
+    };
+  }, [landscapeDismissed]);
+
+  // Android Back / Escape leave Modo Mesa instead of the app.
+  useEffect(() => {
+    const target = window as VosBridgeWindow;
+    if (!isTableLandscapeMode) return;
+    const previous = target.__vosHandleAndroidBack;
+    target.__vosHandleAndroidBack = () => {
+      exitTableMode();
+      return "handled";
+    };
+    const onEscape = (event: KeyboardEvent): void => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      exitTableMode();
+    };
+    window.addEventListener("keydown", onEscape);
+    return () => {
+      window.removeEventListener("keydown", onEscape);
+      if (target.__vosHandleAndroidBack) target.__vosHandleAndroidBack = previous;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTableLandscapeMode]);
+
+  const tableHalves = [
+    { key: "left", side: leftSide, data: left },
+    { key: "right", side: rightSide, data: right },
+  ] as const;
 
   return (
     <StationShell
@@ -2003,6 +2230,41 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         >
           ↺ {t(locale, "Reiniciar Set", "Reset Set", "Reiniciar Set")}
         </button>
+        <button
+          type="button"
+          data-testid="enter-table-mode-btn"
+          aria-pressed={isTableLandscapeMode}
+          onClick={() => (isTableLandscapeMode ? exitTableMode() : enterTableMode())}
+          className="rounded-lg border border-white/20 bg-white/5 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white/80 transition hover:border-volt hover:text-volt focus-visible:outline focus-visible:outline-2 focus-visible:outline-volt"
+        >
+          📱 {t(locale, "Modo Mesa", "Table Mode", "Modo Mesa")}
+        </button>
+        <button
+          type="button"
+          data-testid="copy-match-summary-btn"
+          onClick={() => {
+            const setHistoryText = (state.setHistory ?? []).map((entry) => `${entry.scoreA}-${entry.scoreB}`).join(" | ");
+            const summary = `🏐 VoleyOS | ${left.name} ${left.sets} - ${right.sets} ${right.name} (${setHistoryText || "0-0"} | Set actual: ${state.scoreA}-${state.scoreB})`;
+            void navigator.clipboard?.writeText(summary).catch(() => undefined);
+            triggerCourtHaptics(12);
+            setMessage(t(locale, "📋 Resumen copiado.", "📋 Match summary copied.", "📋 Resumo copiado."));
+          }}
+          className="rounded-lg border border-white/20 bg-white/5 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white/80 transition hover:border-volt hover:text-volt focus-visible:outline focus-visible:outline-2 focus-visible:outline-volt"
+        >
+          📋 {t(locale, "Copiar Resumen", "Copy Summary", "Copiar Resumo")}
+        </button>
+        <span
+          data-testid="pc-shortcuts-hint"
+          className="hidden rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-white/45 lg:inline-block"
+        >
+          ⌨️{" "}
+          {t(
+            locale,
+            "Atajos PC: [A] +1 Izq · [L] +1 Der · [Z] Deshacer · [M] Mesa",
+            "PC keys: [A] +1 Left · [L] +1 Right · [Z] Undo · [M] Table",
+            "Atalhos PC: [A] +1 Esq · [L] +1 Dir · [Z] Desfazer · [M] Mesa",
+          )}
+        </span>
         <button
           type="button"
           data-testid="score-edit-open"
@@ -2077,6 +2339,100 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       ) : null}
       {uiMode === "pro" ? (
       <>
+      {!isTableLandscapeMode ? (
+        <div className="vos-item-card mb-2 space-y-2" data-testid="dvw-courtside-console">
+          <p className="text-[10px] font-black uppercase tracking-wider text-white/60">
+            ⌨️{" "}
+            {t(
+              locale,
+              "Consola DataVolley / Courtside",
+              "DataVolley / Courtside Console",
+              "Console DataVolley / Courtside",
+            )}
+          </p>
+          <div className="flex flex-wrap gap-1">
+            <input
+              data-testid="dvw-command-input"
+              value={dvwCommand}
+              onChange={(event) => setDvwCommand(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                submitDvwCommand();
+              }}
+              placeholder={t(locale, "*14AT#42B2", "*14AT#42B2", "*14AT#42B2")}
+              className="min-w-[170px] flex-1 rounded-lg border border-white/15 bg-black/40 px-2 py-1 font-mono text-[11px] text-white focus:border-volt focus:outline-none"
+            />
+            <button type="button" data-testid="dvw-submit-btn" onClick={submitDvwCommand} className={BTN}>
+              ↵ {t(locale, "Anotar", "Log", "Registrar")}
+            </button>
+          </div>
+          <p
+            data-testid="dvw-live-readback"
+            className={`rounded-lg border px-2 py-1 text-[11px] font-bold ${
+              dvwTranslation.valid ? "border-volt/50 bg-volt/10 text-volt" : "border-white/10 bg-white/5 text-white/50"
+            }`}
+          >
+            {dvwTranslation.summary}
+          </p>
+          {dvwLatestIssue ? (
+            <p
+              data-testid="dvw-lint-warning"
+              className="rounded-lg border border-crimson/60 bg-crimson/15 px-2 py-1 text-[11px] font-bold text-white"
+            >
+              ⚠️ {dvwLatestIssue.message}
+            </p>
+          ) : null}
+          {dvwNotice ? (
+            <p data-testid="dvw-notice" className="text-[11px] font-bold text-white/70">
+              {dvwNotice}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              data-testid="dvw-import-btn"
+              onClick={() => dvwFileRef.current?.click()}
+              className={BTN}
+            >
+              📥 {t(locale, "Importar .DVW", "Import .DVW", "Importar .DVW")}
+            </button>
+            <button type="button" data-testid="dvw-export-btn" onClick={exportDvwFile} className={BTN}>
+              📤 {t(locale, "Exportar .DVW", "Export .DVW", "Exportar .DVW")}
+            </button>
+            <button
+              type="button"
+              data-testid="dvw-load-demo-btn"
+              onClick={() =>
+                loadDvwText(
+                  SAMPLE_DEMO_DVW,
+                  t(locale, "🧪 Demo cargada", "🧪 Demo loaded", "🧪 Demo carregada"),
+                )
+              }
+              className={BTN}
+            >
+              🧪 {t(locale, "Cargar Demo .DVW", "Load Demo .DVW", "Carregar Demo .DVW")}
+            </button>
+            <input
+              ref={dvwFileRef}
+              type="file"
+              accept=".dvw,text/plain"
+              className="hidden"
+              data-testid="dvw-file-input"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                void file
+                  .text()
+                  .then((text) => loadDvwText(text, file.name))
+                  .catch(() =>
+                    setDvwNotice(t(locale, "No se pudo leer el archivo.", "Could not read the file.", "Não foi possível ler o arquivo.")),
+                  );
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
       <div className="mb-2 flex flex-wrap gap-1">
         <button type="button" onClick={() => startPicadito()} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "picadito" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>⚡ {t(locale, "Picadito", "Pickup", "Rachinha")}</button>
         <button type="button" onClick={() => setPreset("king")} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "king" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>👑 {t(locale, "Ganador en cancha", "Winner stays", "Vencedor fica")}</button>
@@ -2875,6 +3231,269 @@ ${name}` : name))} testId="cancha-player-chips" />
                 ? `🏆 ${t(locale, "¡Partido cerrado!", "Match closed!", "Partida encerrada!")}`
                 : `🎉 ${t(locale, "¡Set ganado!", "Set won!", "Set ganho!")}`}
             </p>
+          </div>
+        </div>
+      ) : null}
+      {isTableLandscapeMode ? (
+        <div
+          data-testid="landscape-table-scoreboard"
+          role="dialog"
+          aria-label={t(locale, "Modo Mesa", "Table mode", "Modo Mesa")}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9990,
+            display: "flex",
+            flexDirection: "column",
+            background: "#070709",
+            userSelect: "none",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            data-testid="landscape-set-pill"
+            style={{
+              position: "absolute",
+              top: 6,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 3,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "5px 12px",
+              borderRadius: 999,
+              background: "rgba(8,8,12,0.92)",
+              border: "1px solid rgba(255,255,255,0.18)",
+              fontSize: 12,
+              fontWeight: 900,
+              letterSpacing: "0.08em",
+              color: "#FACC15",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <span>SET {currentSet}</span>
+            <span data-testid="landscape-sets-score" style={{ color: "#fff" }}>
+              {left.sets} - {right.sets}
+            </span>
+          </div>
+
+          <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, minHeight: 0, padding: 4 }}>
+            {tableHalves.map((half) => (
+              <div
+                key={half.key}
+                data-testid={`landscape-half-${half.key}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => point(half.side)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  point(half.side);
+                }}
+                style={{
+                  position: "relative",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minHeight: 0,
+                  cursor: "pointer",
+                  borderRadius: 10,
+                  border: `2px solid ${half.data.color || "#ffffff"}`,
+                  background: `radial-gradient(120% 95% at 50% 8%, ${half.data.color || "#333333"}80 0%, ${half.data.color || "#333333"}26 48%, #070709 100%)`,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 6,
+                    left: 8,
+                    right: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 6,
+                    flexDirection: half.key === "left" ? "row" : "row-reverse",
+                  }}
+                >
+                  <button
+                    type="button"
+                    data-testid={`landscape-minus-${half.key}`}
+                    aria-label={t(locale, "Restar punto", "Subtract point", "Subtrair ponto")}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      subtractPoint(half.side);
+                    }}
+                    style={{
+                      padding: "2px 8px",
+                      borderRadius: 8,
+                      border: "1px solid rgba(255,255,255,0.25)",
+                      background: "rgba(0,0,0,0.45)",
+                      color: "rgba(255,255,255,0.85)",
+                      fontSize: 12,
+                      fontWeight: 900,
+                    }}
+                  >
+                    −1
+                  </button>
+                  <span
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      fontSize: "clamp(11px, 2.4vw, 18px)",
+                      fontWeight: 900,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
+                      color: "#fff",
+                    }}
+                  >
+                    <span data-testid={`landscape-name-${half.key}`}>{half.data.name}</span>
+                    <button
+                      type="button"
+                      data-testid={`landscape-serve-${half.key}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setServe(half.side);
+                      }}
+                      style={{
+                        padding: "1px 7px",
+                        borderRadius: 999,
+                        border: `1px solid ${half.data.serving ? "#FACC15" : "rgba(255,255,255,0.3)"}`,
+                        background: half.data.serving ? "rgba(250,204,21,0.22)" : "rgba(0,0,0,0.35)",
+                        color: half.data.serving ? "#FACC15" : "rgba(255,255,255,0.75)",
+                        fontSize: 10,
+                        fontWeight: 900,
+                        opacity: half.data.serving ? 1 : 0.75,
+                      }}
+                    >
+                      🏐 {t(locale, "SACA", "SERVE", "SACA")}
+                    </button>
+                  </span>
+                </div>
+
+                <span
+                  data-testid={`landscape-score-${half.key}`}
+                  style={{
+                    fontSize: "clamp(5.5rem, 24vw, 11rem)",
+                    fontWeight: 900,
+                    lineHeight: 1,
+                    fontVariantNumeric: "tabular-nums",
+                    color: "#ffffff",
+                    textShadow: "0 4px 24px rgba(0,0,0,0.65)",
+                  }}
+                >
+                  {half.data.score}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {matchDone ? (
+            <div
+              data-testid="landscape-winner-banner"
+              style={{
+                position: "absolute",
+                top: 44,
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 3,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "6px 10px",
+                borderRadius: 12,
+                background: "rgba(8,8,12,0.94)",
+                border: "1px solid rgba(250,204,21,0.5)",
+                fontSize: 12,
+                fontWeight: 900,
+                color: "#fff",
+                whiteSpace: "nowrap",
+              }}
+            >
+              🏆 {state.winner === "A" ? state.teamA : state.teamB} {state.setsA}-{state.setsB}
+              <button
+                type="button"
+                data-testid="landscape-rematch-btn"
+                onClick={resetMatch}
+                style={{
+                  padding: "3px 9px",
+                  borderRadius: 999,
+                  background: "#FACC15",
+                  color: "#070709",
+                  fontSize: 11,
+                  fontWeight: 900,
+                }}
+              >
+                🔄 {t(locale, "Revancha 0-0", "Rematch 0-0", "Revanche 0-0")}
+              </button>
+            </div>
+          ) : null}
+
+          <div
+            style={{
+              position: "absolute",
+              bottom: 10,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 3,
+              display: "flex",
+              gap: 6,
+              padding: "6px 10px",
+              borderRadius: 999,
+              background: "rgba(8,8,12,0.88)",
+              border: "1px solid rgba(255,255,255,0.16)",
+              backdropFilter: "blur(8px)",
+              maxWidth: "96vw",
+              flexWrap: "wrap",
+              justifyContent: "center",
+            }}
+          >
+            <button
+              type="button"
+              data-testid="landscape-undo-btn"
+              onClick={undo}
+              style={DOCK_BTN}
+            >
+              ↶ {t(locale, "Deshacer", "Undo", "Desfazer")}
+            </button>
+            <button
+              type="button"
+              data-testid="landscape-swap-btn"
+              onClick={swapSides}
+              style={DOCK_BTN}
+            >
+              🔄 {t(locale, "Cambio de Lado", "Swap sides", "Troca de lado")}
+            </button>
+            <button
+              type="button"
+              data-testid="landscape-whistle-btn"
+              onClick={() => playCourtWhistle("double")}
+              style={DOCK_BTN}
+            >
+              😗 {t(locale, "Silbato", "Whistle", "Apito")}
+            </button>
+            <button
+              type="button"
+              data-testid="landscape-reset-btn"
+              onClick={resetSet}
+              style={DOCK_BTN}
+            >
+              ↺ {t(locale, "Reiniciar (0-0)", "Reset (0-0)", "Zerar (0-0)")}
+            </button>
+            <button
+              type="button"
+              data-testid="landscape-exit-btn"
+              onClick={exitTableMode}
+              style={{ ...DOCK_BTN, borderColor: "rgba(255,255,255,0.35)" }}
+            >
+              ✕ {t(locale, "Salir", "Exit", "Sair")}
+            </button>
           </div>
         </div>
       ) : null}
@@ -4972,6 +5591,12 @@ export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) 
   const [records, setRecords] = useState<AthleteJumpRecord[]>(() => loadAthleteRecords());
   const [clockOn, setClockOn] = useState(false);
   const [clockPos, setClockPos] = useState({ x: 50, y: 36 });
+  // v10.3.0 — Courtside clip playlist: timestamped codes + Jugador/Habilidad/
+  // Rotación filters with inline editing.
+  const [clips, setClips] = useState<TelestrationClip[]>([]);
+  const [clipPlayer, setClipPlayer] = useState("");
+  const [clipSkill, setClipSkill] = useState("");
+  const [clipRotation, setClipRotation] = useState("");
   const report = useMemo(
     () => (strokes.length > 0 ? analyzeTelestration({ frameWidth: 100, frameHeight: 100, strokes, scaleCmPerPx: 1 }) : null),
     [strokes],
@@ -5016,6 +5641,34 @@ export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) 
 
   const flight =
     takeoffT !== null && landingT !== null && landingT > takeoffT ? flightTimeJump(landingT - takeoffT) : null;
+
+  const clipPlayers = Array.from(
+    new Set(
+      clips
+        .map((clip) => parseScoutCode(clip.code)?.player ?? null)
+        .filter((player): player is number => player !== null),
+    ),
+  ).sort((a, b) => a - b);
+
+  const filteredClips = clips.filter((clip) => {
+    const parsed = parseScoutCode(clip.code);
+    if (clipPlayer && (!parsed || `#${parsed.player}` !== clipPlayer)) return false;
+    if (clipSkill && (!parsed || parsed.skill !== clipSkill)) return false;
+    if (clipRotation && String(clip.rotation ?? "") !== clipRotation) return false;
+    return true;
+  });
+
+  const addClip = (): void => {
+    const timeMs = Math.round((videoRef.current?.currentTime ?? 0) * 1000);
+    setClips((previous) => [
+      ...previous,
+      { id: `clip-${timeMs}-${previous.length}`, timeMs, code: "*14AT#", rotation: null },
+    ]);
+  };
+
+  const updateClip = (id: string, patch: Partial<TelestrationClip>): void => {
+    setClips((previous) => previous.map((clip) => (clip.id === id ? { ...clip, ...patch } : clip)));
+  };
 
   const persistJump = (): void => {
     if (!flight) return;
@@ -5359,6 +6012,127 @@ export function VideoTelestratorStation({ meta, locale, onSave }: StationProps) 
           </p>
         </div>
       ) : null}
+      <div className="mt-2 rounded-xl border border-white/10 p-2" data-testid="telestrator-playlist">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-1">
+          <p className="text-[10px] font-black uppercase tracking-wider text-white/60">
+            🎬 {t(locale, "Clips con código", "Coded clips", "Clips com código")}
+          </p>
+          <button type="button" data-testid="telestrator-add-clip-btn" className={BTN} onClick={addClip}>
+            + {t(locale, "Añadir clip", "Add clip", "Adicionar clip")}
+          </button>
+        </div>
+
+        <div className="mb-2 flex flex-wrap gap-1" data-testid="telestrator-filters">
+          <span className="text-[9px] font-bold uppercase text-white/45">
+            {t(locale, "Jugador", "Player", "Jogador")}:
+          </span>
+          {clipPlayers.map((player) => (
+            <button
+              key={player}
+              type="button"
+              data-testid={`telestrator-filter-player-${player}`}
+              aria-pressed={clipPlayer === `#${player}`}
+              onClick={() => setClipPlayer((value) => (value === `#${player}` ? "" : `#${player}`))}
+              className={`rounded-lg border px-2 py-0.5 text-[9px] font-bold ${
+                clipPlayer === `#${player}` ? "border-volt text-volt" : "border-white/10 text-white/55"
+              }`}
+            >
+              #{player}
+            </button>
+          ))}
+          {(["S", "R", "E", "A", "B", "D"] as const).map((skill) => (
+            <button
+              key={skill}
+              type="button"
+              data-testid={`telestrator-filter-skill-${skill}`}
+              aria-pressed={clipSkill === skill}
+              onClick={() => setClipSkill((value) => (value === skill ? "" : skill))}
+              className={`rounded-lg border px-2 py-0.5 text-[9px] font-bold ${
+                clipSkill === skill ? "border-volt text-volt" : "border-white/10 text-white/55"
+              }`}
+            >
+              {skill}
+            </button>
+          ))}
+          {[1, 2, 3, 4, 5, 6].map((rotation) => (
+            <button
+              key={rotation}
+              type="button"
+              data-testid={`telestrator-filter-rotation-p${rotation}`}
+              aria-pressed={clipRotation === String(rotation)}
+              onClick={() => setClipRotation((value) => (value === String(rotation) ? "" : String(rotation)))}
+              className={`rounded-lg border px-2 py-0.5 text-[9px] font-bold ${
+                clipRotation === String(rotation) ? "border-volt text-volt" : "border-white/10 text-white/55"
+              }`}
+            >
+              P{rotation}
+            </button>
+          ))}
+        </div>
+
+        {filteredClips.length === 0 ? (
+          <p data-testid="telestrator-playlist-empty" className="text-[10px] text-white/45">
+            {t(
+              locale,
+              "Sin clips todavía: pausá el video y añadí uno.",
+              "No clips yet: pause the video and add one.",
+              "Sem clips ainda: pause o vídeo e adicione um.",
+            )}
+          </p>
+        ) : (
+          <ul className="space-y-1">
+            {filteredClips.map((clip) => (
+              <li
+                key={clip.id}
+                data-testid="telestrator-clip-row"
+                className="flex flex-wrap items-center gap-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1"
+              >
+                <span className="font-mono text-[10px] text-volt">
+                  {String(Math.floor(clip.timeMs / 60000)).padStart(2, "0")}:
+                  {String(Math.floor((clip.timeMs % 60000) / 1000)).padStart(2, "0")}.
+                  {String(clip.timeMs % 1000).padStart(3, "0")}
+                </span>
+                <input
+                  data-testid="telestrator-clip-code-input"
+                  value={clip.code}
+                  onChange={(event) => updateClip(clip.id, { code: event.target.value })}
+                  className="w-28 rounded border border-white/15 bg-black/50 px-1 py-0.5 font-mono text-[10px] text-white focus:border-volt focus:outline-none"
+                />
+                <select
+                  data-testid="telestrator-clip-rotation"
+                  value={clip.rotation ?? ""}
+                  onChange={(event) => {
+                    const raw = event.target.value;
+                    updateClip(clip.id, { rotation: raw ? Number(raw) : null });
+                  }}
+                  className="rounded border border-white/15 bg-black/50 px-1 py-0.5 text-[10px] text-white focus:border-volt focus:outline-none"
+                >
+                  <option value="">{t(locale, "Sin rotación", "No rotation", "Sem rotação")}</option>
+                  {[1, 2, 3, 4, 5, 6].map((rotation) => (
+                    <option key={rotation} value={rotation}>
+                      P{rotation}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[10px] text-white/50">
+                  {(() => {
+                    const parsed = parseScoutCode(clip.code);
+                    return parsed ? `#${parsed.player} ${parsed.skill}${parsed.evaluation}` : "—";
+                  })()}
+                </span>
+                <button
+                  type="button"
+                  data-testid="telestrator-clip-remove"
+                  className="ml-auto rounded border border-white/15 px-2 text-[10px] text-white/60 hover:text-crimson"
+                  onClick={() => setClips((previous) => previous.filter((item) => item.id !== clip.id))}
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </StationShell>
   );
 }
