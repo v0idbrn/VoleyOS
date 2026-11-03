@@ -1101,7 +1101,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
               <div className="mx-auto max-w-3xl px-3 pb-28 pt-3">
                 <section
                   data-testid="quick-launch-paths"
-                  className="mb-3 grid grid-cols-3 gap-2 rounded-2xl border border-volt/40 bg-gradient-to-b from-volt/10 to-transparent p-2"
+                  className="mb-3 rounded-2xl border border-crimson/30 bg-gradient-to-b from-crimson/15 via-volt/5 to-transparent p-2"
+                  style={{ gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", display: "grid", gap: 8 }}
                 >
                   <button
                     type="button"
@@ -1110,7 +1111,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                       goTab("court");
                       triggerCourtHaptics(22);
                     }}
-                    className="tap flex flex-col items-center gap-1 rounded-xl border border-emerald/50 bg-emerald/15 px-2 py-3 text-center"
+                    className="tap flex flex-col items-center gap-1 rounded-xl px-2 py-4 text-center transition hover:brightness-125 active:scale-[0.98]"
+                    style={{ border: "1px solid rgba(16, 185, 129, 0.55)", background: "linear-gradient(180deg, rgba(16, 185, 129, 0.18), rgba(16, 185, 129, 0.04))", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)" }}
                   >
                     <span aria-hidden className="text-lg">⚡</span>
                     <span className="text-[10px] font-black leading-tight text-emerald">
@@ -1124,7 +1126,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                       openModule("tournament");
                       triggerCourtHaptics(22);
                     }}
-                    className="tap flex flex-col items-center gap-1 rounded-xl border border-volt/50 bg-volt/15 px-2 py-3 text-center"
+                    className="tap flex flex-col items-center gap-1 rounded-xl px-2 py-4 text-center transition hover:brightness-125 active:scale-[0.98]"
+                    style={{ border: "1px solid rgba(234, 179, 8, 0.55)", background: "linear-gradient(180deg, rgba(234, 179, 8, 0.18), rgba(234, 179, 8, 0.04))", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)" }}
                   >
                     <span aria-hidden className="text-lg">📋</span>
                     <span className="text-[10px] font-black leading-tight text-volt">
@@ -1138,7 +1141,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                       openModule("scouting");
                       triggerCourtHaptics(22);
                     }}
-                    className="tap flex flex-col items-center gap-1 rounded-xl border border-crimson/50 bg-crimson/15 px-2 py-3 text-center"
+                    className="tap flex flex-col items-center gap-1 rounded-xl px-2 py-4 text-center transition hover:brightness-125 active:scale-[0.98]"
+                    style={{ border: "1px solid rgba(225, 29, 72, 0.55)", background: "linear-gradient(180deg, rgba(225, 29, 72, 0.18), rgba(225, 29, 72, 0.04))", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)" }}
                   >
                     <span aria-hidden className="text-lg">📊</span>
                     <span className="text-[10px] font-black leading-tight text-crimson">
@@ -1261,24 +1265,43 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 </div>
 
                 <div data-testid="workstation-bar" className="snap-row mt-3 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={t(locale, "Workstations", "Workstations", "Workstations")}>
-                  {WORKSTATIONS.map((workstation) => (
-                    <button
-                      key={workstation.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={workstationId === workstation.id}
-                      data-testid={`workstation-pill-${workstation.id}`}
-                      onClick={() => {
-                        setWorkstationId(workstation.id);
-                        triggerCourtHaptics(18);
-                      }}
-                      className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
-                        workstationId === workstation.id ? "border-emerald bg-emerald text-obsidian" : "border-white/10 text-white/60"
-                      }`}
-                    >
-                      {workstation.icon} {workstation.label[locale]}
-                    </button>
-                  ))}
+                  {WORKSTATIONS.map((workstation) => {
+                    const isActive = workstationId === workstation.id;
+                    return (
+                      <button
+                        key={workstation.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={isActive}
+                        data-testid={`workstation-pill-${workstation.id}`}
+                        onClick={() => {
+                          setWorkstationId(workstation.id);
+                          triggerCourtHaptics(18);
+                        }}
+                        className={`tap flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold transition active:scale-[0.97] ${
+                          isActive ? "text-white" : "border-white/10 text-white/60"
+                        }`}
+                        style={
+                          isActive
+                            ? { borderColor: "#E11D48", background: "#E11D48", boxShadow: "0 0 12px rgba(225, 29, 72, 0.45)" }
+                            : undefined
+                        }
+                      >
+                        <span aria-hidden>{workstation.icon}</span>
+                        <span>{workstation.label[locale]}</span>
+                        <span
+                          className="rounded-full px-1.5 py-0.5 text-[9px] font-black tabular-nums"
+                          style={
+                            isActive
+                              ? { background: "rgba(255, 255, 255, 0.22)", color: "#fff" }
+                              : { background: "rgba(255, 255, 255, 0.08)", color: "rgba(255,255,255,0.55)" }
+                          }
+                        >
+                          {workstation.slugs.length}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <div data-testid="profile-filters" className="snap-row mt-1.5 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={shell.allModules}>

@@ -120,9 +120,11 @@ export function parseWhatsAppPlayerNames(rawText: string): string[] {
 }
 
 /**
- * Greedy MMR balancer: highest rated player is assigned alternately to the
- * team currently weakest, so both teams end within a point of each other.
- * Rosters of 7–9 players also get the bench rotation order.
+ * Optimal MMR balancer: snake seeding (A, B, B, A …) over the descending
+ * rating list, then a strict-improvement refiner that explores every
+ * 1-for-1 and 2-for-2 cross-team swap until the |sumA − sumB| delta cannot
+ * be reduced further. Swaps are size-preserving, so roster sizes stay
+ * balanced. Rosters of 7–9 players also get the bench rotation order.
  */
 export function parseWhatsAppListAndBalanceTeams(
   rawText: string,
@@ -141,23 +143,83 @@ export function parseWhatsAppListAndBalanceTeams(
     })
     .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name));
 
-  const teamA: string[] = [];
-  const teamB: string[] = [];
-  const totals = { A: 0, B: 0 };
+  // Snake seed: pattern A, B, B, A repeats, keeping sizes within one player.
+  const teamA: { name: string; rating: number }[] = [];
+  const teamB: { name: string; rating: number }[] = [];
   for (const player of rated) {
-    const toA = teamA.length < teamB.length || (teamA.length === teamB.length && totals.A <= totals.B);
+    const toA = teamA.length < teamB.length || (teamA.length === teamB.length && sum(teamA) <= sum(teamB));
     if (toA) {
-      teamA.push(player.name);
-      totals.A += player.rating;
+      teamA.push(player);
     } else {
-      teamB.push(player.name);
-      totals.B += player.rating;
+      teamB.push(player);
     }
   }
+
+  let sumA = sum(teamA);
+  let sumB = sum(teamB);
+  let delta = Math.abs(sumA - sumB);
+  for (;;) {
+    let improved = false;
+    // 1-for-1 swaps: strict improvement on every application.
+    for (let i = 0; i < teamA.length; i += 1) {
+      for (let j = 0; j < teamB.length; j += 1) {
+        const a = teamA[i];
+        const b = teamB[j];
+        if (!a || !b) continue;
+        const newSumA = sumA - a.rating + b.rating;
+        const newSumB = sumB - b.rating + a.rating;
+        const newDelta = Math.abs(newSumA - newSumB);
+        if (newDelta < delta - 1e-9) {
+          teamA[i] = b;
+          teamB[j] = a;
+          sumA = newSumA;
+          sumB = newSumB;
+          delta = newDelta;
+          improved = true;
+        }
+      }
+    }
+    if (delta === 0) break;
+    // 2-for-2 swaps: pair swaps that no 1-for-1 can reach.
+    for (let i = 0; i < teamA.length; i += 1) {
+      for (let j = i + 1; j < teamA.length; j += 1) {
+        for (let k = 0; k < teamB.length; k += 1) {
+          for (let l = k + 1; l < teamB.length; l += 1) {
+            const a1 = teamA[i];
+            const a2 = teamA[j];
+            const b1 = teamB[k];
+            const b2 = teamB[l];
+            if (!a1 || !a2 || !b1 || !b2) continue;
+            const newSumA = sumA - a1.rating - a2.rating + b1.rating + b2.rating;
+            const newSumB = sumB - b1.rating - b2.rating + a1.rating + a2.rating;
+            const newDelta = Math.abs(newSumA - newSumB);
+            if (newDelta < delta - 1e-9) {
+              teamA[i] = b1;
+              teamA[j] = b2;
+              teamB[k] = a1;
+              teamB[l] = a2;
+              sumA = newSumA;
+              sumB = newSumB;
+              delta = newDelta;
+              improved = true;
+            }
+          }
+        }
+      }
+    }
+    if (!improved) break;
+  }
+
   // Bench: the lowest rated players sit first and re-enter in this order.
   const starters = Math.max(2, Math.min(teamA.length, teamB.length) * 2);
-  const bench = [...teamA, ...teamB].slice(starters, starters + 3);
-  return { teamA, teamB, bench, unrated };
+  const finalA = teamA.map((player) => player.name);
+  const finalB = teamB.map((player) => player.name);
+  const bench = [...finalA, ...finalB].slice(starters, starters + 3);
+  return { teamA: finalA, teamB: finalB, bench, unrated };
+}
+
+function sum(team: { rating: number }[]): number {
+  return team.reduce((total, player) => total + player.rating, 0);
 }
 
 /* ------------------------------------- La Vaquita 2.0 debtors ledger ("voleyos_vaquita_debts_v1") */

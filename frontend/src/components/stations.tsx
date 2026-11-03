@@ -2552,7 +2552,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       </div>
       <div
         data-testid="inline-live-metrics-strip"
-        className={`mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-white/60${focusMode ? " hidden" : ""}`}
+        className={`mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-white/60 tabular-nums${focusMode ? " hidden" : ""}`}
       >
         <span className="text-volt">📊</span>
         <span>K1 {fmtPct(statsA.k1Pct)}</span>
@@ -3421,13 +3421,26 @@ ${name}` : name))} testId="cancha-player-chips" />
       {/* v11.0.0 — vertical primary dock: always reachable, works with one thumb */}
       <nav
         data-testid="cancha-primary-dock"
-        className="fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/15 bg-obsidian/95 px-2 py-2 shadow-2xl backdrop-blur"
+        className="fixed bottom-3 left-1/2 z-30 -translate-x-1/2"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 8,
+          width: "min(94vw, 30rem)",
+          padding: 8,
+          borderRadius: 16,
+          background: "rgba(15, 15, 22, 0.92)",
+          backdropFilter: "blur(12px)",
+          border: "1px solid rgba(225, 29, 72, 0.28)",
+          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.55)",
+        }}
       >
         <button
           type="button"
           data-testid="cancha-dock-undo"
           onClick={undo}
-          className="rounded-full border border-white/20 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white/85 transition hover:border-volt hover:text-volt"
+          className="rounded-xl border border-white/20 bg-white/5 text-white/85 transition hover:border-volt hover:text-volt active:translate-y-px"
+          style={{ minHeight: 46, fontSize: "0.82rem", fontWeight: 800 }}
         >
           ↶ {t(locale, "Deshacer", "Undo", "Desfazer")}
         </button>
@@ -3438,7 +3451,8 @@ ${name}` : name))} testId="cancha-player-chips" />
             playCourtWhistle("short");
             triggerCourtHaptics(10);
           }}
-          className="rounded-full border border-white/20 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white/85 transition hover:border-volt hover:text-volt"
+          className="rounded-xl border border-white/20 bg-white/5 text-white/85 transition hover:border-volt hover:text-volt active:translate-y-px"
+          style={{ minHeight: 46, fontSize: "0.82rem", fontWeight: 800 }}
         >
           🔊 {t(locale, "Audio", "Audio", "Áudio")}
         </button>
@@ -3447,7 +3461,15 @@ ${name}` : name))} testId="cancha-player-chips" />
           data-testid="enter-table-mode-btn"
           aria-pressed={isTableLandscapeMode}
           onClick={() => (isTableLandscapeMode ? exitTableMode() : enterTableMode())}
-          className="rounded-full border border-volt/40 bg-volt/10 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-volt transition hover:brightness-110"
+          className="rounded-xl transition hover:brightness-110 active:translate-y-px"
+          style={{
+            minHeight: 46,
+            fontSize: "0.82rem",
+            fontWeight: 800,
+            border: `1px solid ${isTableLandscapeMode ? "#E11D48" : "rgba(234, 179, 8, 0.4)"}`,
+            background: isTableLandscapeMode ? "rgba(225, 29, 72, 0.22)" : "rgba(234, 179, 8, 0.10)",
+            color: isTableLandscapeMode ? "#FF1744" : "#EAB308",
+          }}
         >
           📱 {t(locale, "Modo Mesa", "Table Mode", "Modo Mesa")}
         </button>
@@ -3459,7 +3481,8 @@ ${name}` : name))} testId="cancha-player-chips" />
             setMoreOpen((previous) => !previous);
             triggerCourtHaptics(8);
           }}
-          className="rounded-full border border-white/20 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white/85 transition hover:border-volt hover:text-volt"
+          className="rounded-xl border border-white/20 bg-white/5 text-white/85 transition hover:border-crimson hover:text-crimson active:translate-y-px"
+          style={{ minHeight: 46, fontSize: "0.82rem", fontWeight: 800 }}
         >
           ⋯ {t(locale, "Partido", "Match", "Partida")}
         </button>
@@ -3618,7 +3641,7 @@ ${name}` : name))} testId="cancha-player-chips" />
             </div>
           </div>
           {/* 15-second timeout diagnostic: 1 problem + 2 evidences + 1 action, zero NaN */}
-          <div data-testid="timeout-diagnostic-card" className="space-y-1 rounded-xl border border-crimson/50 bg-crimson/10 p-2 text-[10px] text-white/80">
+          <div data-testid="timeout-diagnostic-card" className="space-y-1 rounded-xl border p-2 text-[10px] text-white/80" style={{ borderColor: "rgba(225, 29, 72, 0.55)", background: "rgba(225, 29, 72, 0.10)", fontVariantNumeric: "tabular-nums" }}>
             <p className="font-black uppercase tracking-wider text-crimson">⏱️ {t(locale, "Sacada de 15s", "15s Timeout Card", "Sacada de 15s")}</p>
             <p>
               <strong>{t(locale, "Problema", "Problem", "Problema")}:</strong>{" "}
@@ -3642,7 +3665,7 @@ ${name}` : name))} testId="cancha-player-chips" />
               {t(locale, "Subir la calidad del primer toque y repetitive el saque más atacado.", "Raise first-ball quality and repeat the best serve zone.", "Subir a qualidade da primeira bola e repetir o saque mais atacado.")}
             </p>
           </div>
-          <div data-testid="three-match-keys-card" className="space-y-1 rounded-xl border border-volt/40 bg-volt/5 p-2 text-[10px] text-white/80">
+          <div data-testid="three-match-keys-card" className="space-y-1 rounded-xl border p-2 text-[10px] text-white/80" style={{ borderColor: "rgba(245, 158, 11, 0.55)", background: "rgba(245, 158, 11, 0.08)", fontVariantNumeric: "tabular-nums" }}>
             <p className="font-black uppercase tracking-wider text-volt">🔑 {t(locale, "Las 3 Claves del Partido", "3 Match Keys", "As 3 Chaves da Partida")}</p>
             <ul className="list-decimal space-y-0.5 pl-4">
               <li>{t(locale, `K1 ${fmtPct(statsA.k1Pct)} · rival ${fmtPct(statsB.k1Pct)}`, `K1 ${fmtPct(statsA.k1Pct)} · rival ${fmtPct(statsB.k1Pct)}`, `K1 ${fmtPct(statsA.k1Pct)} · rival ${fmtPct(statsB.k1Pct)}`)}</li>
@@ -3655,7 +3678,8 @@ ${name}` : name))} testId="cancha-player-chips" />
       {hubOpen ? (
         <section
           data-testid="end-of-match-hub"
-          className="fixed bottom-20 left-1/2 z-40 w-[min(94vw,30rem)] -translate-x-1/2 space-y-2 rounded-2xl border border-volt/50 bg-obsidian/95 p-3 shadow-2xl backdrop-blur"
+          className="fixed bottom-20 left-1/2 z-40 -translate-x-1/2 space-y-2 rounded-2xl p-3 shadow-2xl"
+          style={{ width: "min(94vw, 30rem)", background: "rgba(15, 15, 22, 0.92)", backdropFilter: "blur(12px)", border: "1px solid rgba(225, 29, 72, 0.28)", fontVariantNumeric: "tabular-nums" }}
         >
           <div className="flex items-center justify-between">
             <h3 className="text-[11px] font-black uppercase tracking-wider text-volt">🏁 {t(locale, "Cierre y 3er Tiempo", "Close & After-Match", "Encerramento e 3º tempo")}</h3>
@@ -3882,7 +3906,13 @@ ${name}` : name))} testId="cancha-player-chips" />
       {uiMode === "pro" && !soloTeams && scoutDepth >= 2 ? (
         <div
           data-testid="quick-rally-tagger"
-          className="fixed bottom-24 left-1/2 z-40 w-[min(94vw,26rem)] -translate-x-1/2 rounded-2xl border border-volt/40 bg-obsidian/95 p-2 shadow-2xl backdrop-blur"
+          className="fixed bottom-24 left-1/2 z-40 -translate-x-1/2 rounded-2xl p-2 shadow-2xl"
+          style={{
+            width: "min(94vw, 26rem)",
+            background: "rgba(15, 15, 22, 0.92)",
+            backdropFilter: "blur(12px)",
+            border: "1px solid rgba(225, 29, 72, 0.28)",
+          }}
         >
           <div className="mb-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-white/50">
             <span>⚡ {t(locale, "Tag rápido → .DVW", "Quick tag → .DVW", "Tag rápido → .DVW")}</span>
@@ -3899,32 +3929,59 @@ ${name}` : name))} testId="cancha-player-chips" />
               ))}
             </select>
           </div>
+          <div data-testid="tagger-jersey-chips" className="flex gap-1 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+            {Array.from({ length: 18 }, (_, index) => index + 1).map((number_) => {
+              const isT = taggerJersey === number_;
+              return (
+                <button
+                  key={number_}
+                  type="button"
+                  onClick={() => setTaggerJersey(number_)}
+                  className="tap shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black transition active:scale-95"
+                  style={
+                    isT
+                      ? { background: "#E11D48", color: "#fff", border: "1px solid #FF1744" }
+                      : { background: "rgba(255, 255, 255, 0.06)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.15)" }
+                  }
+                >
+                  #{number_}
+                </button>
+              );
+            })}
+          </div>
           <div className="flex flex-wrap gap-1">
-            {(["attack", "block", "ace", "error"] as ScoutAction[]).map((action) => (
+            {([
+              ["attack", "rgba(16, 185, 129, 0.18)", "#10B981"],
+              ["block", "rgba(14, 165, 233, 0.18)", "#0EA5E9"],
+              ["ace", "rgba(245, 158, 11, 0.18)", "#F59E0B"],
+              ["error", "rgba(225, 29, 72, 0.18)", "#E11D48"],
+            ] as const).map(([action, tint, accent]) => (
               <button
                 key={action}
                 type="button"
                 data-testid={`tagger-${action}`}
                 onClick={() => appendDvwCode(taggerCode(action, taggerJersey))}
-                className="tap rounded-lg border border-white/15 bg-white/5 px-2 py-1.5 text-[10px] font-black text-white/85 transition active:scale-95"
+                className="tap rounded-lg px-2 py-1.5 text-[10px] font-black transition active:scale-95"
+                style={{ background: tint, border: `1px solid ${accent}`, color: accent }}
               >
                 {scoutActionLabel(action).split(" ")[0]} {action === "attack" ? t(locale, "Ataque", "Attack", "Ataque") : action === "block" ? t(locale, "Bloqueo", "Block", "Bloqueio") : action === "ace" ? t(locale, "Ace", "Ace", "Ace") : t(locale, "Error", "Error", "Erro")}
               </button>
             ))}
-            <span data-testid="tagger-last-code" className="rounded bg-volt/15 px-2 py-1 text-[10px] font-black text-volt">
+            <span data-testid="tagger-last-code" className="rounded bg-volt/15 px-2 py-1 text-[10px] font-black text-volt" style={{ fontVariantNumeric: "tabular-nums" }}>
               {dvwLog[dvwLog.length - 1] ?? ""}
             </span>
           </div>
-          <div data-testid="swipe-scout-pad" className="mt-1 grid grid-cols-4 gap-1">
-            {([["up", "⬆️"], ["down", "⬇️"], ["right", "➡️"], ["left", "⬅️"]] as const).map(([direction, icon]) => (
+          <div data-testid="swipe-scout-pad" className="mt-1 grid grid-cols-3 gap-1" style={{ width: "9.5rem", marginInlineStart: "auto", marginInlineEnd: "auto" }}>
+            {([["up", "⬆️", "#", 2, 1], ["left", "⬅️", "/", 1, 2], ["right", "➡️", "+", 3, 2], ["down", "⬇️", "=", 2, 3]] as const).map(([direction, icon, badge, col, row]) => (
               <button
                 key={direction}
                 type="button"
                 data-testid={`swipe-${direction}`}
                 onClick={() => appendDvwCode(SWIPE_CODES[direction])}
                 className="tap rounded-lg border border-white/15 bg-white/5 py-1.5 text-[11px] font-black text-white/85 transition active:scale-95"
+                style={{ gridColumn: col, gridRow: row }}
               >
-                {icon}
+                {icon} <span className="text-[9px] text-volt">{badge}</span>
               </button>
             ))}
           </div>

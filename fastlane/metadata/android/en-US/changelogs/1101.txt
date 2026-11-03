@@ -1,0 +1,4 @@
+💄 v11.0.1 broadcast polish: glassmorphic dock, color-coded tagger pills and a 360px-ready swipe compass.
+🧮 Optimal MMR balancing: snake seed + 1-for-1 and 2-for-2 swap optimizer down to the exact minimum delta.
+🎨 Diagnostic/keys cards with status borders and tabular digits; end-of-match hub and hero quick-launch restyled.
+🔒 Zero telemetry: 0 PostHog, 0 session-replay.

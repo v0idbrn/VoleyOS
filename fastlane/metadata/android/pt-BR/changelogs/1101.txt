@@ -1,0 +1,4 @@
+💄 Polimento broadcast v11.0.1: dock glassmórfico, pills do tagger codificadas por cor e bússola de swipe em 360px.
+🧮 Balanceamento MMR ótimo: seed serpente + otimizador de trocas 1×1 e 2×2 até o delta mínimo exato.
+🎨 Cartões de diagnóstico/chaves com bordas de status e dígitos tabulares; hub de encerramento e quick-launch de herói.
+🔒 Zero telemetria: 0 PostHog, 0 session-replay.

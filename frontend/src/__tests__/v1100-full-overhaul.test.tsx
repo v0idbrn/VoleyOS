@@ -154,6 +154,16 @@ describe("v11.0.0 Full Overhaul", () => {
     expect(JSON.stringify(JSON.parse(stored ?? "{}").teamA)).toContain("Ana");
   });
 
+  it("balances the tricky 6-player split optimally (0 delta where greedy snake fails)", () => {
+    const ratings: Record<string, number> = { Ana: 1800, Beto: 1700, Cara: 1400, Dario: 1300, Emma: 1200, Fabi: 1000 };
+    const balance = parseWhatsAppListAndBalanceTeams("1. Ana\n2. Beto\n3. Cara\n4. Dario\n5. Emma\n6. Fabi", ratings);
+    const totalA = balance.teamA.reduce((sum_, name) => sum_ + (ratings[name] ?? 0), 0);
+    const totalB = balance.teamB.reduce((sum_, name) => sum_ + (ratings[name] ?? 0), 0);
+    expect(totalA).toBe(4200);
+    expect(totalB).toBe(4200);
+    expect(Math.abs(totalA - totalB)).toBe(0);
+  });
+
   it("boots Cancha with the teams pushed from the WhatsApp pipeline", () => {
     window.localStorage.setItem(
       PIPELINE_TEAMS_KEY,

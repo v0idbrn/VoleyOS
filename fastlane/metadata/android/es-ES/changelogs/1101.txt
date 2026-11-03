@@ -1,0 +1,4 @@
+💄 Pulido broadcast v11.0.1: dock glassmorfico, pills de tag codificadas por color y brújula de swipe a 360px.
+🧮 Balanceo MMR óptimo: seed serpiente + optimizador de intercambios 1×1 y 2×2 hasta delta mínimo exacto.
+🎨 Tarjetas de diagnóstico/llaves con bordes de estado y dígitos tabulares; hub de cierre y quick-launch de héroe.
+🔒 Sin telemetría: 0 PostHog, 0 session-replay.
