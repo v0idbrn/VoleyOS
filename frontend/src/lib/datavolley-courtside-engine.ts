@@ -701,3 +701,199 @@ export function scoutLinesToLogEntries(rallies: string[], rotations: number[] = 
   });
   return entries;
 }
+
+/* ------------------------------------------------------- v11.0.0 FIVB rules */
+
+export type RotationSlot = 1 | 2 | 3 | 4 | 5 | 6;
+export interface RotationPosition {
+  /** Court x in [0, 9], 0 = left sideline (from the serving team's view). */
+  x: number;
+  /** Court y in [0, 9], 0 = the net, 9 = the own baseline. */
+  y: number;
+}
+
+export interface RotationOverlapResult {
+  legal: boolean;
+  violations: string[];
+}
+
+/**
+ * Official FIVB 5-1 overlap check at serve contact. Front row is P4 (left),
+ * P3 (middle), P2 (right); back row P5 (left), P6 (middle), P1 (right).
+ * Rules: inside each row the left-to-right order must hold, and each front
+ * player must sit closer to the net (smaller y) than their column counterpart.
+ */
+export function validateFivbRotationOverlap(
+  positions: Record<RotationSlot, RotationPosition>,
+): RotationOverlapResult {
+  const violations: string[] = [];
+  const pairs: Array<[{ slot: RotationSlot; x: number }, { slot: RotationSlot; x: number }]> = [
+    [{ slot: 4, x: positions[4].x }, { slot: 3, x: positions[3].x }],
+    [{ slot: 3, x: positions[3].x }, { slot: 2, x: positions[2].x }],
+    [{ slot: 5, x: positions[5].x }, { slot: 6, x: positions[6].x }],
+    [{ slot: 6, x: positions[6].x }, { slot: 1, x: positions[1].x }],
+  ];
+  for (const [left, right] of pairs) {
+    if (!(left.x < right.x)) {
+      violations.push(`P${left.slot}/P${right.slot}`);
+    }
+  }
+  const columns: Array<{ front: RotationSlot; back: RotationSlot }> = [
+    { front: 4, back: 5 },
+    { front: 3, back: 6 },
+    { front: 2, back: 1 },
+  ];
+  for (const { front, back } of columns) {
+    if (!(positions[front].y < positions[back].y)) {
+      violations.push(`P${front}<P${back}`);
+    }
+  }
+  return { legal: violations.length === 0, violations };
+}
+
+export interface FivbPoolMatch {
+  teamA: string;
+  teamB: string;
+  /** Per-set [pointsA, pointsB] in played order; must be non-empty. */
+  setScores: Array<[number, number]>;
+}
+
+/* --------------------------------------------------- v11.0.0 smart auto-libero */
+
+export interface AutoLiberoPair {
+  libero: number;
+  replaced: number;
+}
+
+export interface AutoLiberoResult {
+  lineup: number[];
+  active: AutoLiberoPair | null;
+}
+
+/**
+ * Pure smart-libero step: a middle blocker sitting in a back-row lineup slot
+ * (indices 0/4/5 = P1/P5/P6) is swapped for the roster libero until the MB
+ * reaches front row (index 3 = P4). This is a jersey swap, never a counted
+ * substitution. `active` carries the in-court pair across rotations.
+ */
+export function applyAutoLiberoSwap(
+  lineup: number[],
+  roster: ReadonlyArray<{ number: number; role: string }>,
+  active: AutoLiberoPair | null,
+): AutoLiberoResult {
+  const libero = roster.find((player) => player.role === "L")?.number;
+  if (libero === undefined) return { lineup, active: null };
+  const backSlots = [0, 4, 5];
+  if (active) {
+    const slot = lineup.indexOf(active.libero);
+    if (slot === 3 || (slot >= 0 && !backSlots.includes(slot))) {
+      const restored = [...lineup];
+      restored[slot] = active.replaced;
+      return { lineup: restored, active: null };
+    }
+    return { lineup, active };
+  }
+  const roleOf = (index: number): string =>
+    roster.find((player) => player.number === lineup[index])?.role ?? "";
+  const mbSlot = backSlots.find((index) => roleOf(index) === "MB");
+  if (mbSlot === undefined) return { lineup, active: null };
+  if (lineup.includes(libero)) return { lineup, active };
+  const working = [...lineup];
+  const replaced = working[mbSlot] ?? -1;
+  working[mbSlot] = libero;
+  return { lineup: working, active: { libero, replaced } };
+}
+
+export type FivbPoolRow = {
+  team: string;
+  matches: number;
+  matchesWon: number;
+  matchesLost: number;
+  setsWon: number;
+  setsLost: number;
+  pointsWon: number;
+  pointsLost: number;
+  matchPoints: number;
+  setQuotient: number;
+  pointQuotient: number;
+};
+
+/**
+ * Official FIVB tie-break chain for pools: Matches Won → Match Points
+ * (3-0/3-1 win = 3, 3-2 win = 2, 3-2 loss = 1, otherwise 0) → Set Quotient →
+ * Point Quotient. Immutable rows, ties sorted by team name for determinism.
+ */
+export function computeFivbPoolStandings(matches: FivbPoolMatch[]): FivbPoolRow[] {
+  const rows = new Map<string, FivbPoolRow>();
+  const rowFor = (team: string): FivbPoolRow => {
+    const existing = rows.get(team);
+    if (existing) return existing;
+    const fresh: FivbPoolRow = {
+      team,
+      matches: 0,
+      matchesWon: 0,
+      matchesLost: 0,
+      setsWon: 0,
+      setsLost: 0,
+      pointsWon: 0,
+      pointsLost: 0,
+      matchPoints: 0,
+      setQuotient: 0,
+      pointQuotient: 0,
+    };
+    rows.set(team, fresh);
+    return fresh;
+  };
+
+  for (const match of matches) {
+    const setsA = match.setScores.filter(([a, b]) => a > b).length;
+    const setsB = match.setScores.filter(([a, b]) => b > a).length;
+    if (setsA === setsB) continue; // unfinished/malformed match: no standings change
+    const pointsA = match.setScores.reduce((total, [a]) => total + a, 0);
+    const pointsB = match.setScores.reduce((total, [, b]) => total + b, 0);
+    const winnerALed = setsA > setsB;
+    const setsWinner = winnerALed ? setsA : setsB;
+    const setsLoser = winnerALed ? setsB : setsA;
+    const rowWinner = rowFor(winnerALed ? match.teamA : match.teamB);
+    const rowLoser = rowFor(winnerALed ? match.teamB : match.teamA);
+    rowWinner.matches += 1;
+    rowLoser.matches += 1;
+    if (winnerALed) {
+      rowWinner.matchesWon += 1;
+      rowLoser.matchesLost += 1;
+    } else {
+      rowWinner.matchesLost += 1;
+      rowLoser.matchesWon += 1;
+    }
+    rowWinner.setsWon += setsWinner;
+    rowWinner.setsLost += setsLoser;
+    rowLoser.setsWon += setsLoser;
+    rowLoser.setsLost += setsWinner;
+    rowWinner.pointsWon += Math.max(pointsA, pointsB);
+    rowWinner.pointsLost += Math.min(pointsA, pointsB);
+    rowLoser.pointsWon += Math.min(pointsA, pointsB);
+    rowLoser.pointsLost += Math.max(pointsA, pointsB);
+    // FIVB match points: 3-0/3-1 win = 3 · 3-2 win = 2 · 3-2 loss = 1 · else 0.
+    if (setsLoser === 2) {
+      rowWinner.matchPoints += 2;
+      rowLoser.matchPoints += 1;
+    } else {
+      rowWinner.matchPoints += 3;
+    }
+  }
+
+  for (const row of rows.values()) {
+    row.setQuotient = row.setsLost === 0 ? Number.POSITIVE_INFINITY : row.setsWon / row.setsLost;
+    row.pointQuotient =
+      row.pointsLost === 0 ? Number.POSITIVE_INFINITY : row.pointsWon / row.pointsLost;
+  }
+
+  return [...rows.values()].sort(
+    (a, b) =>
+      b.matchesWon - a.matchesWon ||
+      b.matchPoints - a.matchPoints ||
+      b.setQuotient - a.setQuotient ||
+      b.pointQuotient - a.pointQuotient ||
+      a.team.localeCompare(b.team),
+  );
+}

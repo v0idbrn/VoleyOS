@@ -746,6 +746,93 @@ export const MODULES: ModuleMeta[] = [
 
 export const MODULE_BY_SLUG = new Map(MODULES.map((module) => [module.slug, module]));
 
+/* ------------------------------------------------- v11.0.0 workstations */
+
+export type WorkstationId =
+  | "all"
+  | "match"
+  | "team"
+  | "court"
+  | "scouting"
+  | "tactics"
+  | "video"
+  | "performance"
+  | "community";
+
+export interface Workstation {
+  id: WorkstationId;
+  icon: string;
+  label: Record<Locale, string>;
+  /** Every module lives in exactly one workstation; "all" shows every module. */
+  slugs: string[];
+}
+
+export const WORKSTATIONS: Workstation[] = [
+  { id: "all", icon: "🏟️", label: { es: "Todas", en: "All", pt: "Todas" }, slugs: MODULES.map((module) => module.slug) },
+  {
+    id: "match",
+    icon: "📋",
+    label: { es: "Partido", en: "Match", pt: "Partida" },
+    slugs: [
+      "tournament", "bracket-architect", "lineup-slip", "match-poster", "play-by-play", "mvp-awards",
+      "referee-console", "substitution-tracker", "integrity-seal", "tiebreak-commander", "house-rules", "fivb-escoresheet",
+    ],
+  },
+  {
+    id: "team",
+    icon: "👥",
+    label: { es: "Equipo", en: "Team", pt: "Equipe" },
+    slugs: [
+      "roster-pass", "captain-draft", "player-career", "practice-planner", "injury-prehab", "tournament-nutrition",
+      "recruiting-dossier", "equipment-inspector", "club-white-label", "acwr", "elo-ranking", "inclusive-adaptive",
+    ],
+  },
+  {
+    id: "court",
+    icon: "🏐",
+    label: { es: "Cancha", en: "Court", pt: "Quadra" },
+    slugs: ["scoreboard", "rotation", "court-split", "qr-sync", "gym-screen"],
+  },
+  {
+    id: "scouting",
+    icon: "📊",
+    label: { es: "Scouting", en: "Scouting", pt: "Scouting" },
+    slugs: ["scouting", "matchup-matrix", "shot-heatmap", "head-to-head", "deception-reader", "seam-radar"],
+  },
+  {
+    id: "tactics",
+    icon: "♟️",
+    label: { es: "Táctica", en: "Tactics", pt: "Tática" },
+    slugs: [
+      "setter-iq", "setter-signals", "block-shadow", "blockout-lab", "momentum-coach",
+      "system-transition", "timeout-chalkboard", "tempo",
+    ],
+  },
+  {
+    id: "video",
+    icon: "🎬",
+    label: { es: "Video", en: "Video", pt: "Vídeo" },
+    slugs: ["video-telestrator", "rally-clipper", "playbook-animator", "overlay", "var"],
+  },
+  {
+    id: "performance",
+    icon: "🧪",
+    label: { es: "Rendimiento (Beta)", en: "Performance (Beta)", pt: "Desempenho (Beta)" },
+    slugs: ["biomechanics", "serve-radar", "ball-aerodynamics", "peripheral-reflex", "beach"],
+  },
+  {
+    id: "community",
+    icon: "🍻",
+    label: { es: "Comunidad", en: "Community", pt: "Comunidade" },
+    slugs: ["pickup", "volleycard", "fan-companion", "team-treasury", "arena-dj", "court-slang", "sponsor-deck", "capsule-io"],
+  },
+];
+
+export const WORKSTATION_BY_ID = new Map(WORKSTATIONS.map((workstation) => [workstation.id, workstation]));
+
+/** Hardware modules whose numbers are estimates, not calibrated measurements. */
+export const EXPERIMENTAL_SLUGS = new Set(["serve-radar", "biomechanics"]);
+
 export const PROFILE_LABELS: Record<Profile | "all", Record<Locale, string>> = {
   all: { es: "Todos", en: "All", pt: "Todos" },
   players: { es: "Jugador", en: "Player", pt: "Jogador" },

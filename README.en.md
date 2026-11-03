@@ -1,8 +1,8 @@
-# VolleyOS Global
+﻿# VolleyOS Global
 
 [English](README.md) · [Español](README.es.md) · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v10.3.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v11.0.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Modules](https://img.shields.io/badge/modules-61-FF3B5C?style=for-the-badge&color=EAB308)](#encyclopedia-of-the-61-modules)
 [![Offline](https://img.shields.io/badge/100%25-offline--first-FF3B5C?style=for-the-badge&color=EAB308)](#why-volleyos-exists)
 [![Android](https://img.shields.io/badge/Android%20APK-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -13,6 +13,18 @@
 [![Download APK](https://img.shields.io/badge/APK-voleyos--universal.apk-FF3B5C?style=for-the-badge&logo=android)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
 
 Signed universal APK built by GitHub Actions on every `v*` tag. Android 7.0+ (minSdk 24), trilingual, offline-first, no accounts and no telemetry. F-Droid ready.
+
+## 🆕 What's new in v11.0.0 — Ultimate Overhaul
+
+- **🚀 WhatsApp → Court in 20s**: paste the list in 🍻 Picadito, tap `⚖️ Balance`, and the local MMR record splits even teams with a bench order; `🚀 Send Teams` boots ⏱️ Court preloaded.
+- **🏐 Vertical court dock**: 4-button primary dock (Undo · Audio · Table Mode · More), 🎯 Focus Mode, pure `#000000` OLED theme and 4-level scouting depth.
+- **⚡ Tap-to-DVW scouting + swipe pad + 🎙️ voice dictation** generating real DataVolley codes (`*14AH#`, `*05A#`, `=`…).
+- **🦺 Smart Auto-Líbero** swaps the libero for back-row middle blockers with zero counted substitutions, plus a FIVB 5-1 overlap validator, pool standings and code-based roster swap.
+- **🏁 End-of-match hub**: WhatsApp summary, MVP/Mufa MMR votes (±5), La Vaquita 2.0 debt ledger and an Obsidian & Crimson PNG story card.
+- **📊 Live K1% · K2% · Side-Out%**, ⚖️ El Juez quick rules, timeout diagnostic card, 3 match keys, zero NaN.
+- **🧭 3-path quick launch, 8 navigation workstations over the 61 modules, 🧪 beta credibility badges.**
+- **🔒 Zero telemetry: no PostHog, no session replay, 100% offline.**
+- **Keeps everything from v10.3.0.**
 
 ## 🆕 What's new in v10.3.0 — Table Mode & Courtside
 

@@ -7,7 +7,7 @@ import { LOCALE_NAMES, SHELL, t } from "@/lib/i18n";
 import { awardIndoorPoint, buildTarget, jumpLoad, newScoreboard, paywallEnabled, swapCourt, type Locale, type Profile, type ScoreboardState } from "@/lib/local-engines";
 import { clearCreatorUnlock, creatorUnlocked, matchesCreatorKey, persistCreatorToken } from "@/lib/creator-unlock";
 import { clearLicenseToken, unlockCreatorOnServer } from "@/lib/api-client";
-import { MODULES, MODULE_BY_SLUG, PROFILE_LABELS } from "@/lib/modules";
+import { EXPERIMENTAL_SLUGS, MODULES, MODULE_BY_SLUG, PROFILE_LABELS, WORKSTATIONS, WORKSTATION_BY_ID, type WorkstationId } from "@/lib/modules";
 import { DIFFICULTY_BADGES, GUIDED_MODES, GUIDED_MODE_BY_ID, type GuidedModeId } from "@/lib/guided-modes";
 import { ModuleGuideBanner } from "@/components/ModuleGuideBanner";
 import { CoachMarksOverlay } from "@/components/CoachMarksOverlay";
@@ -298,6 +298,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   });
   const [teamColor, setTeamColor] = useState<string>("#eab308");
   const [profile, setProfile] = useState<Profile | "all">("all");
+  const [workstationId, setWorkstationId] = useState<WorkstationId>("all");
   const [favOnly, setFavOnly] = useState(false);
   const [guidedMode, setGuidedMode] = useState<GuidedModeId | null>(null);
   const [casualOpen, setCasualOpen] = useState(false);
@@ -407,7 +408,9 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
 
   const visible = useMemo(() => {
     const needle = query.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const workstation = WORKSTATION_BY_ID.get(workstationId);
     return MODULES.filter((module) => {
+      if (workstationId !== "all" && workstation && !workstation.slugs.includes(module.slug)) return false;
       if (favOnly && !pinned.includes(module.slug)) return false;
       if (!favOnly && profile !== "all" && !module.profiles.includes(profile)) return false;
       if (!needle) return true;
@@ -417,7 +420,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
         .toLowerCase()
         .includes(needle);
     });
-  }, [locale, profile, query, favOnly, pinned]);
+  }, [locale, profile, query, favOnly, pinned, workstationId]);
 
   const chooseMode = (id: GuidedModeId): void => {
     if (guidedMode === id) {
@@ -1096,6 +1099,53 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
           <div className="h-full overflow-y-auto no-scrollbar">
             {tab === "home" ? (
               <div className="mx-auto max-w-3xl px-3 pb-28 pt-3">
+                <section
+                  data-testid="quick-launch-paths"
+                  className="mb-3 grid grid-cols-3 gap-2 rounded-2xl border border-volt/40 bg-gradient-to-b from-volt/10 to-transparent p-2"
+                >
+                  <button
+                    type="button"
+                    data-testid="quick-path-fast-match"
+                    onClick={() => {
+                      goTab("court");
+                      triggerCourtHaptics(22);
+                    }}
+                    className="tap flex flex-col items-center gap-1 rounded-xl border border-emerald/50 bg-emerald/15 px-2 py-3 text-center"
+                  >
+                    <span aria-hidden className="text-lg">⚡</span>
+                    <span className="text-[10px] font-black leading-tight text-emerald">
+                      {t(locale, "Empezar Partido Rápido (<10s)", "Start Fast Match (<10s)", "Começar Partida Rápida (<10s)")}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="quick-path-tournament"
+                    onClick={() => {
+                      openModule("tournament");
+                      triggerCourtHaptics(22);
+                    }}
+                    className="tap flex flex-col items-center gap-1 rounded-xl border border-volt/50 bg-volt/15 px-2 py-3 text-center"
+                  >
+                    <span aria-hidden className="text-lg">📋</span>
+                    <span className="text-[10px] font-black leading-tight text-volt">
+                      {t(locale, "Cargar Partido / Torneo", "Load Match / Tournament", "Carregar Partida / Torneio")}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="quick-path-scouting"
+                    onClick={() => {
+                      openModule("scouting");
+                      triggerCourtHaptics(22);
+                    }}
+                    className="tap flex flex-col items-center gap-1 rounded-xl border border-crimson/50 bg-crimson/15 px-2 py-3 text-center"
+                  >
+                    <span aria-hidden className="text-lg">📊</span>
+                    <span className="text-[10px] font-black leading-tight text-crimson">
+                      {t(locale, "Abrir Scouting / Análisis", "Open Scouting / Analysis", "Abrir Scouting / Análise")}
+                    </span>
+                  </button>
+                </section>
                 {uiMode === "simple" ? (
                   <section data-testid="simple-mode-tabs" className="mb-3">
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald">
@@ -1206,6 +1256,27 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                       }`}
                     >
                       {mode.icon} {mode.label[locale]}
+                    </button>
+                  ))}
+                </div>
+
+                <div data-testid="workstation-bar" className="snap-row mt-3 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={t(locale, "Workstations", "Workstations", "Workstations")}>
+                  {WORKSTATIONS.map((workstation) => (
+                    <button
+                      key={workstation.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={workstationId === workstation.id}
+                      data-testid={`workstation-pill-${workstation.id}`}
+                      onClick={() => {
+                        setWorkstationId(workstation.id);
+                        triggerCourtHaptics(18);
+                      }}
+                      className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+                        workstationId === workstation.id ? "border-emerald bg-emerald text-obsidian" : "border-white/10 text-white/60"
+                      }`}
+                    >
+                      {workstation.icon} {workstation.label[locale]}
                     </button>
                   ))}
                 </div>
@@ -1375,6 +1446,14 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                             </span>
                             <span className="line-clamp-2 text-[12px] font-bold leading-tight text-white">{meta.name[locale]}</span>
                             <span className="line-clamp-1 text-[10px] leading-tight text-white/45">{meta.tagline[locale]}</span>
+                            {EXPERIMENTAL_SLUGS.has(meta.slug) ? (
+                              <span
+                                data-testid="experimental-beta-badge"
+                                className="rounded-full border border-amber-400/50 bg-amber-400/10 px-2 py-0.5 text-[9px] font-black leading-tight text-amber-200"
+                              >
+                                🧪 {t(locale, "Beta Experimental (Estimación No Calibrada)", "Experimental Beta (Uncalibrated Estimate)", "Beta Experimental (Estimativa Não Calibrada)")}
+                              </span>
+                            ) : null}
                           </button>
                           <button
                             type="button"

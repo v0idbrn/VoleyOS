@@ -159,6 +159,8 @@ export function LiveCastModal({
   const [copied, setCopied] = useState(false);
   const [joinPin, setJoinPin] = useState("");
   const [coAdminUrl, setCoAdminUrl] = useState("");
+  // v11.0.0 — 3-role cooperative court: whoever opens the phone picks a role.
+  const [coopRole, setCoopRole] = useState<"mesa" | "scout" | "banco">("mesa");
   const seqRef = useRef(0);
   /** Joiner-side writer identity: co-admins publish their own revisions. */
   const joinerSecretRef = useRef("");
@@ -419,6 +421,27 @@ export function LiveCastModal({
         </p>
 
         <div className="mt-2 space-y-1.5 rounded-xl border border-white/10 bg-obsidian/60 p-2" data-testid="live-access-controls">
+          {/* v11.0.0 cooperative roles: one phone per role, the match runs itself */}
+          <div data-testid="coop-role-selector" className="flex flex-wrap gap-1">
+            {(
+              [
+                ["mesa", "🔢 Mesa", { es: "Rol 1: Puntos y Sets", en: "Role 1: Points & Sets", pt: "Função 1: Pontos e Sets" }],
+                ["scout", "📊 Scout Rápido", { es: "Rol 2: Causa / Dorsal", en: "Role 2: Cause / Jersey", pt: "Função 2: Causa / Dorsal" }],
+                ["banco", "🔄 Banco", { es: "Rol 3: Rotación 5-1 y Líbero", en: "Role 3: 5-1 Rotation & Libero", pt: "Função 3: Rotação 5-1 e Líbero" }],
+              ] as const
+            ).map(([role, icon, labels]) => (
+              <button
+                key={role}
+                type="button"
+                data-testid={`coop-role-${role}`}
+                aria-pressed={coopRole === role}
+                onClick={() => setCoopRole(role)}
+                className={`rounded-lg border px-2 py-1 text-[10px] font-black transition ${coopRole === role ? "border-volt bg-volt/15 text-volt" : "border-white/20 bg-white/5 text-white/75"}`}
+              >
+                {icon} {t(locale, labels.es, labels.en, labels.pt)}
+              </button>
+            ))}
+          </div>
           <label className="block">
             <span className={LEGEND}>👤 {t3(locale, "Tu Nombre en la Mesa", "Your Name at the Table", "Seu Nome na Mesa")}</span>
             <input

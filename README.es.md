@@ -1,8 +1,8 @@
-# VolleyOS Global
+﻿# VolleyOS Global
 
 [English](README.md) · **Español** · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v10.3.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v11.0.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Módulos](https://img.shields.io/badge/módulos-61-FF3B5C?style=for-the-badge&color=EAB308)](#enciclopedia-de-los-61-módulos)
 [![Offline](https://img.shields.io/badge/100%25-offline--primero-FF3B5C?style=for-the-badge&color=EAB308)](#por-qué-existe-volleyos)
 [![Android](https://img.shields.io/badge/APK%20Android-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -14,7 +14,19 @@
 
 APK universal firmado, construido por GitHub Actions en cada tag `v*`. Android 7.0+ (minSdk 24), trilingüe, offline primero, sin cuentas y sin telemetría. Listo para F-Droid.
 
-## 🆕 Novedades de v10.3.0 — Modo Mesa y Courtside
+## 🆕 Novedades de v11.0.0 — Ultimate Overhaul
+
+- **🚀 WhatsApp → Cancha en 20s**: pegá la lista del grupo en 🍻 Picadito, tocá `⚖️ Balancear` y el MMR local arma dos equipos parejos con orden de banco; `🚀 Enviar Equipos` arranca ⏱️ Cancha ya cargada.
+- **🏐 Dock vertical de Cancha**: dock primario de 4 botones (Deshacer · Audio · Modo Mesa · Más), 🎯 Modo Concentración, tema OLED puro `#000000` y scouting de 4 niveles (N0 puntos → N3 consola `.DVW` pro).
+- **⚡ Tag rápido → .DVW**: el etiquetador genera códigos DataVolley reales (`*14AH#`, `*05A#`, `=`…), el pad de 4 direcciones entrena el shorthand y 🎙️ el dictado por voz anota diciendo "punto local".
+- **🦺 Auto-Líbero inteligente**: el líbero entra por los centrales en zona atrás y sale en P4 sin gastar sustituciones; validador de rotación 5-1 FIVB, posiciones de triangular y códigos de cambio de alineación sin claves.
+- **🏁 Cierre End-of-Match**: resumen WhatsApp, votos MVP/Mufa en el MMR (±5), La Vaquita 2.0 con reclamo de deudas y tarjeta PNG Obsidian & Crimson para Stories.
+- **📊 En vivo + inline**: K1% · K2% · Side-Out% · eficacia bajo el marcador, ⚖️ El Juez, tarjeta de diagnóstico de 15s, "Las 3 Claves del Partido" y cero NaN.
+- **🧭 Cirugía de navegación**: 3 rutas de lanzamiento rápido, 8 workstations sobre los 61 módulos y 🧪 insignias beta en los medidores experimentales.
+- **🔒 Purga de telemetría**: sin PostHog, sin session replay, sin analítica de terceros — 100% offline y local.
+- **Conserva todo lo de v10.3.0**: Modo Mesa, consola `.dvw` y linter de errores de rally.
+
+## 🆕 Novedades de v10.3.0 - Modo Mesa y Courtside
 
 - **📱 Modo Mesa apaisado**: date vuelta en ⏱️ Cancha (o tocá `📱 Modo Mesa`) y toda la pantalla pasa a ser un marcador dividido 50/50 — puntajes gigantes con números tabulares que se suman con un toque, nombre del equipo + insignia `🏐 SACA`, un `−1` en cada esquina exterior y un dock flotante de 5 botones (Deshacer, Cambio de lado, Silbato, Reiniciar 0-0, Salir). El giro de Android es fluido (`configChanges`, sin reiniciar la Activity) y la pantalla nunca se apaga en pleno rally.
 - **⌨️ Consola Courtside DataVolley (Modo Pro)**: escribí siglas como `*14AT#42B2` y leelas en lenguaje claro *antes* de pulsar Enter, anotalas con una tecla, e importá / exportá archivos `.dvw` reales — más una demo en 1 toque para probar sin archivo.

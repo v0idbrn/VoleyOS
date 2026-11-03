@@ -10,8 +10,8 @@ android {
         applicationId "org.voleyos.global"
         minSdk 24
         targetSdk 34
-        versionCode 1030
-        versionName "10.3.0"
+        versionCode 1100
+        versionName "11.0.0"
     }
 
     // Android's asset merger ignores directories whose name starts with an underscore

@@ -32,10 +32,34 @@ import {
   scoutLinesToLogEntries,
   translateScoutCodeLive,
   tryParseDvwFile,
+  computeFivbPoolStandings,
+  validateFivbRotationOverlap,
+  applyAutoLiberoSwap,
+  type FivbPoolMatch,
+  type RotationPosition,
+  type RotationSlot,
 } from "@/lib/datavolley-courtside-engine";
+import {
+  MMR_MVP_DELTA,
+  MMR_MUFA_DELTA,
+  applyPlayerMmrDelta,
+  debtReminderText,
+  generateMatchStoryCardDataUrl,
+  loadPlayerMmr,
+  loadPipelineTeams,
+  loadVaquitaDebts,
+  parseWhatsAppListAndBalanceTeams,
+  parseWhatsAppPlayerNames,
+  savePipelineTeams,
+  saveVaquitaDebts,
+  setVaquitaDebt,
+  type PipelineTeams,
+  type TeamBalance,
+  type VaquitaDebt,
+} from "@/lib/community-match-pipeline";
 import { BenchRotator, FlowWizard, PlayerChips } from "@/components/CasualPlayerSuite";
 import { LiveCastModal } from "@/components/LiveCastModal";
-import { bridgeSaveData, sharePng } from "@/lib/png-exporter";
+import { bridgeSaveData, downloadBlob, sharePng } from "@/lib/png-exporter";
 import {
   careerCardStats,
   flightTimeJump,
@@ -78,6 +102,7 @@ import {
   saveScoutSession,
   sessionShots,
   tagLastScoutPoint,
+  totalStats,
   undoScoutPoint,
   type ScoutAction,
   type ScoutSession,
@@ -1024,6 +1049,8 @@ function stateFromPacket(packet: LiveMatchPacket): ScoreboardState {
   });
 }
 
+/** Minimal structural type... (removed — shared interface lives near ScoutingStation) */
+
 export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [matchFormat, setMatchFormat] = useState<"bo3" | "bo5" | "short15">("bo3");
   const [preset, setPreset] = useState<"picadito" | "king" | "oficial">("oficial");
@@ -1554,13 +1581,24 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         triggerCourtHaptics([50, 40, 50]);
         return;
       }
-      setHistory(commitScoreboard(history, result.state));
+      const liberoLineupA = applyAutoLibero("A", result.state.lineupA);
+      const liberoLineupB = applyAutoLibero("B", result.state.lineupB);
+      setHistory(
+        commitScoreboard(
+          history,
+          result.rotated
+            ? { ...result.state, lineupA: liberoLineupA, lineupB: liberoLineupB }
+            : result.state,
+        ),
+      );
+      if (result.rotated) triggerCourtHaptics([50, 40, 50, 40, 80]);
       flashUndoPill();
       recordScout(state, team, result.rotated);
       if (result.matchFinished) flashBurst("match");
       else if (result.setFinished) flashBurst("set");
       if (result.matchFinished) saveSeasonMatch(seasonMatchFromState(result.state, preset));
       if (result.matchFinished) window.dispatchEvent(new CustomEvent("voleyos:support-moment", { detail: "match" }));
+      if (result.matchFinished) setHubOpen(true);
       setMessage(
         `${result.message}${result.rotated ? t(locale, " · rotación", " · rotation", " · rotação") : ""}${
           result.sideSwitchDue ? t(locale, " · cambio de lado", " · switch sides", " · troca de lado") : ""
@@ -1620,7 +1658,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     setHistory((previous) => undoScoreboard(previous));
     setScout((previous) => undoScoutPoint(previous));
     setMessage(t(locale, "Jugada deshecha.", "Play undone.", "Jogada desfeita."));
-    triggerCourtHaptics(18);
+    triggerCourtHaptics([140]);
   };
 
   useEffect(() => {
@@ -2109,6 +2147,252 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     triggerCourtHaptics(14);
   };
 
+  // ------------------------------------------- v11.0.0 Cancha overhaul state
+  const [focusMode, setFocusMode] = useState(false);
+  const [oledMode, setOledMode] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [scoutDepth, setScoutDepth] = useState(0);
+  const [autoLiberoOn, setAutoLiberoOn] = useState(false);
+  const [hubOpen, setHubOpen] = useState(false);
+  const [taggerJersey, setTaggerJersey] = useState(14);
+  const [voiceFallback, setVoiceFallback] = useState(false);
+  const [voiceText, setVoiceText] = useState("");
+  const [overlapSwapped, setOverlapSwapped] = useState(false);
+  const [triText, setTriText] = useState("");
+  const [triRows, setTriRows] = useState<ReturnType<typeof computeFivbPoolStandings>>([]);
+  const [rosterSwapCode, setRosterSwapCode] = useState("");
+  const [mvpVote, setMvpVote] = useState("");
+  const [mufaVote, setMufaVote] = useState("");
+  const [vaquitaDebts, setVaquitaDebts] = useState<VaquitaDebt[]>(() => loadVaquitaDebts());
+  const [vaquitaAlias, setVaquitaAlias] = useState("");
+  const liberoInRef = useRef<{ libero: number; replaced: number; side: "A" | "B" } | null>(null);
+  const pipelineIngestedRef = useRef(false);
+
+  // WhatsApp pipeline teams saved from Picadito land in Cancha on first mount.
+  useEffect(() => {
+    if (pipelineIngestedRef.current) return;
+    pipelineIngestedRef.current = true;
+    const teams = loadPipelineTeams();
+    if (!teams) return;
+    setHistory((previous) =>
+      commitScoreboard(previous, {
+        ...previous.present,
+        teamA: teams.teamA.join(" · "),
+        teamB: teams.teamB.join(" · "),
+      }),
+    );
+  }, []);
+
+  // Pure #000000 OLED battery-saver background.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.style.backgroundColor = oledMode ? "#000000" : "";
+  }, [oledMode]);
+
+  const statsA = totalStats(scout, "A");
+  const statsB = totalStats(scout, "B");
+  const fmtPct = (value: number): string => (Number.isFinite(value) ? `${value.toFixed(1)}%` : "—");
+  const sideOutPct = (side: "A" | "B"): number => {
+    const row = side === "A" ? statsA : statsB;
+    return row.sideOutAttempts > 0 ? (row.sideOutWins / row.sideOutAttempts) * 100 : 0;
+  };
+
+  const appendDvwCode = (code: string): void => {
+    setDvwLog((previous) => [...previous, code]);
+    triggerCourtHaptics(12);
+  };
+
+  // Deterministic DataVolley codes from the quick tagger: *NN attack H / block B / ace A, rival error =.
+  const taggerCode = (action: ScoutAction, jersey: number): string => {
+    const digits = String(jersey).padStart(2, "0");
+    if (action === "attack") return `*${digits}AH#`;
+    if (action === "block") return `*${digits}B#`;
+    if (action === "ace") return `*${digits}A#`;
+    return "=";
+  };
+  const SWIPE_CODES: Record<"up" | "down" | "right" | "left", string> = {
+    up: "#",
+    down: "=",
+    right: "+",
+    left: "/",
+  };
+
+  const startVoiceScout = (): void => {
+    const w = window as SpeechWindow;
+    const Recognition = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!Recognition) {
+      setVoiceFallback(true);
+      return;
+    }
+    try {
+      const engine = new Recognition();
+      engine.lang = navigator.language || "es-ES";
+      engine.onresult = (event) => {
+        const heard = Array.from(event.results)
+          .map((result) => result[0]?.transcript ?? "")
+          .join(" ");
+        if (heard.trim()) applyVoiceCommand(heard.trim());
+      };
+      engine.onerror = () => setVoiceFallback(true);
+      engine.start();
+    } catch {
+      setVoiceFallback(true);
+    }
+  };
+
+  const applyVoiceCommand = (text: string): void => {
+    const clean = text.toLowerCase();
+    if (clean.includes("punto local") || clean.includes("punto visitante")) {
+      point(clean.includes("punto local") ? "A" : "B");
+      return;
+    }
+    const attack = clean.match(/(\d{1,2})\s*(?:ataque|ataca)/);
+    if (attack) {
+      appendDvwCode(taggerCode("attack", Number(attack[1])));
+      return;
+    }
+    setMessage(
+      t(
+        locale,
+        '🎙️ Frase no reconocida. Probá "punto local" o "14 ataque punto".',
+        '🎙️ Phrase not recognised. Try "punto local" or "14 attack point".',
+        '🎙️ Frase não reconhecida. Tente "ponto local" ou "14 ataque ponto".',
+      ),
+    );
+  };
+
+  // v11 auto-libero: middle blocker ↔ libero swap on back-row landings — never a counted sub.
+  const applyAutoLibero = (side: "A" | "B", lineup: number[]): number[] => {
+    if (!autoLiberoOn) return lineup;
+    const roster = (side === "A" ? state.rosterA : state.rosterB)?.players ?? [];
+    if (roster.length === 0) return lineup;
+    const active =
+      liberoInRef.current && liberoInRef.current.side === side
+        ? { libero: liberoInRef.current.libero, replaced: liberoInRef.current.replaced }
+        : null;
+    const applied = applyAutoLiberoSwap(lineup, roster, active);
+    liberoInRef.current = applied.active ? { ...applied.active, side } : null;
+    return applied.lineup;
+  };
+
+  const canonicalRotation: Record<RotationSlot, RotationPosition> = {
+    1: { x: 5, y: 8 },
+    2: { x: 5, y: 1 },
+    3: { x: 3, y: 1 },
+    4: { x: 1, y: 1 },
+    5: { x: 1, y: 8 },
+    6: { x: 3, y: 8 },
+  };
+  const demoRotation: Record<RotationSlot, RotationPosition> = overlapSwapped
+    ? { ...canonicalRotation, 1: canonicalRotation[2], 2: canonicalRotation[1] }
+    : canonicalRotation;
+  const demoOverlap = validateFivbRotationOverlap(demoRotation) as { legal: boolean; violations: string[] };
+
+  const runTriangular = (): void => {
+    const matches: FivbPoolMatch[] = [];
+    for (const line of triText.split(/\r?\n/)) {
+      const parsed = line.trim().match(/^(\S+)\s+((?:\d{1,3}-\d{1,3}\s*)+)(\S+)$/);
+      if (!parsed || !parsed[1] || !parsed[2] || !parsed[3]) continue;
+      const setScores = parsed[2]
+        .trim()
+        .split(/\s+/)
+        .map((pair): [number, number] | null => {
+          const halves = pair.split("-");
+          const a = Number(halves[0] ?? NaN);
+          const b = Number(halves[1] ?? NaN);
+          return Number.isFinite(a) && Number.isFinite(b) ? [a, b] : null;
+        })
+        .filter((pair): pair is [number, number] => pair !== null);
+      if (setScores.length > 0) matches.push({ teamA: parsed[1], teamB: parsed[3], setScores });
+    }
+    setTriRows(computeFivbPoolStandings(matches));
+  };
+
+  const copyRosterSwapCode = (): void => {
+    const code = `${state.lineupA.slice(0, 6).join(",")}|${state.lineupB.slice(0, 6).join(",")}`;
+    void navigator.clipboard?.writeText(code).catch(() => undefined);
+    setRosterSwapCode(code);
+    setMessage(t(locale, "📥 Código de alineación copiado — pegalo en otro dispositivo.", "📥 Lineup code copied — paste it on another device.", "📥 Código de escalación copiado — cole noutro dispositivo."));
+  };
+
+  const applyRosterSwapCode = (): void => {
+    const parts = rosterSwapCode.split("|");
+    const parseLineup = (raw: string): number[] =>
+      raw
+        .split(",")
+        .map((piece) => Number(piece))
+        .filter((number_) => Number.isInteger(number_) && number_ > 0)
+        .slice(0, 6);
+    if (parts.length !== 2 || parts[0] === undefined || parts[1] === undefined) {
+      setMessage(t(locale, "Código de alineación inválido.", "Invalid lineup code.", "Código de escalación inválido."));
+      return;
+    }
+    const lineA = parseLineup(parts[0]);
+    const lineB = parseLineup(parts[1]);
+    if (lineA.length !== 6 || lineB.length !== 6) {
+      setMessage(t(locale, "Código de alineación inválido.", "Invalid lineup code.", "Código de escalación inválido."));
+      return;
+    }
+    setHistory((previous) =>
+      commitScoreboard(previous, { ...previous.present, lineupA: lineA, lineupB: lineB }),
+    );
+    setMessage(t(locale, "🔄 Alineación intercambiada por código.", "🔄 Lineups swapped by code.", "🔄 Escalações trocadas por código."));
+  };
+
+  const copyWhatsAppSummary = (): void => {
+    const setHistoryText = (state.setHistory ?? []).map((entry) => `${entry.scoreA}-${entry.scoreB}`).join(" | ");
+    const summary = `🏐 VoleyOS | ${left.name} ${left.sets} - ${right.sets} ${right.name} (${setHistoryText || "0-0"} | Set actual: ${state.scoreA}-${state.scoreB})`;
+    void navigator.clipboard?.writeText(summary).catch(() => undefined);
+    triggerCourtHaptics(12);
+    setMessage(t(locale, "📋 Resumen WhatsApp copiado.", "📋 WhatsApp summary copied.", "📋 Resumo WhatsApp copiado."));
+  };
+
+  const exportMatchCard = async (): Promise<void> => {
+    const dataUrl = await generateMatchStoryCardDataUrl({
+      title: `${left.name} vs ${right.name}`,
+      finalScore: `${left.score}-${right.score}`,
+      setsLine: `${t(locale, "Sets", "Sets", "Sets")} ${left.sets}-${right.sets}`,
+      mvp: mvpVote.trim() || undefined,
+    });
+    if (!dataUrl) {
+      setMessage(t(locale, "📸 Tarjeta no disponible.", "📸 Card unavailable.", "📸 Cartão indisponível."));
+      return;
+    }
+    try {
+      const bin = atob(dataUrl.split(",")[1] ?? "");
+      const bytes = Uint8Array.from(bin, (char) => char.charCodeAt(0));
+      const saved = downloadBlob(new Blob([bytes], { type: "image/png" }), "voleyos-match-card.png");
+      setMessage(
+        saved
+          ? t(locale, "📸 Tarjeta descargada.", "📸 Card downloaded.", "📸 Cartão baixado.")
+          : t(locale, "📸 Tarjeta lista (descarga bloqueada).", "📸 Card ready (download blocked).", "📸 Cartão pronto (download bloqueado)."),
+      );
+    } catch {
+      setMessage(t(locale, "📸 Tarjeta lista.", "📸 Card ready.", "📸 Cartão pronto."));
+    }
+  };
+
+  const toggleVaquitaDebt = (alias: string, paid: boolean): void => {
+    const next = setVaquitaDebt(vaquitaDebts, alias, paid);
+    setVaquitaDebts(next);
+    saveVaquitaDebts(next);
+  };
+
+  const copyDebtReminder = (alias: string): void => {
+    void navigator.clipboard?.writeText(debtReminderText(vaquitaDebts, alias)).catch(() => undefined);
+    triggerCourtHaptics(12);
+    setMessage(t(locale, "📲 Reclamo copiado.", "📲 Reminder copied.", "📲 Cobrança copiada."));
+  };
+
+  const applyVotes = (): void => {
+    if (mvpVote.trim()) applyPlayerMmrDelta(mvpVote.trim(), MMR_MVP_DELTA);
+    if (mufaVote.trim()) applyPlayerMmrDelta(mufaVote.trim(), MMR_MUFA_DELTA);
+    setMvpVote("");
+    setMufaVote("");
+    setMessage(t(locale, "🏆 Votos aplicados al MMR local.", "🏆 Votes applied to local MMR.", "🏆 Votos aplicados ao MMR local."));
+  };
+
   const left = swapped
     ? { name: state.teamB, score: state.scoreB, sets: state.setsB, serving: state.serving === "B", color: state.colorB }
     : { name: state.teamA, score: state.scoreA, sets: state.setsA, serving: state.serving === "A", color: state.colorA };
@@ -2204,7 +2488,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         setMessage(t(locale, "Ejemplo cargado: set decisivo 22-20.", "Example loaded: decider 22-20.", "Exemplo carregado: set decisivo 22-20."));
       }}
     >
-      <div className="mb-2 flex flex-wrap items-center gap-1" data-testid="cancha-topbar">
+      <div className={`mb-2 flex flex-wrap items-center gap-1${focusMode ? " hidden" : ""}`} data-testid="cancha-topbar">
         <span
           data-testid="set-badge"
           className="rounded-full border border-volt/40 bg-volt/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-volt"
@@ -2229,15 +2513,6 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           className="rounded-lg border border-white/20 bg-white/5 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white/80 transition hover:border-volt hover:text-volt focus-visible:outline focus-visible:outline-2 focus-visible:outline-volt"
         >
           ↺ {t(locale, "Reiniciar Set", "Reset Set", "Reiniciar Set")}
-        </button>
-        <button
-          type="button"
-          data-testid="enter-table-mode-btn"
-          aria-pressed={isTableLandscapeMode}
-          onClick={() => (isTableLandscapeMode ? exitTableMode() : enterTableMode())}
-          className="rounded-lg border border-white/20 bg-white/5 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white/80 transition hover:border-volt hover:text-volt focus-visible:outline focus-visible:outline-2 focus-visible:outline-volt"
-        >
-          📱 {t(locale, "Modo Mesa", "Table Mode", "Modo Mesa")}
         </button>
         <button
           type="button"
@@ -2274,6 +2549,48 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         >
           ✏️ {t(locale, "Editar Puntos / Sets", "Edit Points / Sets", "Editar Pontos / Sets")}
         </button>
+      </div>
+      <div
+        data-testid="inline-live-metrics-strip"
+        className={`mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-white/60${focusMode ? " hidden" : ""}`}
+      >
+        <span className="text-volt">📊</span>
+        <span>K1 {fmtPct(statsA.k1Pct)}</span>
+        <span>K2 {fmtPct(statsA.k2Pct)}</span>
+        <span>SO {fmtPct(sideOutPct("A"))}</span>
+        <span>{t(locale, "Efic.", "Eff.", "Efic.")} {fmtPct(statsA.efficiency)}</span>
+        <span className="text-crimson">
+          B: K1 {fmtPct(statsB.k1Pct)} · SO {fmtPct(sideOutPct("B"))}
+        </span>
+      </div>
+      <div className={`mb-2${focusMode ? " hidden" : ""}`}>
+        <button
+          type="button"
+          data-testid="inline-rules-drawer-btn"
+          aria-expanded={rulesOpen}
+          onClick={() => {
+            setRulesOpen((previous) => !previous);
+            triggerCourtHaptics(8);
+          }}
+          className={BTN}
+        >
+          ⚖️ {t(locale, "El Juez — Consulta Reglamento", "El Juez — Rules Check", "O Juiz — Consulta Regras")}
+        </button>
+        {rulesOpen ? (
+          <div
+            data-testid="inline-rules-drawer"
+            className="mt-1 rounded-xl border border-volt/40 bg-volt/5 p-2 text-[10px] leading-relaxed text-white/70"
+          >
+            <strong className="text-volt">{t(locale, "Reglamento exprés", "Express rules", "Regras expressas")}</strong>
+            <ul className="mt-1 list-disc space-y-0.5 pl-4">
+              <li>{t(locale, "Máximo 3 toques por equipo; el bloqueo no cuenta.", "Max 3 team contacts; the block does not count.", "Máximo 3 toques por equipe; o bloqueio não conta.")}</li>
+              <li>{t(locale, "Doble toque / levantamiento llevado = falta.", "Double contact / lifted set = fault.", "Duplo toque / levantamento carregado = falta.")}</li>
+              <li>{t(locale, "Líbero: no ataca, no bloquea, no saca (FIVB 2022+ sí puede sacar).", "Libero: no attack, no block, no serve (FIVB 2022+ may serve).", "Líbero: não ataca, não bloqueia, não sacava (FIVB 2022+ pode sacar).")}</li>
+              <li>{t(locale, "Sancciones: amonestación (amarilla) → expulsión (roja) → descalificación (roja y amarilla juntas).", "Sanctions: warning (yellow) → expulsion (red) → disqualification (yellow+red).", "Sanções: advertência (amarela) → expulsão (vermelha) → desqualificação.")}</li>
+              <li>{t(locale, "Invasión bajo la red solo falta si interfiere la jugada.", "Under-net invasion only faults when play is interfered.", "Invasão sob a rede só falta se interferir a jogada.")}</li>
+            </ul>
+          </div>
+        ) : null}
       </div>
       {matchDone && preset !== "king" ? (
         continuousSets ? (
@@ -3101,6 +3418,356 @@ ${name}` : name))} testId="cancha-player-chips" />
           </div>
         ) : null}
       </div>
+      {/* v11.0.0 — vertical primary dock: always reachable, works with one thumb */}
+      <nav
+        data-testid="cancha-primary-dock"
+        className="fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/15 bg-obsidian/95 px-2 py-2 shadow-2xl backdrop-blur"
+      >
+        <button
+          type="button"
+          data-testid="cancha-dock-undo"
+          onClick={undo}
+          className="rounded-full border border-white/20 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white/85 transition hover:border-volt hover:text-volt"
+        >
+          ↶ {t(locale, "Deshacer", "Undo", "Desfazer")}
+        </button>
+        <button
+          type="button"
+          data-testid="cancha-dock-audio"
+          onClick={() => {
+            playCourtWhistle("short");
+            triggerCourtHaptics(10);
+          }}
+          className="rounded-full border border-white/20 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white/85 transition hover:border-volt hover:text-volt"
+        >
+          🔊 {t(locale, "Audio", "Audio", "Áudio")}
+        </button>
+        <button
+          type="button"
+          data-testid="enter-table-mode-btn"
+          aria-pressed={isTableLandscapeMode}
+          onClick={() => (isTableLandscapeMode ? exitTableMode() : enterTableMode())}
+          className="rounded-full border border-volt/40 bg-volt/10 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-volt transition hover:brightness-110"
+        >
+          📱 {t(locale, "Modo Mesa", "Table Mode", "Modo Mesa")}
+        </button>
+        <button
+          type="button"
+          data-testid="cancha-more-drawer-toggle"
+          aria-expanded={moreOpen}
+          onClick={() => {
+            setMoreOpen((previous) => !previous);
+            triggerCourtHaptics(8);
+          }}
+          className="rounded-full border border-white/20 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white/85 transition hover:border-volt hover:text-volt"
+        >
+          ⋯ {t(locale, "Partido", "Match", "Partida")}
+        </button>
+      </nav>
+      {moreOpen ? (
+        <div
+          data-testid="cancha-more-drawer"
+          className="fixed bottom-20 left-1/2 z-30 max-h-[60vh] w-[min(94vw,28rem)] -translate-x-1/2 space-y-2 overflow-y-auto rounded-2xl border border-white/15 bg-obsidian/95 p-3 shadow-2xl backdrop-blur"
+        >
+          <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              data-testid="focus-mode-toggle"
+              aria-pressed={focusMode}
+              onClick={() => {
+                setFocusMode((previous) => !previous);
+                triggerCourtHaptics(10);
+              }}
+              className={BTN}
+            >
+              🎯 {t(locale, "Modo Concentración", "Focus Mode", "Modo Foco")}
+            </button>
+            <button
+              type="button"
+              data-testid="oled-theme-toggle"
+              aria-pressed={oledMode}
+              onClick={() => setOledMode((previous) => !previous)}
+              className={BTN}
+            >
+              ⬛ {t(locale, "OLED", "OLED", "OLED")}
+            </button>
+            <button
+              type="button"
+              data-testid="auto-libero-toggle"
+              aria-pressed={autoLiberoOn}
+              onClick={() => setAutoLiberoOn((previous) => !previous)}
+              className={BTN}
+            >
+              🦺 {t(locale, "Auto-Líbero", "Auto-Libero", "Auto-Líbero")}
+            </button>
+            <button
+              type="button"
+              data-testid="match-hub-toggle"
+              aria-expanded={hubOpen}
+              onClick={() => setHubOpen((previous) => !previous)}
+              className={BTN}
+            >
+              🏁 {t(locale, "Cierre y 3er Tiempo", "Close & After-Match", "Encerramento e 3º tempo")}
+            </button>
+          </div>
+          {/* Nivel 0 Puntos → Nivel 3 Consola Pro .DVW */}
+          <div data-testid="scouting-depth-selector" className="flex flex-wrap items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-white/60">
+            <span>{t(locale, "Profundidad de scout", "Scout depth", "Profundidade do scout")}:</span>
+            {[
+              t(locale, "N0 Puntos", "N0 Points", "N0 Pontos"),
+              t(locale, "N1 Causa", "N1 Cause", "N1 Causa"),
+              t(locale, "N2 Jugador+Acción", "N2 Player+Action", "N2 Jogador+Ação"),
+              t(locale, "N3 Consola Pro", "N3 Pro Console", "N3 Console Pro"),
+            ].map((label, level) => (
+              <button
+                key={level}
+                type="button"
+                data-testid={`scout-depth-${level}`}
+                aria-pressed={scoutDepth === level}
+                onClick={() => setScoutDepth(level)}
+                className={`rounded-full border px-2 py-1 transition ${scoutDepth === level ? "border-volt bg-volt/15 text-volt" : "border-white/20 bg-white/5 text-white/70"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="space-y-1 rounded-xl border border-white/10 bg-white/5 p-2 text-[10px] text-white/70">
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="font-bold uppercase tracking-wider text-white/60">{t(locale, "Rotación 5-1", "5-1 Rotation", "Rotação 5-1")}:</span>
+              <span data-testid="fivb-overlap-status" className={`font-black ${demoOverlap.legal ? "text-emerald" : "text-crimson"}`}>
+                {demoOverlap.legal
+                  ? `✅ ${t(locale, "Rotación legal", "Legal rotation", "Rotação legal")}`
+                  : `⚠️ ${demoOverlap.violations.join(" · ")}`}
+              </span>
+              <button
+                type="button"
+                data-testid="overlap-demo-swap-btn"
+                onClick={() => setOverlapSwapped((previous) => !previous)}
+                className="rounded-lg border border-white/20 bg-white/5 px-2 py-1 font-black text-white/80"
+              >
+                🔄 {t(locale, "Simular invasión", "Demo swap", "Simular invasão")}
+              </button>
+            </div>
+            <div data-testid="quick-triangular-generator" className="space-y-1">
+              <p className="font-bold uppercase tracking-wider text-white/60">{t(locale, "Triangular / Cuadrangular FIVB", "FIVB Tri/Quad", "Triangular/Quadrangular FIVB")}</p>
+              <textarea
+                data-testid="triangular-results-input"
+                rows={3}
+                value={triText}
+                onChange={(event) => setTriText(event.target.value)}
+                placeholder={"Tiburones 25-20 25-18 Cóndores"}
+                className="w-full rounded-lg border border-white/15 bg-obsidian/70 p-1 font-mono text-[10px] text-white/85"
+              />
+              <button
+                type="button"
+                data-testid="triangular-compute-btn"
+                onClick={runTriangular}
+                className="rounded-lg border border-volt/50 bg-volt/10 px-2 py-1 font-black text-volt"
+              >
+                🧮 {t(locale, "Calcular posiciones", "Compute standings", "Calcular posições")}
+              </button>
+              {triRows.length > 0 ? (
+                <table data-testid="triangular-standings" className="w-full text-left font-mono text-[10px] text-white/85">
+                  <thead>
+                    <tr className="text-white/40">
+                      <th>#</th><th>Eq</th><th>M</th><th>MP</th><th>S</th><th>Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {triRows.map((row, index) => (
+                      <tr key={row.team}>
+                        <td>{index + 1}</td>
+                        <td>{row.team}</td>
+                        <td>{row.matchesWon}</td>
+                        <td>{row.matchPoints}</td>
+                        <td>{row.setsWon}-{row.setsLost}</td>
+                        <td>{row.pointsWon}-{row.pointsLost}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : null}
+            </div>
+            <div className="space-y-1">
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  data-testid="roster-qr-swap-btn"
+                  onClick={copyRosterSwapCode}
+                  className="rounded-lg border border-white/20 bg-white/5 px-2 py-1 font-black text-white/80"
+                >
+                  📋 {t(locale, "Copiar código de alineación", "Copy lineup code", "Copiar código de escalação")}
+                </button>
+                <button
+                  type="button"
+                  data-testid="roster-swap-apply-btn"
+                  onClick={applyRosterSwapCode}
+                  className="rounded-lg border border-volt/50 bg-volt/10 px-2 py-1 font-black text-volt"
+                >
+                  🔄 {t(locale, "Aplicar", "Apply", "Aplicar")}
+                </button>
+              </div>
+              <textarea
+                data-testid="roster-swap-input"
+                rows={2}
+                value={rosterSwapCode}
+                onChange={(event) => setRosterSwapCode(event.target.value)}
+                placeholder="4,3,2,1,5,6|4,3,2,1,5,6"
+                className="w-full rounded-lg border border-white/15 bg-obsidian/70 p-1 font-mono text-[10px] text-white/85"
+              />
+            </div>
+          </div>
+          {/* 15-second timeout diagnostic: 1 problem + 2 evidences + 1 action, zero NaN */}
+          <div data-testid="timeout-diagnostic-card" className="space-y-1 rounded-xl border border-crimson/50 bg-crimson/10 p-2 text-[10px] text-white/80">
+            <p className="font-black uppercase tracking-wider text-crimson">⏱️ {t(locale, "Sacada de 15s", "15s Timeout Card", "Sacada de 15s")}</p>
+            <p>
+              <strong>{t(locale, "Problema", "Problem", "Problema")}:</strong>{" "}
+              {(statsA.efficiency <= statsB.efficiency ? statsA : statsB).efficiency === 0 && statsA.attempts === 0 && statsB.attempts === 0
+                ? t(locale, "Sin datos de ataque todavía.", "No attack data yet.", "Sem dados de ataque ainda.")
+                : t(
+                    locale,
+                    `Ataque de ${((statsA.efficiency <= statsB.efficiency ? statsA : statsB).kills === 0 && (statsA.efficiency <= statsB.efficiency ? statsA : statsB).attempts === 0 ? "" : "")}${
+                      (statsA.efficiency <= statsB.efficiency ? "A" : "B") === "A" ? left.name : right.name
+                    } con ${fmtPct((statsA.efficiency <= statsB.efficiency ? statsA : statsB).efficiency)} de eficacia`,
+                    `Attack of ${(statsA.efficiency <= statsB.efficiency ? "A" : "B") === "A" ? left.name : right.name} at ${fmtPct((statsA.efficiency <= statsB.efficiency ? statsA : statsB).efficiency)} efficiency`,
+                    `Ataque de ${(statsA.efficiency <= statsB.efficiency ? "A" : "B") === "A" ? left.name : right.name} com ${fmtPct((statsA.efficiency <= statsB.efficiency ? statsA : statsB).efficiency)} de eficácia`,
+                  )}
+            </p>
+            <p>
+              {t(locale, "Evidencias", "Evidences", "Evidências")}: K1 {fmtPct((statsA.efficiency <= statsB.efficiency ? statsA : statsB).k1Pct)} · K2 {fmtPct((statsA.efficiency <= statsB.efficiency ? statsA : statsB).k2Pct)} ·{" "}
+              {t(locale, "Errores", "Errors", "Erros")} {(statsA.efficiency <= statsB.efficiency ? statsA : statsB).errors}
+            </p>
+            <p>
+              <strong>{t(locale, "Acción", "Action", "Ação")}:</strong>{" "}
+              {t(locale, "Subir la calidad del primer toque y repetitive el saque más atacado.", "Raise first-ball quality and repeat the best serve zone.", "Subir a qualidade da primeira bola e repetir o saque mais atacado.")}
+            </p>
+          </div>
+          <div data-testid="three-match-keys-card" className="space-y-1 rounded-xl border border-volt/40 bg-volt/5 p-2 text-[10px] text-white/80">
+            <p className="font-black uppercase tracking-wider text-volt">🔑 {t(locale, "Las 3 Claves del Partido", "3 Match Keys", "As 3 Chaves da Partida")}</p>
+            <ul className="list-decimal space-y-0.5 pl-4">
+              <li>{t(locale, `K1 ${fmtPct(statsA.k1Pct)} · rival ${fmtPct(statsB.k1Pct)}`, `K1 ${fmtPct(statsA.k1Pct)} · rival ${fmtPct(statsB.k1Pct)}`, `K1 ${fmtPct(statsA.k1Pct)} · rival ${fmtPct(statsB.k1Pct)}`)}</li>
+              <li>{t(locale, `Side-out ${fmtPct(sideOutPct("A"))} · rival ${fmtPct(sideOutPct("B"))}`, `Side-out ${fmtPct(sideOutPct("A"))} · rival ${fmtPct(sideOutPct("B"))}`, `Side-out ${fmtPct(sideOutPct("A"))} · rival ${fmtPct(sideOutPct("B"))}`)}</li>
+              <li>{t(locale, `Efic. ataque ${fmtPct(statsA.efficiency)} · errores ${statsA.errors + statsB.errors}`, `Attack eff. ${fmtPct(statsA.efficiency)} · errors ${statsA.errors + statsB.errors}`, `Efic. ataque ${fmtPct(statsA.efficiency)} · erros ${statsA.errors + statsB.errors}`)}</li>
+            </ul>
+          </div>
+        </div>
+      ) : null}
+      {hubOpen ? (
+        <section
+          data-testid="end-of-match-hub"
+          className="fixed bottom-20 left-1/2 z-40 w-[min(94vw,30rem)] -translate-x-1/2 space-y-2 rounded-2xl border border-volt/50 bg-obsidian/95 p-3 shadow-2xl backdrop-blur"
+        >
+          <div className="flex items-center justify-between">
+            <h3 className="text-[11px] font-black uppercase tracking-wider text-volt">🏁 {t(locale, "Cierre y 3er Tiempo", "Close & After-Match", "Encerramento e 3º tempo")}</h3>
+            <button
+              type="button"
+              data-testid="close-end-of-match-hub"
+              onClick={() => setHubOpen(false)}
+              className="rounded-lg border border-white/20 bg-white/5 px-2 py-1 text-[10px] font-black text-white/70"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              data-testid="copy-wa-summary-btn"
+              onClick={copyWhatsAppSummary}
+              className={BTN}
+            >
+              📋 {t(locale, "Copiar Resumen WhatsApp", "Copy WhatsApp Summary", "Copiar Resumo WhatsApp")}
+            </button>
+            <button
+              type="button"
+              data-testid="export-match-png-btn"
+              onClick={() => void exportMatchCard()}
+              className={BTN}
+            >
+              📸 {t(locale, "Tarjeta PNG (Stories)", "PNG Card (Stories)", "Cartão PNG (Stories)")}
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-1 text-[10px]">
+            <input
+              data-testid="mvp-vote-input"
+              value={mvpVote}
+              onChange={(event) => setMvpVote(event.target.value)}
+              placeholder={t(locale, "MVP del partido", "Match MVP", "MVP da partida")}
+              className="min-w-0 flex-1 rounded-lg border border-white/15 bg-obsidian/70 px-2 py-1 text-[10px] text-white/85"
+            />
+            <button
+              type="button"
+              data-testid="vote-mvp-btn"
+              onClick={applyVotes}
+              className="rounded-lg border border-volt/50 bg-volt/10 px-2 py-1 font-black text-volt"
+            >
+              🏆 +5 MMR
+            </button>
+            <input
+              data-testid="mufa-vote-input"
+              value={mufaVote}
+              onChange={(event) => setMufaVote(event.target.value)}
+              placeholder={t(locale, "La Mufa", "The Jinx", "A Fúria")}
+              className="min-w-0 flex-1 rounded-lg border border-white/15 bg-obsidian/70 px-2 py-1 text-[10px] text-white/85"
+            />
+            <button
+              type="button"
+              data-testid="vote-mufa-btn"
+              onClick={applyVotes}
+              className="rounded-lg border border-white/20 bg-white/5 px-2 py-1 font-black text-white/80"
+            >
+              🥶 −5 MMR
+            </button>
+          </div>
+          <div data-testid="vaquita-debtors-ledger" className="space-y-1 rounded-xl border border-white/10 bg-white/5 p-2">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-white/50">💸 {t(locale, "La Vaquita 2.0 — ledger", "La Vaquita 2.0 — ledger", "La Vaquita 2.0 — ledger")}</p>
+            <div className="flex gap-1">
+              <input
+                data-testid="vaquita-alias-input"
+                value={vaquitaAlias}
+                onChange={(event) => setVaquitaAlias(event.target.value)}
+                placeholder={t(locale, "Alias deudor", "Debtor alias", "Alias devedor")}
+                className="min-w-0 flex-1 rounded-lg border border-white/15 bg-obsidian/70 px-2 py-1 text-[10px] text-white/85"
+              />
+              <button
+                type="button"
+                data-testid="add-vaquita-debt-btn"
+                onClick={() => {
+                  if (!vaquitaAlias.trim()) return;
+                  toggleVaquitaDebt(vaquitaAlias.trim(), false);
+                  setVaquitaAlias("");
+                }}
+                className="rounded-lg border border-white/20 bg-white/5 px-2 py-1 font-black text-white/80"
+              >
+                ⏳ {t(locale, "Debe", "Owes", "Deve")}
+              </button>
+            </div>
+            <ul className="space-y-0.5">
+              {vaquitaDebts.map((debt) => (
+                <li key={debt.alias} className="flex items-center justify-between gap-1 text-[10px] text-white/70">
+                  <span>{debt.paid ? "✅" : "⏳"} {debt.alias}</span>
+                  <span className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleVaquitaDebt(debt.alias, !debt.paid)}
+                      className="rounded border border-white/15 bg-white/5 px-1 text-white/70"
+                    >
+                      {debt.paid ? "↩" : "✅"}
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="copy-debt-reminder-btn"
+                      onClick={() => copyDebtReminder(debt.alias)}
+                      className="rounded border border-white/15 bg-white/5 px-1 text-white/70"
+                    >
+                      📲
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      ) : null}
       <BenchRotator locale={locale} />
       {castOpen ? (
         <LiveCastModal
@@ -3210,6 +3877,89 @@ ${name}` : name))} testId="cancha-player-chips" />
               ))}
             </div>
           ) : null}
+        </div>
+      ) : null}
+      {uiMode === "pro" && !soloTeams && scoutDepth >= 2 ? (
+        <div
+          data-testid="quick-rally-tagger"
+          className="fixed bottom-24 left-1/2 z-40 w-[min(94vw,26rem)] -translate-x-1/2 rounded-2xl border border-volt/40 bg-obsidian/95 p-2 shadow-2xl backdrop-blur"
+        >
+          <div className="mb-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-white/50">
+            <span>⚡ {t(locale, "Tag rápido → .DVW", "Quick tag → .DVW", "Tag rápido → .DVW")}</span>
+            <select
+              data-testid="tagger-jersey-select"
+              value={taggerJersey}
+              onChange={(event) => setTaggerJersey(Number(event.target.value))}
+              className="rounded border border-white/15 bg-obsidian/70 px-1 py-0.5 text-[10px] font-black text-volt"
+            >
+              {Array.from({ length: 18 }, (_, index) => index + 1).map((number_) => (
+                <option key={number_} value={number_}>
+                  #{number_}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {(["attack", "block", "ace", "error"] as ScoutAction[]).map((action) => (
+              <button
+                key={action}
+                type="button"
+                data-testid={`tagger-${action}`}
+                onClick={() => appendDvwCode(taggerCode(action, taggerJersey))}
+                className="tap rounded-lg border border-white/15 bg-white/5 px-2 py-1.5 text-[10px] font-black text-white/85 transition active:scale-95"
+              >
+                {scoutActionLabel(action).split(" ")[0]} {action === "attack" ? t(locale, "Ataque", "Attack", "Ataque") : action === "block" ? t(locale, "Bloqueo", "Block", "Bloqueio") : action === "ace" ? t(locale, "Ace", "Ace", "Ace") : t(locale, "Error", "Error", "Erro")}
+              </button>
+            ))}
+            <span data-testid="tagger-last-code" className="rounded bg-volt/15 px-2 py-1 text-[10px] font-black text-volt">
+              {dvwLog[dvwLog.length - 1] ?? ""}
+            </span>
+          </div>
+          <div data-testid="swipe-scout-pad" className="mt-1 grid grid-cols-4 gap-1">
+            {([["up", "⬆️"], ["down", "⬇️"], ["right", "➡️"], ["left", "⬅️"]] as const).map(([direction, icon]) => (
+              <button
+                key={direction}
+                type="button"
+                data-testid={`swipe-${direction}`}
+                onClick={() => appendDvwCode(SWIPE_CODES[direction])}
+                className="tap rounded-lg border border-white/15 bg-white/5 py-1.5 text-[11px] font-black text-white/85 transition active:scale-95"
+              >
+                {icon}
+              </button>
+            ))}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1">
+            <button
+              type="button"
+              data-testid="voice-scout-dictation-btn"
+              onClick={startVoiceScout}
+              className="tap rounded-lg border border-white/15 bg-white/5 px-2 py-1.5 text-[10px] font-black text-white/85 transition active:scale-95"
+            >
+              🎙️ {t(locale, "Dictar Jugada", "Dictate Play", "Ditar Jogada")}
+            </button>
+            {voiceFallback ? (
+              <>
+                <input
+                  data-testid="voice-scout-text-input"
+                  value={voiceText}
+                  onChange={(event) => setVoiceText(event.target.value)}
+                  placeholder={t(locale, "punto local · 14 ataque punto", "punto local · 14 attack point", "ponto local · 14 ataque ponto")}
+                  className="min-w-0 flex-1 rounded-lg border border-white/15 bg-obsidian/70 px-2 py-1 text-[10px] text-white/85"
+                />
+                <button
+                  type="button"
+                  data-testid="voice-scout-text-apply"
+                  onClick={() => {
+                    if (voiceText.trim()) applyVoiceCommand(voiceText.trim());
+                    setVoiceText("");
+                  }}
+                  className="rounded-lg border border-volt/50 bg-volt/10 px-2 py-1.5 text-[10px] font-black text-volt"
+                >
+                  ➜
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
       ) : null}
       {burst ? (
@@ -3544,6 +4294,10 @@ export function TournamentStation({ meta, locale, onSave }: StationProps) {
 
 export function PickupStation({ meta, locale, onSave }: StationProps) {
   const [result, setResult] = useState(() => balanceTeams(PICKUP_SAMPLE, 2));
+  // v11.0.0 — WhatsApp → Cancha in 20 seconds: paste the group list, balance, push.
+  const [waList, setWaList] = useState("");
+  const [waBalance, setWaBalance] = useState<TeamBalance | null>(null);
+  const [waSent, setWaSent] = useState(false);
 
   return (
     <StationShell meta={meta} locale={locale} rows={result.teams.length} onSave={onSave} onExample={() => setResult(balanceTeams(PICKUP_SAMPLE, 2))}>
@@ -3568,6 +4322,53 @@ export function PickupStation({ meta, locale, onSave }: StationProps) {
         {result.balanced ? t(locale, " · equipos parejos", " · balanced", " · times parelhos") : t(locale, " · ajuste mínimo posible", " · minimal possible gap", " · ajuste mínimo possível")}
       </p>
         <p className="mt-1 text-[10px] text-white/40">{t(locale, "Rey de la Cancha", "King of the Court", "Rei da Quadra")}: Tiburones → Cóndores → Panteras</p>
+      <section data-testid="whatsapp-pipeline-panel" className="mt-3 rounded-xl border border-white/10 bg-obsidian/60 p-2">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-volt">💬 {t(locale, "WhatsApp → Cancha en 20s", "WhatsApp → Court in 20s", "WhatsApp → Quadra em 20s")}</p>
+        <textarea
+          data-testid="whatsapp-list-input"
+          rows={4}
+          value={waList}
+          onChange={(event) => setWaList(event.target.value)}
+          placeholder={"1. Ana\n2. Beto\n3. Cara"}
+          className="mt-1 w-full rounded-lg border border-white/15 bg-obsidian/70 p-1 font-mono text-[10px] text-white/85"
+        />
+        <div className="mt-1 flex flex-wrap gap-1">
+          <button
+            type="button"
+            data-testid="pipeline-balance-btn"
+            onClick={() => setWaBalance(parseWhatsAppListAndBalanceTeams(waList, loadPlayerMmr()))}
+            className="tap rounded-lg border border-white/20 bg-white/5 px-2 py-1.5 text-[10px] font-black text-white/85 transition active:scale-95"
+          >
+            ⚖️ {t(locale, "Balancear con MMR", "Balance with MMR", "Balancear com MMR")}
+          </button>
+          <button
+            type="button"
+            data-testid="pipeline-send-to-cancha-btn"
+            onClick={() => {
+              if (parseWhatsAppPlayerNames(waList).length === 0) return;
+              const balance = parseWhatsAppListAndBalanceTeams(waList, loadPlayerMmr());
+              savePipelineTeams({ teamA: balance.teamA, teamB: balance.teamB, bench: balance.bench });
+              setWaBalance(balance);
+              setWaSent(true);
+            }}
+            className="tap rounded-lg border border-volt/50 bg-volt/10 px-2 py-1.5 text-[10px] font-black text-volt transition active:scale-95"
+          >
+            🚀 {t(locale, "Enviar Equipos y Rotación a Cancha", "Send Teams & Rotation to Court", "Enviar Equipes e Rotação à Quadra")}
+          </button>
+        </div>
+        {waBalance ? (
+          <div data-testid="pipeline-balance-preview" className="mt-1 space-y-0.5 text-[10px] text-white/70">
+            <p>A: {waBalance.teamA.join(", ")}{waBalance.unrated.length > 0 ? ` · ${t(locale, "nuevos MMR 50", "new MMR 50", "novos MMR 50")}: ${waBalance.unrated.length}` : ""}</p>
+            <p>B: {waBalance.teamB.join(", ")}</p>
+            <p>{t(locale, "Banco", "Bench", "Banco")}: {waBalance.bench.join(", ") || "—"}</p>
+          </div>
+        ) : null}
+        {waSent ? (
+          <p data-testid="pipeline-sent-note" className="mt-1 text-[10px] text-emerald">
+            ✅ {t(locale, "Equipos en Cancha: abrí 🏐 Cancha y arrancan cargados.", "Teams on Court: open 🏐 Court and they boot preloaded.", "Equipes na Quadra: abra 🏐 Quadra e elas sobem carregadas.")}
+          </p>
+        ) : null}
+      </section>
     </StationShell>
   );
 }

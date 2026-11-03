@@ -1,8 +1,8 @@
-# VolleyOS Global
+﻿# VolleyOS Global
 
 [English](README.md) · [Español](README.es.md) · [Português](README.pt.md)
 
-[![Version](https://img.shields.io/badge/version-v10.3.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
+[![Version](https://img.shields.io/badge/version-v11.0.0-FF3B5C?style=for-the-badge)](https://github.com/v0idbrn/VoleyOS/releases/latest)
 [![Modules](https://img.shields.io/badge/modules-61-FF3B5C?style=for-the-badge&color=EAB308)](#encyclopedia-of-the-61-modules)
 [![Offline](https://img.shields.io/badge/100%25-offline--first-FF3B5C?style=for-the-badge&color=EAB308)](#why-volleyos-exists)
 [![Android](https://img.shields.io/badge/Android%20APK-voleyos--universal-FF3B5C?style=for-the-badge&color=EAB308)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
@@ -13,6 +13,18 @@
 [![Download APK](https://img.shields.io/badge/APK-voleyos--universal.apk-FF3B5C?style=for-the-badge&logo=android)](https://github.com/v0idbrn/VoleyOS/releases/latest/download/voleyos-universal.apk)
 
 Signed universal APK built by GitHub Actions on every `v*` tag. Android 7.0+ (minSdk 24), trilingual, offline-first, no accounts and no telemetry. F-Droid ready.
+
+## 🆕 What's new in v11.0.0 — Ultimate Overhaul
+
+- **🚀 WhatsApp → Court in 20s**: paste the group list in 🍻 Picadito, tap `⚖️ Balancear` and the local MMR record splits two even teams with a bench rotation order; `🚀 Enviar Equipos` boots ⏱️ Cancha already loaded.
+- **🏐 Vertical Cancha dock**: 4-button primary dock (Undo · Audio · Table Mode · More), 🎯 Focus Mode, pure `#000000` OLED theme and 4-level scouting depth (N0 points → N3 pro `.DVW` console).
+- **⚡ Tap-to-DVW scouting**: the post-point quick tagger generates real DataVolley codes (`*14AH#`, `*05A#`, `=`…), a 4-direction swipe pad drills shorthand, and 🎙️ voice dictation scores by saying "punto local".
+- **🦺 Smart Auto-Líbero**: the libero swaps in for back-row middle blockers and out at P4 with zero counted substitutions; a FIVB 5-1 overlap validator, triangular/quadrangular standings and key-free roster swap codes complete the kit.
+- **🏁 End-of-match hub**: WhatsApp summary, MVP/Mufa votes move the local MMR (±5), La Vaquita 2.0 debtors ledger with debt reminders and an Obsidian & Crimson PNG story card for Stories/WhatsApp.
+- **📊 Live inline metrics**: K1% · K2% · Side-Out% · attack efficiency under the scoreboard, ⚖️ El Juez quick-rule drawer, 15s timeout diagnostic card and "Las 3 Claves del Partido" — zero NaN.
+- **🧭 Navigation surgery**: 3-path quick launch, an 8-workstation task switcher over the 61 modules and 🧪 beta credibility badges on experimental hardware meters.
+- **🔒 Zero-telemetry purge**: no PostHog, no session replay, no third-party analytics — 100% offline and local only.
+- **Keeps everything from v10.3.0**: Table Mode, courtside `.dvw` console and the rally mistake linter.
 
 ## 🆕 What's new in v10.3.0 — Table Mode & Courtside
 
