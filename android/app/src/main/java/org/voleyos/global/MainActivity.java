@@ -86,6 +86,8 @@ public class MainActivity extends Activity {
         private volatile String livePin = "";
         /** v10.2.2 — room access mode gating POST /co-admin-action. */
         private volatile String coAdminMode = "spectator";
+        /** v11.0.2 — per-IP /co-admin-action timestamps for the 15-req/5s limiter. */
+        private final java.util.Map<String, java.util.ArrayDeque<Long>> coAdminHits = new java.util.HashMap<>();
         /** Actions a co-admin may push over :8765 (whitelist, never free-form). */
         private static final java.util.Set<String> ALLOWED_CO_ACTIONS = new java.util.HashSet<>(java.util.Arrays.asList(
                 "home_plus", "home_minus", "away_plus", "away_minus",
@@ -119,6 +121,40 @@ public class MainActivity extends Activity {
                     lockLandscape
                             ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                             : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED));
+        }
+
+        /** v11.0.2 — does the user's Android Quick Settings rotation lock allow rotation? */
+        @JavascriptInterface
+        public boolean isSystemAutoRotateEnabled() {
+            try {
+                return android.provider.Settings.System.getInt(
+                        context.getContentResolver(),
+                        android.provider.Settings.System.ACCELEROMETER_ROTATION,
+                        1
+                ) == 1;
+            } catch (Exception e) {
+                return true;
+            }
+        }
+
+        /**
+         * v11.0.2 — user-selectable rotation behaviour from Cancha, no permissions:
+         * bypass_os_lock rotates physically even with the OS portrait lock ON;
+         * respect_os_lock hands the decision back to the system.
+         */
+        @JavascriptInterface
+        public void setSensorAutoRotateMode(String mode) {
+            activity.runOnUiThread(() -> {
+                if ("landscape_lock".equals(mode)) {
+                    activity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                } else if ("bypass_os_lock".equals(mode) || "full_sensor".equals(mode)) {
+                    activity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+                } else if ("portrait_lock".equals(mode)) {
+                    activity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                } else {
+                    activity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+                }
+            });
         }
 
         /**
@@ -654,6 +690,22 @@ public class MainActivity extends Activity {
                 return;
             }
             if (method.equals("POST") && path.equals("/co-admin-action")) {
+                // v11.0.2 — OWASP: 1 KB body cap and 15 req / 5s per IP.
+                if (contentLength > 1024) {
+                    writeError(client, "413 Payload Too Large");
+                    return;
+                }
+                String ip = client.getInetAddress() == null ? "unknown" : client.getInetAddress().getHostAddress();
+                long now = System.currentTimeMillis();
+                synchronized (coAdminHits) {
+                    java.util.ArrayDeque<Long> hits = coAdminHits.computeIfAbsent(ip, key -> new java.util.ArrayDeque<>());
+                    while (!hits.isEmpty() && now - hits.peekFirst() > 5000) hits.pollFirst();
+                    if (hits.size() >= 15) {
+                        writeError(client, "429 Too Many Requests");
+                        return;
+                    }
+                    hits.addLast(now);
+                }
                 handleCoAdminAction(client, contentLength);
                 return;
             }
@@ -1000,6 +1052,8 @@ public class MainActivity extends Activity {
         // arbitrary files through that origin.
         settings.setAllowFileAccessFromFileURLs(false);
         settings.setAllowUniversalAccessFromFileURLs(false);
+        // v11.0.2 — MASVS-L2: the shell never needs geolocation prompts.
+        settings.setGeolocationEnabled(false);
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {

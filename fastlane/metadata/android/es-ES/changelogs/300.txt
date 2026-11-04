@@ -3,4 +3,3 @@ v3.0.0
 • Salas en vivo persistentes con SQLite WAL, token de administración y lectura pública.
 • Seis perfiles de rol: jugadores, entrenadores, cancha, árbitros, tribuna y torneos.
 • Silbato de árbitro, alto contraste y visor de salas en vivo trilingüe.
-• 24 módulos replicados offline en TypeScript con 42 pruebas frontend.

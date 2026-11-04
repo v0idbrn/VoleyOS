@@ -1,4 +1,4 @@
 Ícone novo: o escudo completo do VoleyOS substitui o círculo de preenchimento.
-Bola de vôlei com costuras, pico V central branco e vermelho e o wordmark VOLEYOS.
-Aplicado ao icon adaptativo do Android, aos 10 PNGs de densidade e aos ícones web.
+Bola de vôlei com costuras, pico V central branco e vermelho e o selo VOLEYOS.
+Aplicado ao ícone adaptativo do Android, aos 10 PNGs de densidade e aos ícones web.
 versionCode 1023.

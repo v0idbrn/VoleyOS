@@ -4,5 +4,3 @@
 ⚡ Quick tag → .DVW with swipe pad and voice dictation.
 🦺 Smart Auto-Libero with zero counted substitutions + FIVB 5-1 overlap validator.
 🏁 End-of-match hub: WhatsApp summary, MVP/Mufa MMR votes, La Vaquita 2.0 ledger and PNG story card.
-📊 Live K1% · K2% · Side-Out% + ⚖️ El Juez rules drawer and 8 navigation workstations.
-🔒 Zero-telemetry purge: 0 PostHog, 0 session-replay.

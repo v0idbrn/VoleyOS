@@ -1,8 +1,7 @@
 🏆 Lançamento v11.0.0 "Ultimate Overhaul":
-🚀 WhatsApp à quadra em 20s: lista, balanceio MMR e rotação no banco.
-🏐 Quadra vertical: dock de 4 botões, Modo Foco, fundo OLED puro.
-⚡ Tag rápido → .DVW com swipe pad e ditado por voz.
-🦺 Auto-Líbero sem consumo de substituições + validador 5-1 FIVB.
-🏁 Encerramento de partida: resumo WhatsApp, votos MVP/Mufa no MMR, La Vaquita 2.0 e cartão PNG.
-📊 K1% · K2% · Side-Out% ao vivo + ⚖️ O Juiz e 8 estações de navegação.
-🔒 Purga total de telemetria: 0 PostHog, 0 session-replay.
+🚀 Lista do WhatsApp vira racha na quadra em 20s: balanceio por MMR e rodízio no banco.
+🏐 Placar ao vivo vertical: dock de 4 botões, Modo Foco e OLED puro.
+⚡ Scout rápido → código .dvw do DataVolley, com ditado por voz.
+🦺 Líbero automático sem queimar substituição + validador do rodízio 5-1 FIVB.
+🏁 Fechamento: resumo pro WhatsApp, MVP/Mufa no MMR, rachadinha do Vaquita e cartão PNG.
+🔒 0 telemetria.

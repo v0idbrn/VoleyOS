@@ -1,5 +1,5 @@
-Modo Mesa apaisado: o celular deitado vira um placar dividido 50/50 gigante.
-Suíte Courtside .dvw do DataVolley: importar, exportar e demo em 1 toque.
-Leitura ao vivo traduz as siglas de observação em português antes do Enter.
-O linter marca duplas recepções, bloqueios faltando, ataques ilegais e rotações desalinhadas.
-Partida que sobrevive ao reinício, atalhos de PC (A/L/Z/M) e copiar o placar em 1 toque.
+Mesinha apaisada: celular deitado vira placar dividido 50/50 gigante para a mesa.
+Scout no padrão .dvw do DataVolley: importar, exportar e demo em 1 toque.
+Leitura ao vivo traduz as siglas de observação pro português antes do Enter.
+O linter marca recepção dupla, bloqueio esquecido, ataque ilegal e rodízio torto.
+Jogo que sobrevive ao app fechado, atalhos de PC (A/L/Z/M) e placar copiável.

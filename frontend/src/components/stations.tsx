@@ -320,6 +320,8 @@ type VosBridgeWindow = Window & {
     setVolumeKeyScoring?: (enabled: boolean) => void;
     setHardwareScoreMode?: (enabled: boolean) => void;
     triggerHapticPattern?: (patternType: string) => void;
+    isSystemAutoRotateEnabled?: () => boolean;
+    setSensorAutoRotateMode?: (mode: string) => void;
   };
   /** Android Back probe: the Activity asks the page before leaving the app. */
   __vosHandleAndroidBack?: () => string | undefined;
@@ -2412,6 +2414,35 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const tableModeBootstrappedRef = useRef(false);
   const tableManualRef = useRef(false);
 
+  // v11.0.2 — user-selectable bypass of the Android rotation lock. Default ON:
+  // laying the phone on the table just works, or one tap respects the OS lock.
+  const [bypassOsRotationLock, setBypassOsRotationLock] = useState(() => {
+    try {
+      return window.localStorage.getItem("voleyos_bypass_os_rotation_lock") !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const bypassRef = useRef(bypassOsRotationLock);
+  useEffect(() => {
+    bypassRef.current = bypassOsRotationLock;
+    try {
+      window.localStorage.setItem("voleyos_bypass_os_rotation_lock", bypassOsRotationLock ? "1" : "0");
+    } catch {
+      // storage full or blocked: keep the in-memory choice
+    }
+    if (!isTableLandscapeMode) {
+      (window as VosBridgeWindow).VoleyOSBridge?.setSensorAutoRotateMode?.(
+        bypassOsRotationLock ? "bypass_os_lock" : "respect_os_lock",
+      );
+    }
+  }, [bypassOsRotationLock, isTableLandscapeMode]);
+
+  const toggleBypassOsRotationLock = (): void => {
+    setBypassOsRotationLock((previous) => !previous);
+    triggerCourtHaptics(12);
+  };
+
   const enterTableMode = (): void => {
     tableManualRef.current = true;
     setLandscapeDismissed(true);
@@ -2435,6 +2466,12 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         if (!tableManualRef.current) setIsTableLandscapeMode(false);
         setLandscapeDismissed(false);
         return;
+      }
+      // v11.0.2 — when the user chose to respect the OS lock and auto-rotate is
+      // disabled system-wide, only the 📱 Modo Mesa button may enter the mode.
+      if (!bypassRef.current) {
+        const sysRotate = (window as VosBridgeWindow).VoleyOSBridge?.isSystemAutoRotateEnabled?.() ?? true;
+        if (!sysRotate) return;
       }
       if (window.innerHeight <= 560 && !landscapeDismissed) setIsTableLandscapeMode(true);
     };
@@ -2548,6 +2585,17 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           onClick={toggleScoreEditor}
         >
           ✏️ {t(locale, "Editar Puntos / Sets", "Edit Points / Sets", "Editar Pontos / Sets")}
+        </button>
+        <button
+          type="button"
+          data-testid="os-rotation-bypass-toggle"
+          aria-pressed={bypassOsRotationLock}
+          className={BTN}
+          onClick={toggleBypassOsRotationLock}
+        >
+          {bypassOsRotationLock
+            ? `🔓 ${t(locale, "Giro Libre (Saltar Lock Android)", "Free Rotation (Bypass Android Lock)", "Giro Livre (Pular Lock Android)")}`
+            : `🔒 ${t(locale, "Respetar Lock del Celu", "Respect Phone Lock", "Respeitar Lock do Celular")}`}
         </button>
       </div>
       <div

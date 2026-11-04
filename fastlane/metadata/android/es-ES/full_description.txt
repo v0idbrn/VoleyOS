@@ -9,9 +9,6 @@ QUÉ INCLUYE
 • Armado de Equipos: equipos parejos con un armador cada uno y cola de rey de la cancha.
 • Overlay OBS: fuente de navegador transparente con banners de set point y match point.
 • VAR de Bolsillo: chequeos de reglas en lenguaje claro con citas FIVB y sorteo inicial.
-• Playa: puntuación 21/15, cambios de lado cada 7/5 puntos y control de saque.
-• Volleycards: radar hexagonal con alcance de remate y bloqueo.
-• Tempo de Ataque: ventanas de 1er tiempo, 2do, pipe y 3er en milisegundos.
 • Monitor ACWR: carga aguda:crónica de saltos con zonas de fatiga y riesgo.
 • Sombra de Bloqueo: cono de sombra, expulsión de defensores y cobertura de cancha.
 • Radar de Costuras: dueño de la costura, prioridad y drill para cerrar el hueco.

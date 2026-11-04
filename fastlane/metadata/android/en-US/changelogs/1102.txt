@@ -1,0 +1,4 @@
+🔓 Cancha: choose whether laying the phone sideways bypasses Android's portrait lock (Free Rotation) or respects the system lock — one tap on the scoreboard.
+🛡️ ISO 27001/MASVS-L2 hardening: input sanitation, prototype-pollution block and a frozen native bridge.
+🔐 VOS-PRO licence bound to your device with a clock guard: rolling the clock back never revives an expired key.
+🧾 F-Droid clean: rewritten pt-BR metadata and DependencyInfo stripped from the APK.

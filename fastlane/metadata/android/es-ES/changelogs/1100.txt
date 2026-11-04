@@ -4,5 +4,3 @@
 ⚡ Tag rápido → .DVW con arrastrar/soltar y dictado por voz.
 🦺 Auto-Líbero sin consumo de sustituciones + validador 5-1 FIVB.
 🏁 Cierre End-of-Match: resumen WhatsApp, MVP/Mufa al MMR, La Vaquita 2.0 y tarjeta PNG.
-📊 K1% · K2% · Side-Out% en vivo + ⚖️ El Juez y 8 workstations de navegación.
-🔒 Purga total de telemetría: 0 PostHog, 0 session-replay.

@@ -1,0 +1,11 @@
+{
+  "id": "org.voleyos.global",
+  "url": "https://github.com/v0idbrn/VoleyOS",
+  "author": "v0idbrn",
+  "name": "VoleyOS",
+  "additionalSettings": "{\"mode\":\"github\",\"filterReleases\":true,\"releaseAssetFilter\":\"voleyos-universal.apk\",\"trackOnly\":false,\"versionExtraction\":\"releaseTagAsVersion\"}",
+  "apkFilterRegEx": "voleyos-universal",
+  "releaseDateAsVersion": false,
+  "versionExtractionRegEx": "",
+  "about": "Offline-first volleyball OS: 61 modules, AGPL-3.0-or-later, zero telemetry."
+}

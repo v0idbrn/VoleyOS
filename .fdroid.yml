@@ -1,23 +1,5 @@
-# F-Droid metadata template for VolleyOS.
-# The Android wrapper lives in `android/` (WebView shell around the static PWA).
-# The wrapper is committed at v5.0.0; until an F-Droid build recipe is reviewed, keep `Builds` empty: F-Droid
-# rejects metadata without a reproducible build recipe, so this file is the
-# source of truth to copy into fdroiddata once the wrapper ships.
-# See docs/FDROID_SUBMISSION_GUIDE.md.
-
-Categories:
-  - Sports
-License: AGPL-3.0-or-later
-AuthorName: v0idbrn
-WebSite: https://volleyos.app
-SourceCode: https://github.com/v0idbrn/VoleyOS
-IssueTracker: https://github.com/v0idbrn/VoleyOS/issues
-Changelog: https://github.com/v0idbrn/VoleyOS/blob/main/fastlane/metadata/android/en-US/changelogs/500.txt
-Donate: https://github.com/sponsors/v0idbrn
-AutoName: VolleyOS
-RepoType: git
-Repo: https://github.com/v0idbrn/VoleyOS.git
-
-Builds: []
-
-AntiFeatures: []
+# VolleyOS — in-source .fdroid.yml hints for fdroid-based scanners.
+# The canonical package metadata lives in fdroid/org.voleyos.global.yml and the
+# store copy in fastlane/metadata/android (consumed directly by IzzyOnDroid).
+# Version detection: versionCode/versionName live in android/app/build.gradle.
+UpdateCheckData: android/app/build.gradle|versionCode (\d+)|.|versionName "(.+)"

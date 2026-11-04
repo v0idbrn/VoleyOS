@@ -1,0 +1,41 @@
+# F-Droid package metadata for VolleyOS (fastlane x fdroiddata-ready).
+Categories:
+  - Sports & Health
+License: AGPL-3.0-or-later
+AuthorName: VolleyOS Contributors
+AuthorEmail: voleyos@proton.me
+WebSite: https://github.com/v0idbrn/VoleyOS
+SourceCode: https://github.com/v0idbrn/VoleyOS
+IssueTracker: https://github.com/v0idbrn/VoleyOS/issues
+Changelog: https://github.com/v0idbrn/VoleyOS/raw/main/fastlane/metadata/android/en-US/changelogs
+Liberapay: 
+
+RepoType: git
+Repo: https://github.com/v0idbrn/VoleyOS.git
+
+# No proprietary blobs, no tracking SDKs, no auto-updaters, no Play servers.
+AntiFeatures:
+
+Builds:
+  - versionName: 11.0.2
+    versionCode: 1102
+    commit: v11.0.2
+    subdir: android/app
+    sudo: false
+    gradle:
+      - yes
+    # The CI assembles the universal APK; fdroid builds from the same tag.
+    output: ../../build/outputs/apk/release/app-release.apk
+    scanignore:
+      - frontend/node_modules
+    build:
+      - cd ../../frontend
+      - npm ci
+      - npm run build
+      - cd ../android
+      - cp -r ../frontend/out/. app/src/main/assets/
+
+AutoUpdateMode: None
+UpdateCheckMode: Tags
+CurrentVersion: 11.0.2
+CurrentVersionCode: 1102

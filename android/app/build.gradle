@@ -10,8 +10,8 @@ android {
         applicationId "org.voleyos.global"
         minSdk 24
         targetSdk 34
-        versionCode 1101
-        versionName "11.0.1"
+        versionCode 1102
+        versionName "11.0.2"
     }
 
     // Android's asset merger ignores directories whose name starts with an underscore
@@ -53,6 +53,13 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // v11.0.2 — F-Droid scanner: strip Google's DependencyInfo blobs from
+    // artifacts so no third-party metadata rides inside the APK/AAB.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 }
 

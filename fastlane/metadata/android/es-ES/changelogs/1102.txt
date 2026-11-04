@@ -1,0 +1,4 @@
+🔓 Cancha: elige si acostar el celular gira libre (saltando el lock de Android) o respeta el bloqueo del sistema — 1 toque en el marcador.
+🛡️ Blindaje ISO 27001/MASVS-L2: saneo de entrada, bloqueo de prototype pollution y puente nativo congelado.
+🔐 Licencia VOS-PRO ligada al aparato con guardián de reloj: rebobinar la hora no reactiva claves vencidas.
+🧾 F-Droid listo: metadata pt-BR reescrita y DependencyInfo fuera del APK.
