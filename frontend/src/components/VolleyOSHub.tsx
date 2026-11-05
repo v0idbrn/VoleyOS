@@ -1176,7 +1176,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald">
                       ⚡ {t(locale, "Modo Simple", "Simple Mode", "Modo Simples")}
                     </p>
-                    <div className="snap-row mt-1 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    <div className="mt-1 flex flex-wrap gap-2" style={{ width: "100%", overflow: "visible" }}>
                       <button
                         key="cancha"
                         type="button"
@@ -1208,7 +1208,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] text-volt">
                       ⭐ {t(locale, "Mis Fijas (Acceso Rápido)", "My Pins (Quick Access)", "Minhas Fixas (Acesso Rápido)")}
                     </p>
-                    <div className="snap-row mt-1 flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                    <div className="mt-1 flex flex-wrap gap-2" style={{ width: "100%", overflow: "visible" }}>
                       {pinned.map((slug) => {
                         const module = MODULE_BY_SLUG.get(slug);
                         if (!module) return null;
@@ -1268,7 +1268,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   </span>
                 </button>
 
-                <div data-testid="guided-modes" className="snap-row mt-3 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={t(locale, "Modos guiados", "Guided modes", "Modos guiados")}>
+                <div data-testid="guided-modes" className="mt-3 flex flex-wrap gap-2" role="tablist" aria-label={t(locale, "Modos guiados", "Guided modes", "Modos guiados")} style={{ width: "100%", overflow: "visible" }}>
                   {GUIDED_MODES.map((mode) => (
                     <button
                       key={mode.id}
@@ -1285,7 +1285,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   ))}
                 </div>
 
-                <div data-testid="workstation-bar" className="snap-row mt-3 flex gap-1.5 no-scrollbar" role="tablist" aria-label={t(locale, "Workstations", "Workstations", "Workstations")} style={{ overflowX: "auto", paddingBottom: "4px" }}>
+                <div data-testid="workstation-bar" className="mt-3 flex flex-wrap gap-2" role="tablist" aria-label={t(locale, "Workstations", "Workstations", "Workstations")} style={{ width: "100%", overflow: "visible", gap: "8px", flexWrap: "wrap" }}>
                   {WORKSTATIONS.map((workstation) => {
                     const isActive = workstationId === workstation.id;
                     return (
@@ -1325,7 +1325,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   })}
                 </div>
 
-                <div data-testid="profile-filters" className="snap-row mt-1.5 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={shell.allModules}>
+                <div data-testid="profile-filters" className="mt-1.5 flex flex-wrap gap-2" role="tablist" aria-label={shell.allModules} style={{ width: "100%", overflow: "visible" }}>
                   <button
                     type="button"
                     role="tab"
@@ -1441,7 +1441,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 {recent.length > 0 && !guidedMode ? (
                   <section className="mt-5">
                     <h2 className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.recents}</h2>
-                    <div className="snap-row mt-2 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    <div className="mt-2 flex flex-wrap gap-2" style={{ width: "100%", overflow: "visible" }}>
                       {recent.map((slug) => {
                         const meta = MODULE_BY_SLUG.get(slug);
                         if (!meta) return null;
@@ -1539,7 +1539,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                       ⤢ {shell.openModule}
                     </button>
                   </div>
-                  <div className="snap-row mt-2 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={tabTitles[tab].title}>
+                  <div className="mt-2 flex flex-wrap gap-2" role="tablist" aria-label={tabTitles[tab].title} style={{ width: "100%", overflow: "visible" }}>
                     {groupSlugs.map((slug) => {
                       const meta = MODULE_BY_SLUG.get(slug);
                       if (!meta) return null;

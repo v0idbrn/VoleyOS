@@ -1,0 +1,4 @@
+🧩 Module and filter bars now wrap into rows: nothing gets sliced at the right edge anymore.
+🏐 Pizarra 5-1, Block Shadow and Seam Radar rebuilt: full courts with giant color-coded role tokens.
+⏱️ Timeout Chalkboard gains an interactive board (freehand drawing, 3 colors) and a real 30s FIVB clock.
+🔀 4-2/6-2/5-1 Simulator gets a visual court diagram; raw JSON is gone from all 61 modules; 8s serve clock.

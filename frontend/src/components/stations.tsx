@@ -239,6 +239,7 @@ import {
   type ShotResult,
   type SixAttributes,
   type SubEvent,
+  type SystemName,
   type TempoCode,
   type ZonePoint,
   type BlockoutDecision,
@@ -272,7 +273,7 @@ export interface StationProps {
 }
 
 const CARD =
-  "station-card flex h-full flex-col gap-4 rounded-2xl border border-white/10 bg-panel/80 p-5 shadow-2xl shadow-black/40 backdrop-blur";
+  "station-card flex flex-col gap-4 rounded-2xl border border-white/10 bg-panel/80 p-5 shadow-2xl shadow-black/40 backdrop-blur";
 const BTN =
   "rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white transition hover:border-volt hover:text-volt focus-visible:outline focus-visible:outline-2 focus-visible:outline-volt";
 const BTN_PRIMARY =
@@ -633,12 +634,26 @@ const DUTY_LINES: Record<RotationRole, Record<Locale, string>> = {
   },
 };
 
+/** v11.0.4 — color-coded role medallions for the 5-1 chalkboard. */
+const ROLE_COLORS: Record<string, string> = {
+  S: "#F59E0B",
+  OH1: "#E11D48",
+  OH2: "#E11D48",
+  MB1: "#10B981",
+  "MB2/L": "#10B981",
+  OPP: "#8B5CF6",
+  L: "#0EA5E9",
+};
+
 export function RotationStation({ meta, locale, onSave }: StationProps) {
   const [rotation, setRotation] = useState(1);
   const [points, setPoints] = useState<ZonePoint[]>(() => defaultPositions(1));
   const [report, setReport] = useState(() => validateOverlap(defaultPositions(1)));
   const [trackedRole, setTrackedRole] = useState<RotationRole>("all");
   const [servePhase, setServePhase] = useState<"K1" | "K2">("K1");
+  // v11.0.4 — draggable giant medallions with live FIVB overlap check.
+  const courtRef = useRef<SVGSVGElement | null>(null);
+  const dragZone = useRef<number | null>(null);
 
   const trackedZones = roleZones(trackedRole, rotation);
   const primaryZone = trackedZones[0] ?? null;
@@ -732,43 +747,89 @@ export function RotationStation({ meta, locale, onSave }: StationProps) {
           🚀 {t(locale, "Sacando Nosotros (K2)", "We Serve (K2)", "Nós Sacamos (K2)")}
         </button>
       </div>
-      <svg viewBox="0 0 900 700" className="mt-2 w-full rounded-xl border border-white/10 bg-[#0b1a13]" role="img" aria-label={t(locale, "Cancha 9x9 con posiciones 5-1", "9x9 court with 5-1 positions", "Quadra 9x9 com posições 5-1")}>
+      <svg
+        ref={courtRef}
+        viewBox="0 0 900 700"
+        className="mt-2 w-full touch-none rounded-xl border border-white/10 bg-[#0b1a13]"
+        role="img"
+        aria-label={t(locale, "Cancha 9x9 con posiciones 5-1", "9x9 court with 5-1 positions", "Quadra 9x9 com posições 5-1")}
+        onPointerMove={(event) => {
+          const zone = dragZone.current;
+          const svg = courtRef.current;
+          if (zone === null || !svg) return;
+          const rect = svg.getBoundingClientRect();
+          const x = Math.max(40, Math.min(860, ((event.clientX - rect.left) / rect.width) * 900));
+          const y = Math.max(60, Math.min(660, ((event.clientY - rect.top) / rect.height) * 700));
+          const next = points.map((point) => (point.zone === zone ? { ...point, x, y } : point));
+          setPoints(next);
+          setReport(validateOverlap(next));
+        }}
+        onPointerUp={() => {
+          dragZone.current = null;
+        }}
+        onPointerLeave={() => {
+          dragZone.current = null;
+        }}
+      >
         <rect x="0" y="0" width="900" height="700" fill="#0b1a13" />
-        <line x1="0" y1="4" x2="900" y2="4" stroke="#F59E0B" strokeWidth="5" />
+        {/* Net band + attack line + floor zones */}
+        <rect x="0" y="0" width="900" height="16" fill="rgba(245, 158, 11, 0.35)" />
+        <line x1="0" y1="16" x2="900" y2="16" stroke="#F59E0B" strokeWidth="4" />
+        <text x="450" y="40" textAnchor="middle" fontSize="15" fontWeight="900" fill="#F59E0B" opacity="0.85">RED / NET</text>
         <line x1="0" y1="300" x2="900" y2="300" stroke="#F59E0B" strokeDasharray="12 10" strokeWidth="3" />
-        <line x1="450" y1="0" x2="450" y2="700" stroke="#ffffff22" strokeWidth="2" />
+        <text x="16" y="292" fontSize="13" fontWeight="800" fill="#F59E0B" opacity="0.7">{t(locale, "LÍNEA DE 3M", "3M LINE", "LINHA DE 3M")}</text>
+        {([[4, 180, 130], [3, 450, 130], [2, 720, 130], [5, 180, 620], [6, 450, 620], [1, 720, 620]] as Array<[number, number, number]>).map(([zone, zx, zy]) => (
+          <text key={zone} x={zx} y={zy} textAnchor="middle" fontSize="14" fontWeight="800" fill="#ffffff" opacity="0.16">{t(locale, `ZONA ${zone}`, `ZONE ${zone}`, `ZONA ${zone}`)}</text>
+        ))}
+        {/* Alignment lines: front 4-3-2, back 5-6-1, and 4-5 / 3-6 / 2-1 columns */}
+        {([[4, 3], [3, 2], [5, 6], [6, 1], [4, 5], [3, 6], [2, 1]] as Array<[number, number]>).map(([from, to]) => {
+          const a = points.find((point) => point.zone === from);
+          const b = points.find((point) => point.zone === to);
+          if (!a || !b) return null;
+          const faulted = report.faults.some((item) => item.offender === from || item.offender === to);
+          return (
+            <line
+              key={`${from}-${to}`}
+              x1={a.x}
+              y1={a.y}
+              x2={b.x}
+              y2={b.y}
+              stroke={faulted ? "#DC2626" : "#10B981"}
+              strokeWidth="3"
+              strokeDasharray="9 7"
+              opacity="0.75"
+            />
+          );
+        })}
         {points.map((zone) => {
           const fault = report.faults.find((item) => item.offender === zone.zone);
+          const role = zoneRoleLabel(zone.zone);
+          const color = ROLE_COLORS[role] ?? "#E11D48";
+          const tracked = trackedZones.includes(zone.zone);
           return (
-            <g key={zone.zone}>
+            <g
+              key={zone.zone}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                dragZone.current = zone.zone;
+              }}
+              style={{ cursor: "grab" }}
+            >
               <circle
                 cx={zone.x}
                 cy={zone.y}
-                r={34}
-                fill={trackedZones.includes(zone.zone) ? "#c8ff00" : fault ? "#DC2626" : "#E11D48"}
-                stroke="#fff"
-                strokeOpacity={trackedZones.includes(zone.zone) ? 1 : 0.5}
-                data-testid={trackedZones.includes(zone.zone) ? `tracked-zone-${zone.zone}` : undefined}
+                r={32}
+                fill={color}
+                stroke={fault ? "#DC2626" : tracked ? "#c8ff00" : "#fff"}
+                strokeWidth={fault || tracked ? 5 : 3}
+                data-testid={tracked ? `tracked-zone-${zone.zone}` : undefined}
               />
-              <text
-                x={zone.x}
-                y={zone.y + 5}
-                textAnchor="middle"
-                fontSize="20"
-                fontWeight="800"
-                fill={trackedZones.includes(zone.zone) ? "#0b1a13" : "#fff"}
-              >
+              <text x={zone.x} y={zone.y - 4} textAnchor="middle" fontSize="18" fontWeight="800" fill="#fff">
                 {zone.zone}
               </text>
-              <text
-                x={zone.x}
-                y={zone.y + 52}
-                textAnchor="middle"
-                fontSize="14"
-                fontWeight="800"
-                fill="#F8FAFC"
-              >
-                {zoneRoleLabel(zone.zone)} · Z{zone.zone}
+              <rect x={zone.x - 27} y={zone.y + 8} width="54" height="17" rx="8.5" fill="#0F172A" opacity="0.92" />
+              <text x={zone.x} y={zone.y + 20.5} textAnchor="middle" fontSize="11" fontWeight="800" fill="#F8FAFC">
+                {role}
               </text>
             </g>
           );
@@ -1162,6 +1223,8 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [dvwLog, setDvwLog] = useState<string[]>([]);
   const [dvwNotice, setDvwNotice] = useState<string | null>(null);
   const dvwFileRef = useRef<HTMLInputElement | null>(null);
+  // v11.0.4 — pointer drag-to-scroll for the jersey chip strip.
+  const jerseyDrag = useRef<{ x: number; left: number } | null>(null);
 
   // The hub toggle and this board share one persisted mode; both dispatch the
   // same event so a switch made on either side stays in sync.
@@ -4064,7 +4127,28 @@ ${name}` : name))} testId="cancha-player-chips" />
               ))}
             </select>
           </div>
-          <div data-testid="tagger-jersey-chips" className="flex gap-1 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+          <div
+            data-testid="tagger-jersey-chips"
+            className="flex gap-1 overflow-x-auto pb-1"
+            style={{ scrollbarWidth: "none" }}
+            onWheel={(event) => {
+              if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) event.currentTarget.scrollLeft += event.deltaY;
+            }}
+            onPointerDown={(event) => {
+              jerseyDrag.current = { x: event.clientX, left: event.currentTarget.scrollLeft };
+            }}
+            onPointerMove={(event) => {
+              if (jerseyDrag.current && event.buttons > 0) {
+                event.currentTarget.scrollLeft = jerseyDrag.current.left - (event.clientX - jerseyDrag.current.x);
+              }
+            }}
+            onPointerUp={() => {
+              jerseyDrag.current = null;
+            }}
+            onPointerLeave={() => {
+              jerseyDrag.current = null;
+            }}
+          >
             {Array.from({ length: 18 }, (_, index) => index + 1).map((number_) => {
               const isT = taggerJersey === number_;
               return (
@@ -4904,6 +4988,18 @@ export function AcwrStation({ meta, locale, onSave }: StationProps) {
 
 /* 13 --------------------------------------------------------------------- */
 
+/** v11.0.4 — block-shadow controls speak coach language, not enum codes. */
+const BLOCK_ZONE_LABELS: Record<AttackZone, { es: string; en: string; pt: string }> = {
+  zone_4: { es: "Punta (Zona 4)", en: "Wing (Zone 4)", pt: "Ponta (Zona 4)" },
+  zone_2: { es: "Opuesto (Zona 2)", en: "Opposite (Zone 2)", pt: "Oposto (Zona 2)" },
+  pipe_6: { es: "Pipe (Zona 6)", en: "Pipe (Zone 6)", pt: "Pipe (Zona 6)" },
+  quick_3: { es: "Primer Tiempo (Z3)", en: "Quick (Z3)", pt: "Primeiro Tempo (Z3)" },
+};
+const BLOCK_SCHEME_LABELS: Record<BlockScheme, { es: string; en: string; pt: string }> = {
+  line: { es: "Paralela (Línea)", en: "Line", pt: "Paralela (Linha)" },
+  cross: { es: "Diagonal (Cross)", en: "Cross", pt: "Diagonal (Cross)" },
+};
+
 export function BlockShadowStation({ meta, locale, onSave }: StationProps) {
   const [zone, setZone] = useState<AttackZone>("zone_4");
   const [blockers, setBlockers] = useState(3);
@@ -4933,7 +5029,7 @@ export function BlockShadowStation({ meta, locale, onSave }: StationProps) {
             onClick={() => setZone(value)}
             className={`rounded-lg border px-2 py-1 text-[10px] font-bold ${zone === value ? "border-volt bg-volt/20 text-volt" : "border-white/10 text-white/50"}`}
           >
-            {value.replace("_", " ")}
+            {t(locale, BLOCK_ZONE_LABELS[value].es, BLOCK_ZONE_LABELS[value].en, BLOCK_ZONE_LABELS[value].pt)}
           </button>
         ))}
       </div>
@@ -4947,21 +5043,58 @@ export function BlockShadowStation({ meta, locale, onSave }: StationProps) {
           <input className="mt-1 w-full accent-crimson" type="range" min={0.2} max={2} step={0.05} value={depth} onChange={(event) => setDepth(Number(event.target.value))} />
         </label>
       </div>
-      <div className="mt-2 flex gap-1">
+      <div className="mt-2 flex flex-wrap gap-1">
         {(["line", "cross"] as BlockScheme[]).map((value) => (
           <button key={value} type="button" onClick={() => setScheme(value)} className={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase ${scheme === value ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>
-            {value}
+            {t(locale, BLOCK_SCHEME_LABELS[value].es, BLOCK_SCHEME_LABELS[value].en, BLOCK_SCHEME_LABELS[value].pt)}
           </button>
         ))}
       </div>
-      <svg viewBox="0 0 90 90" className="mt-3 h-44 w-full rounded-xl border border-white/10 bg-obsidian/60" role="img" aria-label={t(locale, "Cono de sombra del bloqueo", "Block shadow cone", "Cone de sombra do bloqueio")}>
-        <polygon points={report.shadowPolygon.map((point) => `${point.x * 10},${point.y * 10}`).join(" ")} fill="rgba(220,20,60,0.25)" stroke="#dc143c" strokeWidth="0.8" />
-        {report.defenders.map((defender) => (
-          <g key={defender.role}>
-            <circle cx={defender.x * 10} cy={defender.y * 10} r={defender.insideShadow ? 2.6 : 2} fill={defender.insideShadow ? "#dc143c" : "#2ee6a8"} />
-            <text x={defender.x * 10} y={defender.y * 10 - 3.4} fill="#fff" fontSize="3" textAnchor="middle">{defender.role}</text>
-          </g>
+      <svg viewBox="0 0 520 400" className="mt-3 w-full rounded-xl border border-white/10 bg-[#0b1a13]" role="img" aria-label={t(locale, "Cono de sombra del bloqueo", "Block shadow cone", "Cone de sombra do bloqueio")}>
+        {/* Full 9x9m defending court: net at top, 3m line, floor zones. */}
+        <rect x="98" y="48" width="324" height="324" fill="#0e1f18" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="2" />
+        <rect x="98" y="36" width="324" height="12" fill="rgba(245, 158, 11, 0.4)" />
+        <text x="260" y="26" textAnchor="middle" fontSize="13" fontWeight="900" fill="#F59E0B">RED</text>
+        <line x1="98" y1="156" x2="422" y2="156" stroke="#F59E0B" strokeDasharray="8 6" strokeWidth="2" />
+        <text x="104" y="150" fontSize="11" fontWeight="800" fill="#F59E0B" opacity="0.75">{t(locale, "LÍNEA 3M", "3M LINE", "LINHA 3M")}</text>
+        {([[4, 150, 110], [3, 260, 110], [2, 370, 110], [5, 150, 330], [6, 260, 330], [1, 370, 330]] as Array<[number, number, number]>).map(([zone, zx, zy]) => (
+          <text key={zone} x={zx} y={zy} textAnchor="middle" fontSize="12" fontWeight="800" fill="#ffffff" opacity="0.14">{`Z${zone}`}</text>
         ))}
+        {/* Block shadow cone */}
+        <polygon points={report.shadowPolygon.map((point) => `${98 + point.x * 36},${48 + point.y * 36}`).join(" ")} fill="rgba(220,20,60,0.28)" stroke="#dc143c" strokeWidth="1.5" />
+        <text x={98 + (report.shadowPolygon[0]?.x ?? 4) * 36} y={48 + 6.6 * 36} fontSize="11" fontWeight="900" fill="#FF6B8A">{t(locale, "SOMBRA DE BLOQUEO", "BLOCK SHADOW", "SOMBRA DE BLOQUEIO")}</text>
+        {/* Attacker token above the net */}
+        <g>
+          <circle cx={98 + (zone === "zone_4" ? 2.2 : zone === "zone_2" ? 6.8 : 4.5) * 36} cy={20} r={18} fill="#E11D48" stroke="#fff" strokeWidth="2.5" />
+          <text x={98 + (zone === "zone_4" ? 2.2 : zone === "zone_2" ? 6.8 : 4.5) * 36} y={25} textAnchor="middle" fontSize="11" fontWeight="900" fill="#fff">💥</text>
+        </g>
+        <text x={260} y={14} textAnchor="middle" fontSize="11" fontWeight="900" fill="#F8FAFC">💥 {t(locale, "ATACANTE", "ATTACKER", "ATACANTE")}</text>
+        {/* Blocker wall on the net */}
+        {Array.from({ length: blockers }, (_, index) => {
+          const baseX = report.shadowPolygon[0]?.x ?? 4;
+          const width = (report.shadowPolygon[1]?.x ?? 5) - baseX;
+          const bx = 98 + (baseX + (width * (index + 0.5)) / Math.max(blockers, 1)) * 36;
+          return (
+            <g key={index}>
+              <circle cx={bx} cy={48} r={14} fill="#8B5CF6" stroke="#fff" strokeWidth="2" />
+              <text x={bx} y={53} textAnchor="middle" fontSize="11" fontWeight="900" fill="#fff">🧱</text>
+            </g>
+          );
+        })}
+        <text x={422} y={70} textAnchor="end" fontSize="11" fontWeight="900" fill="#C4B5FD">{`🧱 ${t(locale, "BLOQUEO", "BLOCK", "BLOQUEIO")} x${blockers}`}</text>
+        {/* Giant defender tokens with reach halos */}
+        {report.defenders.map((defender) => {
+          const cx = 98 + defender.x * 36;
+          const cy = 48 + defender.y * 36;
+          const label = defender.role === "FREE" ? "LIBRE" : defender.role;
+          return (
+            <g key={defender.role}>
+              <circle cx={cx} cy={cy} r={34} fill="none" stroke={defender.insideShadow ? "#dc143c" : "#2ee6a8"} strokeWidth="1.5" strokeDasharray="5 4" opacity="0.7" />
+              <circle cx={cx} cy={cy} r={26} fill={defender.insideShadow ? "#dc143c" : "#0EA5E9"} stroke="#fff" strokeWidth="3" />
+              <text x={cx} y={cy + 5} textAnchor="middle" fontSize="13" fontWeight="900" fill="#fff">{label}</text>
+            </g>
+          );
+        })}
       </svg>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <Metric label={t(locale, "Cobertura", "Coverage", "Cobertura")} value={`${report.coveragePct}%`} tone="text-volt" />
@@ -4974,6 +5107,13 @@ export function BlockShadowStation({ meta, locale, onSave }: StationProps) {
 }
 
 /* 14 --------------------------------------------------------------------- */
+
+/** v11.0.4 — seam priorities read as Spanish coach words, not engine codes. */
+function seamPriorityLabel(priority: string, locale: Locale): string {
+  if (priority === "CRITICAL") return t(locale, "CRÍTICA", "CRITICAL", "CRÍTICA");
+  if (priority === "HIGH") return t(locale, "ALTA", "HIGH", "ALTA");
+  return t(locale, "BAJA", "LOW", "BAIXA");
+}
 
 export function SeamRadarStation({ meta, locale, onSave }: StationProps) {
   const [formation, setFormation] = useState<SeamFormation>("line3");
@@ -5011,7 +5151,9 @@ export function SeamRadarStation({ meta, locale, onSave }: StationProps) {
       <div className="flex flex-wrap gap-1">
         {(["line3", "line4"] as SeamFormation[]).map((value) => (
           <button key={value} type="button" onClick={() => setFormation(value)} className={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase ${formation === value ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>
-            {value}
+            {value === "line3"
+              ? t(locale, "3 Receptores", "3 Receivers", "3 Receptores")
+              : t(locale, "4 Receptores", "4 Receivers", "4 Receptores")}
           </button>
         ))}
         <select className="rounded-lg border border-white/15 bg-obsidian px-2 py-1 text-[10px] text-white" value={serveType} onChange={(event) => setServeType(event.target.value as ServeType)} aria-label={t(locale, "Tipo de saque", "Serve type", "Tipo de saque")}>
@@ -5030,19 +5172,49 @@ export function SeamRadarStation({ meta, locale, onSave }: StationProps) {
           <input className="mt-1 w-full accent-crimson" type="range" min={0} max={9} step={0.1} value={landingY} onChange={(event) => setLandingY(Number(event.target.value))} />
         </label>
       </div>
-      <svg viewBox="0 0 90 90" className="mt-3 h-44 w-full rounded-xl border border-white/10 bg-obsidian/60" role="img" aria-label={t(locale, "Radar de costuras", "Seam radar", "Radar de costuras")}>
-        <line x1={report.seamX * 10} y1={report.seamY * 10 - 4} x2={report.seamX * 10} y2={report.seamY * 10 + 4} stroke="#2ee6a8" strokeWidth="1" />
+      <svg viewBox="0 0 520 400" className="mt-3 w-full rounded-xl border border-white/10 bg-[#0b1a13]" role="img" aria-label={t(locale, "Radar de costuras", "Seam radar", "Radar de costuras")}>
+        {/* Serve-receive half court: net at top, 3m line, floor zones. */}
+        <rect x="98" y="48" width="324" height="324" fill="#0e1f18" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="2" />
+        <rect x="98" y="36" width="324" height="12" fill="rgba(245, 158, 11, 0.4)" />
+        <text x="260" y="26" textAnchor="middle" fontSize="13" fontWeight="900" fill="#F59E0B">RED</text>
+        <line x1="98" y1="156" x2="422" y2="156" stroke="#F59E0B" strokeDasharray="8 6" strokeWidth="2" />
+        <text x="104" y="150" fontSize="11" fontWeight="800" fill="#F59E0B" opacity="0.75">{t(locale, "LÍNEA 3M", "3M LINE", "LINHA 3M")}</text>
+        {([[4, 150, 110], [3, 260, 110], [2, 370, 110], [5, 150, 330], [6, 260, 330], [1, 370, 330]] as Array<[number, number, number]>).map(([zone, zx, zy]) => (
+          <text key={zone} x={zx} y={zy} textAnchor="middle" fontSize="12" fontWeight="800" fill="#ffffff" opacity="0.14">{`Z${zone}`}</text>
+        ))}
+        {/* Server icon + dashed serve trajectory */}
+        <circle cx="260" cy="16" r="13" fill="#F59E0B" stroke="#fff" strokeWidth="2" />
+        <text x="260" y="21" textAnchor="middle" fontSize="11" fontWeight="900" fill="#0b1a13">S</text>
+        <line x1="260" y1="30" x2={98 + landingX * 36} y2={48 + landingY * 36} stroke="#ffd60a" strokeWidth="2.5" strokeDasharray="7 6" />
+        <circle cx={98 + landingX * 36} cy={48 + landingY * 36} r={9} fill="#ffd60a" stroke="#fff" strokeWidth="2" />
+        {/* Seam conflict zone between the two nearest receivers */}
+        {(() => {
+          const nearest = [...report.receivers].sort(
+            (left, right) => Math.hypot(left.x - report.seamX, left.y - report.seamY) - Math.hypot(right.x - report.seamX, right.y - report.seamY),
+          );
+          const a = nearest[0];
+          const b = nearest[1];
+          if (!a || !b) return null;
+          return (
+            <g>
+              <line x1={98 + a.x * 36} y1={48 + a.y * 36} x2={98 + b.x * 36} y2={48 + b.y * 36} stroke="#dc143c" strokeWidth="2.5" opacity="0.9" />
+              <circle cx={98 + report.seamX * 36} cy={48 + report.seamY * 36} r={30} fill="rgba(220, 20, 60, 0.22)" stroke="#dc143c" strokeWidth="2" />
+              <text x={98 + report.seamX * 36} y={48 + report.seamY * 36 + 46} textAnchor="middle" fontSize="11" fontWeight="900" fill="#FF6B8A">{`${t(locale, "ZONA DE COSTURA", "SEAM ZONE", "ZONA DE COSTURA")}: ${report.gapCm} cm`}</text>
+            </g>
+          );
+        })()}
+        {/* Giant receiver tokens with passing-radius rings */}
         {report.receivers.map((receiver) => (
           <g key={receiver.id}>
-            <circle cx={receiver.x * 10} cy={receiver.y * 10} r={receiver.id === report.primaryReceiver ? 2.8 : 2} fill={receiver.id === report.seamOwner ? "#dc143c" : "#2ee6a8"} />
-            <text x={receiver.x * 10} y={receiver.y * 10 - 3.4} fill="#fff" fontSize="3" textAnchor="middle">{receiver.id}</text>
+            <circle cx={98 + receiver.x * 36} cy={48 + receiver.y * 36} r={38} fill="none" stroke="#2ee6a8" strokeWidth="1.5" strokeDasharray="5 4" opacity="0.6" />
+            <circle cx={98 + receiver.x * 36} cy={48 + receiver.y * 36} r={28} fill={receiver.id === report.seamOwner ? "#dc143c" : "#0EA5E9"} stroke="#fff" strokeWidth="3" />
+            <text x={98 + receiver.x * 36} y={48 + receiver.y * 36 + 5} textAnchor="middle" fontSize="13" fontWeight="900" fill="#fff">{receiver.id}</text>
           </g>
         ))}
-        <circle cx={landingX * 10} cy={landingY * 10} r={1.6} fill="#ffd60a" />
       </svg>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <Metric label={t(locale, "Costura", "Seam gap", "Costura")} value={`${report.gapCm} cm`} />
-        <Metric label={t(locale, "Prioridad", "Priority", "Prioridade")} value={report.priority} tone={tone} />
+        <Metric label={t(locale, "Prioridad", "Priority", "Prioridade")} value={seamPriorityLabel(report.priority, locale)} tone={tone} />
         <Metric label={t(locale, "Recibe", "Primary", "Recebe")} value={report.primaryReceiver} />
         <Metric label={t(locale, "Cierra", "Owner", "Fecha")} value={report.seamOwner} tone="text-volt" />
       </div>
@@ -5385,6 +5557,16 @@ const CARD_BUTTON: Record<CardKind, string> = {
   DELAY_PENALTY: "border-indigo-400/60 bg-indigo-400/10 text-indigo-200",
 };
 
+/** v11.0.4 — sanctions cite the FIVB rule in the coach's language. */
+const SANCTION_LABELS: Record<CardKind, [string, string, string]> = {
+  WARNING_YELLOW: ["🟨 Amonestación Amarilla (Regla 21.1)", "🟨 Yellow Card (Rule 21.1)", "🟨 Advertência Amarela (Regra 21.1)"],
+  PENALTY_RED: ["🟥 Castigo (Regla 21.2)", "🟥 Penalty (Rule 21.2)", "🟥 Punição (Regra 21.2)"],
+  EXPULSION_JOINT: ["🟥 Expulsión (Regla 21.3)", "🟥 Expulsion (Rule 21.3)", "🟥 Expulsão (Regra 21.3)"],
+  DISQUALIFICATION_SEPARATE: ["🟥🟥 Descalificación (Regla 21.4)", "🟥🟥 Disqualification (Rule 21.4)", "🟥🟥 Desqualificação (Regra 21.4)"],
+  DELAY_WARNING: ["⏱️ Advertencia por Demora (Regla 21.5)", "⏱️ Delay Warning (Rule 21.5)", "⏱️ Advertência por Demora (Regra 21.5)"],
+  DELAY_PENALTY: ["⏱️ Castigo por Demora (Regla 21.5)", "⏱️ Delay Penalty (Rule 21.5)", "⏱️ Punição por Demora (Regra 21.5)"],
+};
+
 export function RefereeConsoleStation({ meta, locale, onSave }: StationProps) {
   const [events, setEvents] = useState<RefereeEvent[]>([
     { team: "A", player: 4, kind: "WARNING_YELLOW" },
@@ -5396,6 +5578,20 @@ export function RefereeConsoleStation({ meta, locale, onSave }: StationProps) {
   );
 
   const add = (event: RefereeEvent): void => setEvents((previous) => [...previous, event]);
+  // v11.0.4 — live 8-second FIVB serve clock.
+  const [serveClock, setServeClock] = useState(8);
+  const [serveClockRunning, setServeClockRunning] = useState(false);
+  useEffect(() => {
+    if (!serveClockRunning) return;
+    const id = window.setInterval(() => {
+      setServeClock((current) => {
+        const next = Math.max(0, Math.round((current - 0.1) * 10) / 10);
+        if (next === 0) setServeClockRunning(false);
+        return next;
+      });
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [serveClockRunning]);
 
   return (
     <StationShell
@@ -5408,7 +5604,11 @@ export function RefereeConsoleStation({ meta, locale, onSave }: StationProps) {
       <div className="grid grid-cols-3 gap-2">
         <Metric label={t(locale, "Marcador", "Score", "Placar")} value={`${report.scoreA}-${report.scoreB}`} tone="text-volt" />
         <Metric label={t(locale, "Saque", "Serve", "Saque")} value={report.serving} />
-        <Metric label={t(locale, "Reloj", "Clock", "Relógio")} value={`${report.serveSeconds}s`} tone="text-emerald" />
+        <Metric label={t(locale, "Reloj", "Clock", "Relógio")} value={`${serveClock.toFixed(1)}s`} tone={serveClock > 0 ? "text-emerald" : "text-crimson"} />
+      </div>
+      <div className="mt-1 flex flex-wrap gap-1">
+        <button type="button" data-testid="serve-clock-start" className={BTN} onClick={() => setServeClockRunning(true)}>▶️ 8s {t(locale, "Saque", "Serve", "Saque")}</button>
+        <button type="button" data-testid="serve-clock-reset" className={BTN} onClick={() => { setServeClock(8); setServeClockRunning(false); }}>↺ 8s</button>
       </div>
       <div className="mt-3 flex flex-wrap gap-1">
         <button type="button" className={BTN} onClick={() => add({ team: "A", player: 4, kind: "WARNING_YELLOW" })}>🟨 A #4</button>
@@ -5421,8 +5621,8 @@ export function RefereeConsoleStation({ meta, locale, onSave }: StationProps) {
         {report.sanctions.map((sanction) => (
           <div key={sanction.index} className={`rounded-lg border px-2 py-1 text-[10px] ${CARD_BUTTON[sanction.applied]}`}>
             <p className="font-bold">
-              #{sanction.index} {sanction.team}{sanction.player ? ` #${sanction.player}` : ""} · {sanction.applied.replaceAll("_", " ")}
-              {sanction.escalated ? " · ESCALADO" : ""}
+              #{sanction.index} {sanction.team}{sanction.player ? ` #${sanction.player}` : ""} · {t(locale, SANCTION_LABELS[sanction.applied][0], SANCTION_LABELS[sanction.applied][1], SANCTION_LABELS[sanction.applied][2])}
+              {sanction.escalated ? ` · ${t(locale, "ESCALADO", "ESCALATED", "ESCALADO")}` : ""}
             </p>
             <p className="text-white/60">{sanction.text}</p>
             <p className="tabular-nums text-white/40">{sanction.scoreA}-{sanction.scoreB} · saque {sanction.serving}</p>
@@ -5767,6 +5967,26 @@ const CHALK_SAMPLE = [
   { points: [{ x: 6, y: 14 }, { x: 8, y: 17 }] },
 ];
 
+/** v11.0.4 — chalkboard cues speak Spanish, not engine codes. */
+const CHALK_PRIORITY: Record<string, [string, string, string]> = {
+  CRITICAL: ["PRIORIDAD CRÍTICA", "CRITICAL PRIORITY", "PRIORIDADE CRÍTICA"],
+  HIGH: ["PRIORIDAD ALTA", "HIGH PRIORITY", "PRIORIDADE ALTA"],
+  NORMAL: ["PRIORIDAD MEDIA", "NORMAL PRIORITY", "PRIORIDADE MÉDIA"],
+};
+const CHALK_CODE: Record<string, [string, string, string]> = {
+  fix_reception: ["CERRAR RECEPCIÓN", "FIX RECEPTION", "FECHAR RECEPÇÃO"],
+  serve_short: ["SAQUE CORTO TÁCTICO", "TACTICAL SHORT SERVE", "SAQUE CURTO TÁTICO"],
+  setter_release: ["LIBRAR AL ARMADOR", "FREE THE SETTER", "LIBERAR O LEVANTADOR"],
+  pin_attack: ["ATAQUE DE PUNTA", "PIN ATTACK", "ATAQUE DE PONTA"],
+  block_line: ["BLOQUEO A LA LÍNEA", "BLOCK THE LINE", "BLOQUEIO NA LINHA"],
+  backcourt_cover: ["CUBRIR EL FONDO", "COVER BACKCOURT", "COBRIR O FUNDO"],
+};
+
+interface ChalkStroke {
+  color: string;
+  points: Array<[number, number]>;
+}
+
 export function TimeoutChalkboardStation({ meta, locale, onSave }: StationProps) {
   const [pngNotice, setPngNotice] = useState<string | null>(null);
   const [reason, setReason] = useState<ChalkReason>("stop_serve_run");
@@ -5774,17 +5994,49 @@ export function TimeoutChalkboardStation({ meta, locale, onSave }: StationProps)
     () => buildChalkboard({ reason, rotation: 4, scoreA: 18, scoreB: 21, strokes: CHALK_SAMPLE }),
     [reason],
   );
+  // v11.0.4 — real 30s FIVB timeout clock + freehand chalk drawing.
+  const [clock, setClock] = useState(30);
+  const [clockRunning, setClockRunning] = useState(false);
+  const [chalkColor, setChalkColor] = useState("#FFD60A");
+  const [strokes, setStrokes] = useState<ChalkStroke[]>([]);
+  const boardRef = useRef<SVGSVGElement | null>(null);
+  const activeStroke = useRef<ChalkStroke | null>(null);
+
+  useEffect(() => {
+    if (!clockRunning) return;
+    const id = window.setInterval(() => {
+      setClock((current) => {
+        const next = Math.max(0, Math.round((current - 0.1) * 10) / 10);
+        if (next === 0) setClockRunning(false);
+        return next;
+      });
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [clockRunning]);
+
+  const boardPoint = (event: ReactPointerEvent): [number, number] | null => {
+    const svg = boardRef.current;
+    if (!svg) return null;
+    const rect = svg.getBoundingClientRect();
+    return [((event.clientX - rect.left) / rect.width) * 520, ((event.clientY - rect.top) / rect.height) * 400];
+  };
+
   const reasons: Array<{ key: ChalkReason; label: string }> = [
     { key: "stop_serve_run", label: t(locale, "Cortar saque", "Stop serve run", "Cortar saque") },
     { key: "organize_sideout", label: t(locale, "Side-out", "Side-out", "Side-out") },
     { key: "match_point_defense", label: t(locale, "Defensa MP", "Match point D", "Defesa MP") },
   ];
+  const cueLabel = (cue: { priority: string; code: string }): string => {
+    const priority = CHALK_PRIORITY[cue.priority] ?? [cue.priority, cue.priority, cue.priority];
+    const code = CHALK_CODE[cue.code] ?? [cue.code, cue.code, cue.code];
+    return `${t(locale, priority[0], priority[1], priority[2])} · ${t(locale, code[0], code[1], code[2])}`;
+  };
   const shareBoard = (): void => {
     const esc = (value: string): string => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const rows = report.cues
       .map(
         (cue, index) =>
-          `<text x="60" y="${250 + index * 96}" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#FF3B5C">${esc(`${cue.priority} · ${cue.code}`)}</text>` +
+          `<text x="60" y="${250 + index * 96}" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#FF3B5C">${esc(cueLabel(cue))}</text>` +
           `<text x="60" y="${294 + index * 96}" font-family="Arial, sans-serif" font-size="34" fill="#FFFFFF">${esc(cue.text)}</text>`,
       )
       .join("");
@@ -5807,6 +6059,22 @@ export function TimeoutChalkboardStation({ meta, locale, onSave }: StationProps)
     );
   };
 
+  // Pre-drawn tactical arrows per timeout reason (chalk-yellow on the board).
+  const PRE_DRAWN: Record<ChalkReason, Array<{ path: string; label: string; x: number; y: number }>> = {
+    stop_serve_run: [
+      { path: "M 380 300 L 300 180", label: "CORTAR SAQUE", x: 396, y: 290 },
+      { path: "M 150 300 L 230 180", label: "", x: 0, y: 0 },
+    ],
+    organize_sideout: [
+      { path: "M 150 130 L 370 130", label: "SIDE-OUT", x: 205, y: 118 },
+      { path: "M 260 330 L 260 200", label: "", x: 0, y: 0 },
+    ],
+    match_point_defense: [
+      { path: "M 150 150 L 250 300", label: "DEFENSA MP", x: 120, y: 140 },
+      { path: "M 380 150 L 280 300", label: "", x: 0, y: 0 },
+    ],
+  };
+
   return (
     <StationShell meta={meta} locale={locale} rows={report.cues.length} onSave={onSave} onExample={() => setReason("stop_serve_run")}>
       <div className="flex flex-wrap gap-1">
@@ -5818,12 +6086,90 @@ export function TimeoutChalkboardStation({ meta, locale, onSave }: StationProps)
       </div>
       <div className="mt-2 flex items-center justify-between rounded-lg bg-obsidian/60 px-3 py-2">
         <span className="text-[10px] uppercase tracking-widest text-white/40">{t(locale, "Reloj FIVB", "FIVB clock", "Relógio FIVB")}</span>
-        <span className="font-mono text-2xl font-black text-volt">{report.seconds.toFixed(1)}s</span>
+        <span data-testid="timeout-clock" className="font-mono text-2xl font-black text-volt">{clock.toFixed(1)}s</span>
+      </div>
+      <div className="mt-1 flex flex-wrap gap-1">
+        <button type="button" data-testid="timeout-clock-start" className={BTN} onClick={() => setClockRunning(true)}>▶️ {t(locale, "Iniciar 30s", "Start 30s", "Iniciar 30s")}</button>
+        <button type="button" data-testid="timeout-clock-pause" className={BTN} onClick={() => setClockRunning(false)}>⏸️ {t(locale, "Pausar", "Pause", "Pausar")}</button>
+        <button type="button" data-testid="timeout-clock-reset" className={BTN} onClick={() => { setClock(30); setClockRunning(false); }}>↺ {t(locale, "Reiniciar 30s", "Reset 30s", "Reiniciar 30s")}</button>
+      </div>
+      <svg
+        ref={boardRef}
+        data-testid="timeout-chalkboard-canvas"
+        viewBox="0 0 520 400"
+        className="mt-2 w-full touch-none rounded-xl border border-white/10 bg-[#101511]"
+        role="img"
+        aria-label={t(locale, "Pizarra táctica del tiempo muerto", "Timeout tactical chalkboard", "Lousa tática do tempo")}
+        onPointerDown={(event) => {
+          const point = boardPoint(event);
+          if (!point) return;
+          event.preventDefault();
+          activeStroke.current = { color: chalkColor, points: [point] };
+        }}
+        onPointerMove={(event) => {
+          const stroke = activeStroke.current;
+          const point = boardPoint(event);
+          if (!stroke || !point || event.buttons <= 0) return;
+          stroke.points.push(point);
+          setStrokes((previous) => [...previous.slice(0, -1), { ...stroke, points: [...stroke.points] }]);
+        }}
+        onPointerUp={() => {
+          if (activeStroke.current && activeStroke.current.points.length >= 2) {
+            setStrokes((previous) => [...previous, activeStroke.current as ChalkStroke]);
+          }
+          activeStroke.current = null;
+        }}
+        onPointerLeave={() => {
+          activeStroke.current = null;
+        }}
+      >
+        {/* Chalkboard court */}
+        <rect x="98" y="48" width="324" height="324" fill="none" stroke="#F8FAFC" strokeOpacity="0.55" strokeWidth="2.5" />
+        <rect x="98" y="36" width="324" height="12" fill="rgba(245, 158, 11, 0.35)" />
+        <text x="260" y="26" textAnchor="middle" fontSize="13" fontWeight="900" fill="#F59E0B">RED</text>
+        <line x1="98" y1="156" x2="422" y2="156" stroke="#F59E0B" strokeDasharray="8 6" strokeWidth="2" />
+        {/* Six player medallions */}
+        {([[4, 150, 120], [3, 260, 120], [2, 370, 120], [5, 150, 320], [6, 260, 320], [1, 370, 320]] as Array<[number, number, number]>).map(([zone, zx, zy]) => (
+          <g key={zone}>
+            <circle cx={zx} cy={zy} r={26} fill="#1E293B" stroke="#F8FAFC" strokeWidth="3" />
+            <text x={zx} y={zy + 6} textAnchor="middle" fontSize="16" fontWeight="900" fill="#F8FAFC">{zone}</text>
+          </g>
+        ))}
+        {/* Pre-drawn tactical arrows */}
+        {PRE_DRAWN[reason].map((arrow, index) => (
+          <g key={index}>
+            <path d={arrow.path} stroke="#FFD60A" strokeWidth="4" fill="none" strokeDasharray="10 7" markerEnd="url(#chalk-arrow)" opacity="0.9" />
+            {arrow.label ? <text x={arrow.x} y={arrow.y} fontSize="12" fontWeight="900" fill="#FFD60A">{arrow.label}</text> : null}
+          </g>
+        ))}
+        <defs>
+          <marker id="chalk-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="#FFD60A" />
+          </marker>
+        </defs>
+        {/* Freehand chalk strokes */}
+        {strokes.map((stroke, index) => (
+          <polyline
+            key={index}
+            points={stroke.points.map((point) => `${Math.round(point[0])},${Math.round(point[1])}`).join(" ")}
+            fill="none"
+            stroke={stroke.color}
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
+      </svg>
+      <div className="mt-1 flex flex-wrap gap-1">
+        <button type="button" aria-pressed={chalkColor === "#FFD60A"} className={`rounded-lg border px-2 py-1 text-[10px] font-bold ${chalkColor === "#FFD60A" ? "border-volt text-volt" : "border-white/10 text-white/60"}`} onClick={() => setChalkColor("#FFD60A")}>🟡 {t(locale, "Amarillo", "Yellow", "Amarelo")}</button>
+        <button type="button" aria-pressed={chalkColor === "#FF3B5C"} className={`rounded-lg border px-2 py-1 text-[10px] font-bold ${chalkColor === "#FF3B5C" ? "border-volt text-volt" : "border-white/10 text-white/60"}`} onClick={() => setChalkColor("#FF3B5C")}>🔴 {t(locale, "Rojo", "Red", "Vermelho")}</button>
+        <button type="button" aria-pressed={chalkColor === "#34D399"} className={`rounded-lg border px-2 py-1 text-[10px] font-bold ${chalkColor === "#34D399" ? "border-volt text-volt" : "border-white/10 text-white/60"}`} onClick={() => setChalkColor("#34D399")}>🟢 {t(locale, "Verde", "Green", "Verde")}</button>
+        <button type="button" className={BTN} onClick={() => setStrokes([])}>🗑️ {t(locale, "Limpiar Pizarra", "Clear Board", "Limpar Lousa")}</button>
       </div>
       <div className="mt-2 space-y-1">
         {report.cues.map((cue) => (
           <div key={cue.code} className="rounded-lg border border-white/10 bg-white/5 px-2 py-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-crimson">{cue.priority} · {cue.code}</p>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-crimson">{cueLabel(cue)}</p>
             <p className="text-[11px] text-white/70">{cue.text}</p>
           </div>
         ))}
@@ -7432,12 +7778,12 @@ export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
       {meta.slug === "peripheral-reflex" ? <ReactionDrill locale={locale} /> : null}
       {meta.slug === "injury-prehab" ? <IsometricTendonTimer locale={locale} /> : null}
       {report ? (
-        <div className="grid gap-1 text-[11px]">
+        <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
           {Object.entries(report).filter(([key]) => key !== "svg" && key !== "rallies" && key !== "selected").map(([key, value]) => (
-            <span key={key} className="flex justify-between gap-3 rounded bg-white/5 px-2 py-1">
-              <span className="text-white/55">{key}</span>
-              <span className="truncate text-right text-white/85">{typeof value === "object" ? JSON.stringify(value) : String(value)}</span>
-            </span>
+            <div key={key} className="rounded-lg bg-white/5 px-2 py-1 text-[11px]" style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>
+              <p className="font-bold text-white/55">{formatModuleOutputKey(key, locale)}</p>
+              {formatModuleOutputValue(key, value, locale)}
+            </div>
           ))}
         </div>
       ) : (
@@ -7659,6 +8005,181 @@ export function GymScreenStation({ meta, locale, onSave }: StationProps) {
   );
 }
 
+/** v11.0.4 — engine keys become coach words; never a raw camelCase dump. */
+const OUTPUT_KEY_LABELS: Record<string, [string, string, string]> = {
+  systems: ["Sistemas", "Systems", "Sistemas"],
+  recommended: ["Recomendado", "Recommended", "Recomendado"],
+  infiltrationMap: ["Mapa de infiltración", "Infiltration map", "Mapa de infiltração"],
+  message: ["Mensaje", "Message", "Mensagem"],
+  frontAttackersByRotation: ["Atacantes frontales por rotación", "Front attackers by rotation", "Atacantes de rede por rodízio"],
+  status: ["Estado", "Status", "Estado"],
+  priority: ["Prioridad", "Priority", "Prioridade"],
+  drills: ["Ejercicios", "Drills", "Exercícios"],
+  warnings: ["Advertencias", "Warnings", "Avisos"],
+  name: ["Nombre", "Name", "Nome"],
+  description: ["Descripción", "Description", "Descrição"],
+};
+
+export function formatModuleOutputKey(key: string, locale: Locale): string {
+  const hit = OUTPUT_KEY_LABELS[key];
+  if (hit) return t(locale, hit[0], hit[1], hit[2]);
+  return key
+    .replace(/_/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^./, (char) => char.toUpperCase());
+}
+
+const OUTPUT_CARD_STYLE: CSSProperties = {
+  wordBreak: "break-word",
+  overflowWrap: "anywhere",
+};
+
+/** Recursive visual formatter: arrays/maps become mini-card grids, never JSON. */
+export function formatModuleOutputValue(key: string, value: unknown, locale: Locale): ReactNode {
+  if (value === null || value === undefined || typeof value !== "object") {
+    return <span className="text-white/85">{String(value)}</span>;
+  }
+  if (Array.isArray(value)) {
+    if (value.every((item) => item === null || typeof item !== "object")) {
+      return <span className="text-white/85">{value.map((item) => String(item)).join(" · ")}</span>;
+    }
+    return (
+      <div className="mt-1 grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+        {value.map((item, index) => (
+          <div key={index} className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px]" style={OUTPUT_CARD_STYLE}>
+            {Object.entries(item as Record<string, unknown>).map(([innerKey, innerValue]) => (
+              <p key={innerKey}>
+                <span className="text-white/50">{formatModuleOutputKey(innerKey, locale)}: </span>
+                {formatModuleOutputValue(innerKey, innerValue, locale)}
+              </p>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="mt-1 grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+      {Object.entries(value as Record<string, unknown>).map(([innerKey, innerValue]) => (
+        <div key={innerKey} className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px]" style={OUTPUT_CARD_STYLE}>
+          <p className="font-bold text-white/70">{formatModuleOutputKey(innerKey, locale)}</p>
+          {formatModuleOutputValue(innerKey, innerValue, locale)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** v11.0.4 — dedicated visual station for the 4-2 / 6-2 / 5-1 simulator. */
+const SYSTEM_META: Record<SystemName, { icon: string; description: [string, string, string] }> = {
+  "5-1": { icon: "⚡", description: ["Armador fijo; tres atacantes en R1-R3.", "Fixed setter; three hitters in R1-R3.", "Levantador fixo; três atacantes em R1-R3."] },
+  "6-2": { icon: "🔄", description: ["Armador zaguero penetra; tres atacantes al frente.", "Back-row setter penetrates; three front attackers.", "Levantador de fundo penetra; três atacantes na rede."] },
+  "4-2": { icon: "📐", description: ["Dos armadores alternan delantera y zaga.", "Two setters alternate front and back.", "Dois levantadores alternam rede e fundo."] },
+};
+
+export function SystemTransitionStation({ meta, locale, onSave }: StationProps) {
+  const [picked, setPicked] = useState<SystemName>("5-1");
+  const [rotation, setRotation] = useState(1);
+  const report = useMemo(
+    () => analyzeSystem({ setters: 2, pureHitters: 5, transitionReadGrade: 8, rotation }),
+    [rotation],
+  );
+  const system = report.systems.find((item) => item.name === picked) ?? report.systems[0]!;
+  const attackers = system.frontAttackersByRotation[rotation - 1] ?? 0;
+  // Setter home zone: zone 1 at R1, rotating forward each rotation.
+  const setterHome = ((((1 - 1 + (rotation - 1)) % 6) + 6) % 6) + 1;
+  const setterBackRow = setterHome === 1 || setterHome === 5 || setterHome === 6;
+  const zonePos = (zone: number): [number, number] => {
+    const coords: Record<number, [number, number]> = { 1: [370, 320], 2: [370, 120], 3: [260, 120], 4: [150, 120], 5: [150, 320], 6: [260, 320] };
+    return coords[zone] ?? [260, 320];
+  };
+  const setterPos = zonePos(setterHome);
+
+  return (
+    <StationShell meta={meta} locale={locale} rows={6} onSave={onSave} onExample={() => { setPicked("6-2"); setRotation(1); }}>
+      <div className="flex flex-wrap gap-1">
+        {(["5-1", "6-2", "4-2"] as SystemName[]).map((name) => (
+          <button
+            key={name}
+            type="button"
+            data-testid={`system-pill-${name}`}
+            aria-pressed={picked === name}
+            onClick={() => setPicked(name)}
+            className={`rounded-lg border px-2 py-1 text-[10px] font-bold ${picked === name ? "border-volt bg-volt/20 text-volt" : "border-white/10 text-white/55"}`}
+          >
+            {SYSTEM_META[name].icon} {t(locale, `Sistema ${name}`, `System ${name}`, `Sistema ${name}`)}
+          </button>
+        ))}
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-1">
+        <span className={LABEL}>{t(locale, "Rotación", "Rotation", "Rotação")}</span>
+        {[1, 2, 3, 4, 5, 6].map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setRotation(value)}
+            className={`h-8 w-8 rounded-lg border text-xs font-bold ${rotation === value ? "border-volt bg-volt/20 text-volt" : "border-white/10 text-white/60"}`}
+          >
+            R{value}
+          </button>
+        ))}
+      </div>
+      <svg viewBox="0 0 520 400" className="mt-2 w-full rounded-xl border border-white/10 bg-[#0b1a13]" role="img" aria-label={t(locale, "Diagrama de sistema con infiltración del armador", "System diagram with setter infiltration", "Diagrama de sistema com infiltração do levantador")}>
+        <rect x="98" y="48" width="324" height="324" fill="#0e1f18" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="2" />
+        <rect x="98" y="36" width="324" height="12" fill="rgba(245, 158, 11, 0.4)" />
+        <text x="260" y="26" textAnchor="middle" fontSize="13" fontWeight="900" fill="#F59E0B">RED</text>
+        <line x1="98" y1="156" x2="422" y2="156" stroke="#F59E0B" strokeDasharray="8 6" strokeWidth="2" />
+        {setterBackRow ? (
+          <line x1={setterPos[0]} y1={setterPos[1]} x2={260} y2={70} stroke="#F59E0B" strokeWidth="4" strokeDasharray="10 7" markerEnd="url(#system-arrow)" />
+        ) : null}
+        <defs>
+          <marker id="system-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="#F59E0B" />
+          </marker>
+        </defs>
+        {([1, 2, 3, 4, 5, 6] as number[]).map((zone) => {
+          const [zx, zy] = zonePos(zone);
+          const isSetter = zone === setterHome;
+          const isFront = zone === 2 || zone === 3 || zone === 4;
+          return (
+            <g key={zone}>
+              <circle cx={zx} cy={zy} r={28} fill={isSetter ? "#F59E0B" : isFront ? "#E11D48" : "#10B981"} stroke="#fff" strokeWidth="3" />
+              <text x={zx} y={zy - 2} textAnchor="middle" fontSize="16" fontWeight="900" fill="#fff">{zone}</text>
+              <text x={zx} y={zy + 16} textAnchor="middle" fontSize="10" fontWeight="900" fill="#F8FAFC">{isSetter ? "S" : isFront ? "AT" : "Z"}</text>
+            </g>
+          );
+        })}
+        <text x="260" y="386" textAnchor="middle" fontSize="13" fontWeight="900" fill="#c8ff00">
+          {`${attackers} ${t(locale, "Atacantes en Red", "Front Attackers", "Atacantes na Rede")}`}
+        </text>
+      </svg>
+      <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+        {report.systems.map((item) => (
+          <div key={item.name} className={`rounded-xl border p-2 text-[11px] ${item.name === picked ? "border-volt bg-volt/10" : "border-white/10 bg-white/5"}`}>
+            <p className="font-black text-white">{SYSTEM_META[item.name].icon} {item.name}</p>
+            <p className="text-white/60">{t(locale, SYSTEM_META[item.name].description[0], SYSTEM_META[item.name].description[1], SYSTEM_META[item.name].description[2])}</p>
+            <p className="mt-1 flex flex-wrap gap-1">
+              {item.frontAttackersByRotation.map((count, index) => (
+                <span key={index} className="rounded-full bg-obsidian px-1.5 py-0.5 text-[9px] font-black text-volt">{`R${index + 1}:${count}`}</span>
+              ))}
+            </p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-white/40">{t(locale, "Mapa de infiltración por rotación", "Infiltration map by rotation", "Mapa de infiltração por rodízio")}</p>
+      <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+        {([1, 2, 3, 4, 5, 6] as number[]).map((index) => (
+          <div key={index} className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px]" style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>
+            <p className="font-black text-volt">{`R${index}`}</p>
+            <p className="text-white/70">{t(locale, SYSTEM_META[report.recommended].description[0], SYSTEM_META[report.recommended].description[1], SYSTEM_META[report.recommended].description[2])}</p>
+          </div>
+        ))}
+      </div>
+      <p className="rounded-lg border border-volt/40 bg-volt/10 px-2 py-1 text-[11px] font-bold text-volt">{report.message}</p>
+    </StationShell>
+  );
+}
+
 export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   biomechanics: BiomechanicsStation,
   rotation: RotationStation,
@@ -7699,7 +8220,7 @@ export const STATIONS: Record<string, (props: StationProps) => ReactNode> = {
   "ball-aerodynamics": EnginePreviewStation,
   "rally-clipper": EnginePreviewStation,
   "recruiting-dossier": EnginePreviewStation,
-  "system-transition": EnginePreviewStation,
+  "system-transition": SystemTransitionStation,
   "deception-reader": EnginePreviewStation,
   "inclusive-adaptive": EnginePreviewStation,
   "elo-ranking": EnginePreviewStation,

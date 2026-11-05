@@ -1,0 +1,4 @@
+🧩 Barras de módulos e filtros agora quebram em várias linhas: nada mais é cortado na borda direita.
+🏐 Pizarra 5-1, Sombra de Bloqueio e Radar de Costuras reconstruídos: quadra completa e fichas gigantes.
+⏱️ Lousa do Tempo lateral interativa (desenho livre, 3 cores) e relógio FIVB de 30s de verdade.
+🔀 Simulador 4-2/6-2/5-1 com diagrama visual; fim do JSON cru nos 61 módulos; relógio de saque de 8s.

@@ -169,6 +169,12 @@ textarea,
 
 .station-card {
   transition: transform 180ms ease, border-color 180ms ease;
+  /* v11.0.4 — the card must enclose 100% of its module: no clipping, no trap. */
+  height: auto;
+  min-height: fit-content;
+  overflow: visible;
+  box-sizing: border-box;
+  margin-bottom: 24px;
 }
 
 .station-card:hover {

@@ -1,0 +1,4 @@
+🧩 Barras de módulos y filtros ahora envuelven en varias filas: nada se corta en el borde derecho.
+🏐 Pizarra 5-1, Sombra de Bloqueo y Radar de Costuras reconstruidas: cancha completa y fichas gigantes por rol.
+⏱️ Pizarra de Tiempo Muerto con pizarra interactiva (dibujo libre, 3 colores) y reloj FIVB de 30s real.
+🔀 Simulador 4-2/6-2/5-1 con diagrama visual; adiós al JSON crudo en los 61 módulos; silbato con reloj de 8s.

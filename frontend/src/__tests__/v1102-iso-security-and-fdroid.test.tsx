@@ -2,6 +2,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -13,7 +14,7 @@ import {
   sanitizeUntrustedString,
   verifyProLicenseToken,
 } from "../lib/security-hardening";
-import { ScoreboardStation } from "@/components/stations";
+import { BlockShadowStation, RotationStation, ScoreboardStation, SeamRadarStation, SystemTransitionStation, TimeoutChalkboardStation } from "@/components/stations";
 import { VolleyOSHub } from "@/components/VolleyOSHub";
 import { MODULE_BY_SLUG } from "@/lib/modules";
 
@@ -278,5 +279,47 @@ describe("v11.0.2 ISO security, rotation bypass & F-Droid", () => {
     expect(pill.textContent).toContain("Modo Pro");
     expect(pill.style.webkitTextFillColor).toBe("rgb(251, 191, 36)");
     expect(pill.style.background).not.toBe("");
+  });
+
+  /* v11.0.4 — raw JSON ban, giant tokens, wrapped bars --------------------- */
+  it("renders module-40 with zero raw JSON substrings", () => {
+    const { container } = render(<SystemTransitionStation meta={meta("system-transition")} locale="es" onSave={noop} />);
+    const text = container.textContent ?? "";
+    expect(text).not.toContain('[{"name":');
+    expect(text).not.toContain("frontAttackersByRotation");
+    expect(text).not.toContain("infiltrationMap");
+    expect(screen.getByTestId("system-pill-5-1")).toBeTruthy();
+    expect(text).toContain("Atacantes en Red");
+  });
+
+  it("renders the module-25 chalkboard canvas with localized priorities", () => {
+    const { container } = render(<TimeoutChalkboardStation meta={meta("timeout-chalkboard")} locale="es" onSave={noop} />);
+    expect(screen.getByTestId("timeout-chalkboard-canvas")).toBeTruthy();
+    const text = container.textContent ?? "";
+    expect(text).toContain("PRIORIDAD ALTA · CERRAR RECEPCIÓN");
+    expect(text).not.toContain("HIGH ·");
+    expect(screen.getByTestId("timeout-clock").textContent).toContain("30.0s");
+  });
+
+  it("draws giant player tokens (r >= 24) on the three tactical boards", () => {
+    const boards: Array<[string, () => ReactElement]> = [
+      ["rotation", () => <RotationStation meta={meta("rotation")} locale="es" onSave={noop} />],
+      ["block-shadow", () => <BlockShadowStation meta={meta("block-shadow")} locale="es" onSave={noop} />],
+      ["seam-radar", () => <SeamRadarStation meta={meta("seam-radar")} locale="es" onSave={noop} />],
+    ];
+    for (const [slug, factory] of boards) {
+      const { container } = render(factory());
+      const circles = Array.from(container.querySelectorAll("circle"));
+      const big = circles.map((circle) => Number(circle.getAttribute("r") ?? "0")).filter((radius) => radius >= 24);
+      expect(big.length, `${slug} needs at least one r>=24 token`).toBeGreaterThan(0);
+    }
+  });
+
+  it("wraps every module switcher bar so no pill is clipped", () => {
+    window.localStorage.setItem("voleyos_onboarding_done", "1");
+    render(<VolleyOSHub locale="es" />);
+    const bar = screen.getByTestId("workstation-bar") as HTMLElement;
+    expect(bar.style.flexWrap).toBe("wrap");
+    expect(bar.style.overflow).toBe("visible");
   });
 });
