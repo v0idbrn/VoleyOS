@@ -19,8 +19,9 @@ import {
   playWarmupTick,
   playWhistle,
   saveCrowdAmbience,
+  TTS_TOAST_EVENT,
 } from "@/lib/sound-effects";
-import { announceScoreTTS, isMatchActive, persistLiveScoreboard, readLiveScoreboard, triggerCourtHaptics } from "@/lib/court-ux";
+import { announceScoreTTS, isMatchActive, persistLiveScoreboard, persistTtsEnabled, readLiveScoreboard, TTS_ENABLED_EVENT, triggerCourtHaptics } from "@/lib/court-ux";
 import { clearClonedScoreboard, createQrFrames, emptyIngest, ingestQrFrame, readClonedScoreboard, renderQrSvg, storeClonedScoreboard, type IngestResult, type QrFrame } from "@/lib/qr-transfer";
 import { localizeReactTree } from "@/lib/engine-l10n";
 import { COPY, t } from "@/lib/i18n";
@@ -322,6 +323,8 @@ type VosBridgeWindow = Window & {
     triggerHapticPattern?: (patternType: string) => void;
     isSystemAutoRotateEnabled?: () => boolean;
     setSensorAutoRotateMode?: (mode: string) => void;
+    /** v11.0.3 — native TextToSpeech announcer (spec signature). */
+    speakTts?: (text: string, langTag: string) => boolean;
   };
   /** Android Back probe: the Activity asks the page before leaving the app. */
   __vosHandleAndroidBack?: () => string | undefined;
@@ -357,6 +360,9 @@ function defaultOpenGuide(): boolean {
   if (typeof window === "undefined") return false;
   return window.localStorage.getItem("volleyos.guided") === "novice";
 }
+
+/** v11.0.3 — live stations keep the court clean: no guide banner / report footer. */
+const LIVE_STATION_SLUGS = new Set(["scoreboard", "rotation"]);
 
 function StationShell({
   meta,
@@ -396,16 +402,18 @@ function StationShell({
           {t(locale, "Local", "Local", "Local")}
         </span>
       </header>
-      <ModuleGuideBanner slug={meta.slug} locale={locale} defaultOpen={defaultOpenGuide()} />
+      {LIVE_STATION_SLUGS.has(meta.slug) ? null : <ModuleGuideBanner slug={meta.slug} locale={locale} defaultOpen={defaultOpenGuide()} />}
       <div className="flex-1 text-sm text-white/80">{localizeReactTree(children, locale)}</div>
-      <footer className="flex flex-wrap gap-2 border-t border-white/10 pt-3">
-        <button type="button" className={BTN_PRIMARY} onClick={onExample}>
-          {COPY[locale].loadExample}
-        </button>
-        <button type="button" className={BTN} onClick={() => onSave(meta.slug, rows)}>
-          {t(locale, "Guardar reporte", "Save report", "Salvar relatório")}
-        </button>
-      </footer>
+      {LIVE_STATION_SLUGS.has(meta.slug) ? null : (
+        <footer className="flex flex-wrap gap-2 border-t border-white/10 pt-3">
+          <button type="button" className={BTN_PRIMARY} onClick={onExample}>
+            {COPY[locale].loadExample}
+          </button>
+          <button type="button" className={BTN} onClick={() => onSave(meta.slug, rows)}>
+            {t(locale, "Guardar reporte", "Save report", "Salvar relatório")}
+          </button>
+        </footer>
+      )}
     </article>
   );
 }
@@ -423,6 +431,25 @@ function statusTone(status: string): string {
   if (status === "OPTIMAL" || status === "OPTICAL_WINDOW_11_OCLOCK") return "text-emerald";
   if (status === "TRANSITION_WINDOW" || status === "NEAR_EXTENSION") return "text-volt";
   return "text-crimson";
+}
+
+/** v11.0.3 — Lab & IA statuses speak the coach's language, not engine codes. */
+function statusLabel(status: string, locale: Locale): string {
+  const labels: Record<string, [string, string, string]> = {
+    OPTIMAL: ["ÓPTIMO", "OPTIMAL", "ÓTIMO"],
+    OPTICAL_WINDOW_11_OCLOCK: ["VENTANA ÓPTIMA 11H", "OPTICAL WINDOW 11 OCLOCK", "JANELA ÓTIMA 11H"],
+    LATE_WINDOW_12_OCLOCK: ["VENTANA TARDÍA 12H", "LATE WINDOW 12 OCLOCK", "JANELA TARDIA 12H"],
+    TRANSITION_WINDOW: ["VENTANA EN TRANSICIÓN", "TRANSITION WINDOW", "JANELA EM TRANSIÇÃO"],
+    NEAR_EXTENSION: ["EXTENSIÓN CASI PERFECTA", "NEAR EXTENSION", "EXTENSÃO QUASE PERFEITA"],
+    TOO_DEEP: ["RODILLA MUY PROFUNDA", "TOO DEEP", "JOELHO MUITO PROFUNDO"],
+    TOO_STRAIGHT: ["RODILLA MUY RÍGIDA", "TOO STRAIGHT", "JOELHO MUITO RÍGIDO"],
+    OVER_DRAWN: ["BRAZO MUY ATRASADO", "OVER DRAWN", "BRAÇO MUITO ATRASADO"],
+    UNDER_DRAWN: ["BRAZO MUY ADELANTADO", "UNDER DRAWN", "BRAÇO MUITO ADIANTADO"],
+    T_REX_ARM: ["BRAZO T-REX", "T-REX ARM", "BRAÇO T-REX"],
+    ASYMMETRIC: ["ASIMÉTRICO", "ASYMMETRIC", "ASSIMÉTRICO"],
+  };
+  const hit = labels[status];
+  return hit ? t(locale, hit[0], hit[1], hit[2]) : status.replaceAll("_", " ");
 }
 
 /* 1 ---------------------------------------------------------------------- */
@@ -500,10 +527,10 @@ export function BiomechanicsStation({ meta, locale, onSave }: StationProps) {
               }}
             >
               {tempo === "1st"
-                ? `🏃 1st ${t(locale, "Quick / Central", "Quick / Central", "Quick / Central")}`
+                ? `🏃 ${t(locale, "1er Tiempo / Central", "1st Tempo / Quick", "1º Tempo / Central")}`
                 : tempo === "2nd"
-                  ? `🚀 2nd ${t(locale, "Shoot / Pipe", "Shoot / Pipe", "Shoot / Pipe")}`
-                  : `🎯 3rd ${t(locale, "Bola Alta", "High Ball", "Bola Alta")}`}
+                  ? `🚀 ${t(locale, "2do Tiempo / Pipe", "2nd Tempo / Pipe", "2º Tempo / Pipe")}`
+                  : `🎯 ${t(locale, "3er Tiempo / Pelota Alta", "3rd Tempo / High Ball", "3º Tempo / Bola Alta")}`}
             </button>
           ))}
           <button
@@ -545,7 +572,7 @@ export function BiomechanicsStation({ meta, locale, onSave }: StationProps) {
           <li key={frame.frame} className="flex items-center justify-between gap-2 rounded-lg bg-white/5 px-2 py-1 text-[11px]">
             <span className="text-white/60">F{frame.frame}</span>
             <span className="truncate text-white/70">{frame.detail}</span>
-            <span className={`whitespace-nowrap font-bold ${statusTone(frame.status)}`}>{frame.status.replaceAll("_", " ")}</span>
+            <span className={`whitespace-nowrap font-bold ${statusTone(frame.status)}`}>{statusLabel(frame.status, locale)}</span>
           </li>
         ))}
       </ul>
@@ -617,6 +644,16 @@ export function RotationStation({ meta, locale, onSave }: StationProps) {
   const primaryZone = trackedZones[0] ?? null;
   const trackedNeighbors = primaryZone === null ? [] : zoneNeighbors(primaryZone);
   const trackedPoint = primaryZone === null ? null : points.find((point) => point.zone === primaryZone) ?? null;
+
+  // v11.0.3 — 5-1 role at each zone for this rotation (S/OPP/OH/MB home zones).
+  const zoneRoleLabel = (zone: number): string => {
+    const home = ((((zone - 1 + (rotation - 1)) % 6) + 6) % 6) + 1;
+    if (home === 1) return "S";
+    if (home === 2) return "OPP";
+    if (home === 4) return "OH1";
+    if (home === 6) return "OH2";
+    return home === 3 ? "MB1" : "MB2/L";
+  };
 
   const applyRotation = (value: number): void => {
     const base = defaultPositions(value);
@@ -722,6 +759,16 @@ export function RotationStation({ meta, locale, onSave }: StationProps) {
                 fill={trackedZones.includes(zone.zone) ? "#0b1a13" : "#fff"}
               >
                 {zone.zone}
+              </text>
+              <text
+                x={zone.x}
+                y={zone.y + 52}
+                textAnchor="middle"
+                fontSize="14"
+                fontWeight="800"
+                fill="#F8FAFC"
+              >
+                {zoneRoleLabel(zone.zone)} · Z{zone.zone}
               </text>
             </g>
           );
@@ -1092,7 +1139,11 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [serveCapBanner, setServeCapBanner] = useState<string | null>(null);
   const [undoPill, setUndoPill] = useState(false);
   const [burst, setBurst] = useState<"set" | "match" | null>(null);
-  const [voiceOn, setVoiceOn] = useState(() => window.localStorage.getItem("volleyos.voice") === "1");
+  const [voiceOn, setVoiceOn] = useState(
+    () =>
+      window.localStorage.getItem("voleyos_tts_enabled") === "true" ||
+      window.localStorage.getItem("volleyos.voice") === "1",
+  );
   const [crowdOn, setCrowdOn] = useState(() => loadCrowdAmbience() > 0.01);
   // v10.1.0 teams-only board + Simple/Pro shell.
   const [soloTeams, setSoloTeams] = useState(() => window.localStorage.getItem("volleyos.soloTeams") === "1");
@@ -1480,7 +1531,8 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const toggleVoiceOn = (): void => {
     const next = !voiceOn;
     setVoiceOn(next);
-    window.localStorage.setItem("volleyos.voice", next ? "1" : "0");
+    // v11.0.3 — one shared switch: Ajustes and Cancha stay in sync instantly.
+    persistTtsEnabled(next);
     triggerCourtHaptics(18);
     if (next) {
       announceScoreTTS(
@@ -1490,6 +1542,24 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       );
     }
   };
+
+  // v11.0.3 — Ajustes ↔ Cancha TTS sync + visual announcer toast fallback.
+  const [ttsToast, setTtsToast] = useState("");
+  useEffect(() => {
+    const syncTts = (event: Event): void => {
+      setVoiceOn((event as CustomEvent<string>).detail === "true");
+    };
+    const showToast = (event: Event): void => {
+      const text = (event as CustomEvent<string>).detail;
+      if (text) setTtsToast(`🗣️ ${t(locale, "Locutor", "Announcer", "Locutor")}: "${text}"`);
+    };
+    window.addEventListener(TTS_ENABLED_EVENT, syncTts);
+    window.addEventListener(TTS_TOAST_EVENT, showToast);
+    return () => {
+      window.removeEventListener(TTS_ENABLED_EVENT, syncTts);
+      window.removeEventListener(TTS_TOAST_EVENT, showToast);
+    };
+  }, [locale]);
 
   const toggleCrowd = (): void => {
     const next = !crowdOn;
@@ -2598,6 +2668,13 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
             : `🔒 ${t(locale, "Respetar Lock del Celu", "Respect Phone Lock", "Respeitar Lock do Celular")}`}
         </button>
       </div>
+      {uiMode === "pro" ? (
+        <div className="mb-2 flex flex-wrap gap-1">
+          <button type="button" onClick={() => startPicadito()} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "picadito" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>⚡ {t(locale, "Picadito", "Pickup", "Rachinha")}</button>
+          <button type="button" onClick={() => setPreset("king")} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "king" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>👑 {t(locale, "Ganador en cancha", "Winner stays", "Vencedor fica")}</button>
+          <button type="button" onClick={() => { setPreset("oficial"); setKing(null); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "oficial" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>🏆 {t(locale, "Oficial", "Official", "Oficial")}</button>
+        </div>
+      ) : null}
       <div
         data-testid="inline-live-metrics-strip"
         className={`mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-white/60 tabular-nums${focusMode ? " hidden" : ""}`}
@@ -2702,254 +2779,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           </div>
         )
       ) : null}
-      {uiMode === "pro" ? (
-      <>
-      {!isTableLandscapeMode ? (
-        <div className="vos-item-card mb-2 space-y-2" data-testid="dvw-courtside-console">
-          <p className="text-[10px] font-black uppercase tracking-wider text-white/60">
-            ⌨️{" "}
-            {t(
-              locale,
-              "Consola DataVolley / Courtside",
-              "DataVolley / Courtside Console",
-              "Console DataVolley / Courtside",
-            )}
-          </p>
-          <div className="flex flex-wrap gap-1">
-            <input
-              data-testid="dvw-command-input"
-              value={dvwCommand}
-              onChange={(event) => setDvwCommand(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter") return;
-                event.preventDefault();
-                submitDvwCommand();
-              }}
-              placeholder={t(locale, "*14AT#42B2", "*14AT#42B2", "*14AT#42B2")}
-              className="min-w-[170px] flex-1 rounded-lg border border-white/15 bg-black/40 px-2 py-1 font-mono text-[11px] text-white focus:border-volt focus:outline-none"
-            />
-            <button type="button" data-testid="dvw-submit-btn" onClick={submitDvwCommand} className={BTN}>
-              ↵ {t(locale, "Anotar", "Log", "Registrar")}
-            </button>
-          </div>
-          <p
-            data-testid="dvw-live-readback"
-            className={`rounded-lg border px-2 py-1 text-[11px] font-bold ${
-              dvwTranslation.valid ? "border-volt/50 bg-volt/10 text-volt" : "border-white/10 bg-white/5 text-white/50"
-            }`}
-          >
-            {dvwTranslation.summary}
-          </p>
-          {dvwLatestIssue ? (
-            <p
-              data-testid="dvw-lint-warning"
-              className="rounded-lg border border-crimson/60 bg-crimson/15 px-2 py-1 text-[11px] font-bold text-white"
-            >
-              ⚠️ {dvwLatestIssue.message}
-            </p>
-          ) : null}
-          {dvwNotice ? (
-            <p data-testid="dvw-notice" className="text-[11px] font-bold text-white/70">
-              {dvwNotice}
-            </p>
-          ) : null}
-          <div className="flex flex-wrap gap-1">
-            <button
-              type="button"
-              data-testid="dvw-import-btn"
-              onClick={() => dvwFileRef.current?.click()}
-              className={BTN}
-            >
-              📥 {t(locale, "Importar .DVW", "Import .DVW", "Importar .DVW")}
-            </button>
-            <button type="button" data-testid="dvw-export-btn" onClick={exportDvwFile} className={BTN}>
-              📤 {t(locale, "Exportar .DVW", "Export .DVW", "Exportar .DVW")}
-            </button>
-            <button
-              type="button"
-              data-testid="dvw-load-demo-btn"
-              onClick={() =>
-                loadDvwText(
-                  SAMPLE_DEMO_DVW,
-                  t(locale, "🧪 Demo cargada", "🧪 Demo loaded", "🧪 Demo carregada"),
-                )
-              }
-              className={BTN}
-            >
-              🧪 {t(locale, "Cargar Demo .DVW", "Load Demo .DVW", "Carregar Demo .DVW")}
-            </button>
-            <input
-              ref={dvwFileRef}
-              type="file"
-              accept=".dvw,text/plain"
-              className="hidden"
-              data-testid="dvw-file-input"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (!file) return;
-                void file
-                  .text()
-                  .then((text) => loadDvwText(text, file.name))
-                  .catch(() =>
-                    setDvwNotice(t(locale, "No se pudo leer el archivo.", "Could not read the file.", "Não foi possível ler o arquivo.")),
-                  );
-              }}
-            />
-          </div>
-        </div>
-      ) : null}
-      <div className="mb-2 flex flex-wrap gap-1">
-        <button type="button" onClick={() => startPicadito()} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "picadito" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>⚡ {t(locale, "Picadito", "Pickup", "Rachinha")}</button>
-        <button type="button" onClick={() => setPreset("king")} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "king" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>👑 {t(locale, "Ganador en cancha", "Winner stays", "Vencedor fica")}</button>
-        <button type="button" onClick={() => { setPreset("oficial"); setKing(null); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "oficial" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>🏆 {t(locale, "Oficial", "Official", "Oficial")}</button>
-      </div>
-      {preset === "picadito" ? (
-        <div className="vos-item-card mb-2 space-y-2">
-          <div className="flex flex-wrap gap-1">
-            {([11, 15, 21, 25] as const).map((target) => (
-              <button
-                key={target}
-                type="button"
-                onClick={() => startPicadito(target)}
-                className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${picaditoTarget === target && matchFormat === "short15" ? "border-volt bg-volt/15 text-volt" : "border-white/10 text-white/50"}`}
-              >
-                {target} {t(locale, "pts", "pts", "pts")}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-1">
-            <button
-              type="button"
-              onClick={() => startPicadito(picaditoTarget, false)}
-              className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${!goldenPoint ? "border-volt text-volt" : "border-white/10 text-white/50"}`}
-            >
-              {t(locale, "Diferencia de 2 (14-14 / 24-24)", "Win by 2 (14-14 / 24-24)", "Vantagem de 2 (14-14 / 24-24)")}
-            </button>
-            <button
-              type="button"
-              onClick={() => startPicadito(picaditoTarget, true)}
-              className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${goldenPoint ? "border-volt text-volt" : "border-white/10 text-white/50"}`}
-            >
-              {t(locale, "Punto de oro (muere en el target)", "Golden point (dies at target)", "Ponto de ouro (morre no alvo)")}
-            </button>
-          </div>
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="text-[9px] font-bold text-white/45">🎯 {t(locale, "Límite de Saques Seguidos", "Consecutive Serve Cap", "Limite de Saques Seguidos")}</span>
-            {([0, 3, 5] as const).map((cap) => (
-              <button
-                key={cap}
-                type="button"
-                aria-pressed={serveCap === cap}
-                onClick={() => {
-                  setServeCap(cap);
-                  setServeCapBanner(null);
-                  triggerCourtHaptics(16);
-                }}
-                className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${serveCap === cap ? "border-volt bg-volt/15 text-volt" : "border-white/10 text-white/50"}`}
-              >
-                {cap === 0
-                  ? t(locale, "Sin límite", "No limit", "Sem limite")
-                  : t(locale, `${cap} Saques`, `${cap} Serves`, `${cap} Saques`)}
-              </button>
-            ))}
-          </div>
-          {serveCapBanner ? (
-            <p role="status" className="rounded-lg bg-emerald/15 px-2 py-1 text-center text-[10px] font-semibold text-emerald">
-              {serveCapBanner}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-      {preset === "king" ? (
-        <div className="vos-item-card mb-2 space-y-1">
-          <input
-            value={kingInput}
-            onChange={(event) => setKingInput(event.target.value)}
-            placeholder={t(locale, "Tiburones, Lobos, Titanes, Vinchas… (3-5 equipos)", "Sharks, Wolves, Titans, Vinchas… (3-5 teams)", "Tubarões, Lobos, Titanes, Vinchas… (3-5 times)")}
-            className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px]"
-          />
-          <button type="button" className={`${BTN} w-full`} onClick={startKing}>
-            ▶ {t(locale, "Arrancar Rey de la Cancha (3-5 equipos)", "Start King of the Court (3-5 teams)", "Começar Rei da Quadra (3-5 times)")}
-          </button>
-          {king ? (
-            <p className="text-[9px] text-volt">
-              🔥 {t(locale, "Racha", "Streak", "Sequência")}: {king.streakTeam ?? "—"} ×{king.streak} · {t(locale, "cola", "queue", "fila")}: {king.queue.join(", ") || "—"}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-      {preset === "oficial" ? (
-        <div className="mb-2 flex flex-wrap gap-1">
-          <button type="button" onClick={() => { setMatchFormat("bo3"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 3, { matchFormat: "bo3" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo3" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 3 (25/15)", "Best of 3 (25/15)", "Melhor de 3 (25/15)")}</button>
-          <button type="button" onClick={() => { setMatchFormat("bo5"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 5, { matchFormat: "bo5" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo5" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 5 (25/15)", "Best of 5 (25/15)", "Melhor de 5 (25/15)")}</button>
-        </div>
-      ) : null}
-      </>
-      ) : null}
-      <div className="mb-2 grid grid-cols-2 gap-1">
-        <select
-          aria-label={t(locale, "Equipo local", "Home team", "Time da casa")}
-          value={teamAId ?? ""}
-          onChange={(event) => {
-            const team = teams.find((item) => item.id === event.target.value);
-            if (team) applyRoster(team, "A");
-          }}
-          className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px] text-white"
-        >
-          <option value="">{t(locale, "Equipo A", "Team A", "Time A")}</option>
-          {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
-        </select>
-        <select
-          aria-label={t(locale, "Equipo visitante", "Away team", "Time visitante")}
-          value={teamBId ?? ""}
-          onChange={(event) => {
-            const team = teams.find((item) => item.id === event.target.value);
-            if (team) applyRoster(team, "B");
-          }}
-          className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px] text-white"
-        >
-          <option value="">{t(locale, "Equipo B", "Team B", "Time B")}</option>
-          {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
-        </select>
-        {uiMode === "pro" ? (
-          <button type="button" className={`${BTN} col-span-2`} onClick={() => setRosterOpen((open) => !open)}>
-            {t(locale, "Administrar plantillas", "Manage rosters", "Gerenciar elencos")}
-          </button>
-        ) : null}
-      </div>
-      {rosterOpen && uiMode === "pro" ? (
-        <div className="mb-2 space-y-1 rounded-xl border border-white/10 bg-obsidian/80 p-2">
-          <div className="grid grid-cols-[1fr_4rem] gap-1">
-            <input value={rosterName} onChange={(event) => setRosterName(event.target.value)} placeholder={t(locale, "Nombre del equipo", "Team name", "Nome do time")} className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px]" />
-            <input value={rosterCode} onChange={(event) => setRosterCode(event.target.value)} placeholder="ABC" maxLength={3} className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px] uppercase" />
-          </div>
-          <textarea
-            value={rosterSheet}
-            onChange={(event) => setRosterSheet(event.target.value)}
-            rows={5}
-            placeholder={"1 Sofia S C\n7 Martina L\n4 Valentina OH\n9 Renata MB\n11 Carla OPP\n14 Julieta MB"}
-            className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 font-mono text-[10px]"
-          />
-          <p className="text-[9px] text-white/40">{t(locale, "Dorsal nombre rol (S OH MB OPP L) y C/L para capitán o líbero.", "Number name role (S OH MB OPP L), C/L for captain or libero.", "Número nome posição (S OH MB OPP L), C/L para capitão ou líbero.")}</p>
-          <PlayerChips locale={locale} onPick={(name) => setRosterSheet((current) => (current ? `${current}
-${name}` : name))} testId="cancha-player-chips" />
-          {rosterError ? <p className="text-[10px] text-crimson">{rosterError}</p> : null}
-          <button type="button" className={`${BTN} w-full`} onClick={saveRoster}>{t(locale, "Guardar plantilla", "Save roster", "Salvar elenco")}</button>
-          {teams.length > 0 ? (
-            <div className="space-y-1">
-              {teams.map((team) => (
-                <div key={team.id} className="flex items-center gap-1 text-[10px]">
-                  <span className="flex-1 truncate">{team.name} ({team.players.length})</span>
-                  <button type="button" className={BTN} onClick={() => applyRoster(team, "A")}>A</button>
-                  <button type="button" className={BTN} onClick={() => applyRoster(team, "B")}>B</button>
-                  <button type="button" className={BTN} onClick={() => setTeams(deleteTeam(team.id))}>×</button>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-      <div data-testid="score-card" data-hardware-volume-score={hardwareMode ? "true" : "false"} className={`relative rounded-xl${sunMode ? " vos-sun" : ""}${oledDim ? " vos-oled-dim" : ""}`}>
+      <div data-testid="score-card" data-hardware-volume-score={hardwareMode ? "true" : "false"} className={`vos-score-arena relative rounded-xl${sunMode ? " vos-sun" : ""}${oledDim ? " vos-oled-dim" : ""}`}>
       <button
         type="button"
         aria-pressed={hardwareMode}
@@ -2998,7 +2828,7 @@ ${name}` : name))} testId="cancha-player-chips" />
           <span>{state.status === "finished" ? "FINAL" : `${state.streak} ${t(locale, "en racha", "run", "em sequência")}`}</span>
         </div>
         <div className="vos-oled-keep mt-2 grid grid-cols-2 gap-2 text-center">
-          <div data-side-color={left.color} className={`rounded-lg py-2 ${left.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
+          <div data-side-color={left.color} className={`rounded-lg py-2 ${left.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`} style={{ border: "1px solid rgba(255,255,255,0.18)", color: "#F8FAFC" }}>
             <button
               type="button"
               data-testid={`serve-badge-${leftSide.toLowerCase()}`}
@@ -3009,10 +2839,10 @@ ${name}` : name))} testId="cancha-player-chips" />
               🏐 {left.serving ? t(locale, "SACA", "SERVES", "SAQUE") : t(locale, "SACAR", "SERVE", "SACAR")}
             </button>
             <p className="truncate text-xs font-bold">{left.name}</p>
-            <p data-testid={swapped ? "score-b" : "score-a"} className="text-4xl font-black tabular-nums">{left.score}</p>
+            <p data-testid={swapped ? "score-b" : "score-a"} className="text-5xl font-black tabular-nums" style={{ color: "#FFFFFF" }}>{left.score}</p>
             <p className="text-[10px] text-volt">Sets {left.sets}</p>
           </div>
-          <div data-side-color={right.color} className={`rounded-lg py-2 ${right.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`}>
+          <div data-side-color={right.color} className={`rounded-lg py-2 ${right.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`} style={{ border: "1px solid rgba(255,255,255,0.18)", color: "#F8FAFC" }}>
             <button
               type="button"
               data-testid={`serve-badge-${rightSide.toLowerCase()}`}
@@ -3023,7 +2853,7 @@ ${name}` : name))} testId="cancha-player-chips" />
               🏐 {right.serving ? t(locale, "SACA", "SERVES", "SAQUE") : t(locale, "SACAR", "SERVE", "SACAR")}
             </button>
             <p className="truncate text-xs font-bold">{right.name}</p>
-            <p data-testid={swapped ? "score-a" : "score-b"} className="text-4xl font-black tabular-nums">{right.score}</p>
+            <p data-testid={swapped ? "score-a" : "score-b"} className="text-5xl font-black tabular-nums" style={{ color: "#FFFFFF" }}>{right.score}</p>
             <p className="text-[10px] text-volt">Sets {right.sets}</p>
           </div>
         </div>
@@ -3234,6 +3064,11 @@ ${name}` : name))} testId="cancha-player-chips" />
             className={BTN}
             onClick={() => {
               const whistled = playWhistle("short");
+              // v11.0.3 — PROBAR VOZ always speaks: auto-enable the shared TTS switch.
+              if (!voiceOn) {
+                setVoiceOn(true);
+                persistTtsEnabled(true);
+              }
               const spoken = announceScoreTTS(
                 `${state.scoreA} a ${state.scoreB}`,
                 true,
@@ -3344,6 +3179,15 @@ ${name}` : name))} testId="cancha-player-chips" />
         </div>
       ) : null}
       <p className="mt-2 text-[11px] text-white/60">{message}</p>
+      {ttsToast ? (
+        <p
+          data-testid="tts-announcer-toast"
+          role="status"
+          className="mt-1 rounded-lg border border-volt/60 bg-volt/15 px-2 py-1 text-center text-[11px] font-black text-volt"
+        >
+          {ttsToast}
+        </p>
+      ) : null}
       {coActor ? (
         <p data-testid="coadmin-badge" className="mt-1 rounded-lg border border-emerald/40 bg-emerald/10 px-2 py-1 text-center text-[11px] font-black text-emerald">
           ⚡ {t(locale, `Actualizado por ${coActor}`, `Updated by ${coActor}`, `Atualizado por ${coActor}`)}
@@ -3466,19 +3310,18 @@ ${name}` : name))} testId="cancha-player-chips" />
           </div>
         ) : null}
       </div>
-      {/* v11.0.0 — vertical primary dock: always reachable, works with one thumb */}
+      {/* v11.0.3 — in-flow primary dock: never floats over the scoreboard */}
       <nav
         data-testid="cancha-primary-dock"
-        className="fixed bottom-3 left-1/2 z-30 -translate-x-1/2"
+        className="mb-2"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
           gap: 8,
-          width: "min(94vw, 30rem)",
+          width: "100%",
           padding: 8,
           borderRadius: 16,
           background: "rgba(15, 15, 22, 0.92)",
-          backdropFilter: "blur(12px)",
           border: "1px solid rgba(225, 29, 72, 0.28)",
           boxShadow: "0 10px 30px rgba(0, 0, 0, 0.55)",
         }}
@@ -3535,6 +3378,250 @@ ${name}` : name))} testId="cancha-player-chips" />
           ⋯ {t(locale, "Partido", "Match", "Partida")}
         </button>
       </nav>
+
+      {(uiMode === "pro" || moreOpen) && !isTableLandscapeMode ? (
+        <div className="vos-item-card mb-2 space-y-2" data-testid="dvw-courtside-console">
+          <p className="text-[10px] font-black uppercase tracking-wider text-white/60">
+            ⌨️{" "}
+            {t(
+              locale,
+              "Consola DataVolley / Courtside",
+              "DataVolley / Courtside Console",
+              "Console DataVolley / Courtside",
+            )}
+          </p>
+          <div className="flex flex-wrap gap-1">
+            <input
+              data-testid="dvw-command-input"
+              value={dvwCommand}
+              onChange={(event) => setDvwCommand(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                submitDvwCommand();
+              }}
+              placeholder={t(locale, "*14AT#42B2", "*14AT#42B2", "*14AT#42B2")}
+              className="min-w-[170px] flex-1 rounded-lg border border-white/15 bg-black/40 px-2 py-1 font-mono text-[11px] text-white focus:border-volt focus:outline-none"
+            />
+            <button type="button" data-testid="dvw-submit-btn" onClick={submitDvwCommand} className={BTN}>
+              ↵ {t(locale, "Anotar", "Log", "Registrar")}
+            </button>
+          </div>
+          <p
+            data-testid="dvw-live-readback"
+            className={`rounded-lg border px-2 py-1 text-[11px] font-bold ${
+              dvwTranslation.valid ? "border-volt/50 bg-volt/10 text-volt" : "border-white/10 bg-white/5 text-white/50"
+            }`}
+          >
+            {dvwTranslation.summary}
+          </p>
+          {dvwLatestIssue ? (
+            <p
+              data-testid="dvw-lint-warning"
+              className="rounded-lg border border-crimson/60 bg-crimson/15 px-2 py-1 text-[11px] font-bold text-white"
+            >
+              ⚠️ {dvwLatestIssue.message}
+            </p>
+          ) : null}
+          {dvwNotice ? (
+            <p data-testid="dvw-notice" className="text-[11px] font-bold text-white/70">
+              {dvwNotice}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              data-testid="dvw-import-btn"
+              onClick={() => dvwFileRef.current?.click()}
+              className={BTN}
+            >
+              📥 {t(locale, "Importar .DVW", "Import .DVW", "Importar .DVW")}
+            </button>
+            <button type="button" data-testid="dvw-export-btn" onClick={exportDvwFile} className={BTN}>
+              📤 {t(locale, "Exportar .DVW", "Export .DVW", "Exportar .DVW")}
+            </button>
+            <button
+              type="button"
+              data-testid="dvw-load-demo-btn"
+              onClick={() =>
+                loadDvwText(
+                  SAMPLE_DEMO_DVW,
+                  t(locale, "🧪 Demo cargada", "🧪 Demo loaded", "🧪 Demo carregada"),
+                )
+              }
+              className={BTN}
+            >
+              🧪 {t(locale, "Cargar Demo .DVW", "Load Demo .DVW", "Carregar Demo .DVW")}
+            </button>
+            <input
+              ref={dvwFileRef}
+              type="file"
+              accept=".dvw,text/plain"
+              className="hidden"
+              data-testid="dvw-file-input"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                void file
+                  .text()
+                  .then((text) => loadDvwText(text, file.name))
+                  .catch(() =>
+                    setDvwNotice(t(locale, "No se pudo leer el archivo.", "Could not read the file.", "Não foi possível ler o arquivo.")),
+                  );
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {uiMode === "pro" ? (
+      <>
+      {preset === "picadito" ? (
+        <div className="vos-item-card mb-2 space-y-2">
+          <div className="flex flex-wrap gap-1">
+            {([11, 15, 21, 25] as const).map((target) => (
+              <button
+                key={target}
+                type="button"
+                onClick={() => startPicadito(target)}
+                className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${picaditoTarget === target && matchFormat === "short15" ? "border-volt bg-volt/15 text-volt" : "border-white/10 text-white/50"}`}
+              >
+                {target} {t(locale, "pts", "pts", "pts")}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              onClick={() => startPicadito(picaditoTarget, false)}
+              className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${!goldenPoint ? "border-volt text-volt" : "border-white/10 text-white/50"}`}
+            >
+              {t(locale, "Diferencia de 2 (14-14 / 24-24)", "Win by 2 (14-14 / 24-24)", "Vantagem de 2 (14-14 / 24-24)")}
+            </button>
+            <button
+              type="button"
+              onClick={() => startPicadito(picaditoTarget, true)}
+              className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${goldenPoint ? "border-volt text-volt" : "border-white/10 text-white/50"}`}
+            >
+              {t(locale, "Punto de oro (muere en el target)", "Golden point (dies at target)", "Ponto de ouro (morre no alvo)")}
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-[9px] font-bold text-white/45">🎯 {t(locale, "Límite de Saques Seguidos", "Consecutive Serve Cap", "Limite de Saques Seguidos")}</span>
+            {([0, 3, 5] as const).map((cap) => (
+              <button
+                key={cap}
+                type="button"
+                aria-pressed={serveCap === cap}
+                onClick={() => {
+                  setServeCap(cap);
+                  setServeCapBanner(null);
+                  triggerCourtHaptics(16);
+                }}
+                className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${serveCap === cap ? "border-volt bg-volt/15 text-volt" : "border-white/10 text-white/50"}`}
+              >
+                {cap === 0
+                  ? t(locale, "Sin límite", "No limit", "Sem limite")
+                  : t(locale, `${cap} Saques`, `${cap} Serves`, `${cap} Saques`)}
+              </button>
+            ))}
+          </div>
+          {serveCapBanner ? (
+            <p role="status" className="rounded-lg bg-emerald/15 px-2 py-1 text-center text-[10px] font-semibold text-emerald">
+              {serveCapBanner}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {preset === "king" ? (
+        <div className="vos-item-card mb-2 space-y-1">
+          <input
+            value={kingInput}
+            onChange={(event) => setKingInput(event.target.value)}
+            placeholder={t(locale, "Tiburones, Lobos, Titanes, Vinchas… (3-5 equipos)", "Sharks, Wolves, Titans, Vinchas… (3-5 teams)", "Tubarões, Lobos, Titanes, Vinchas… (3-5 times)")}
+            className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px]"
+          />
+          <button type="button" className={`${BTN} w-full`} onClick={startKing}>
+            ▶ {t(locale, "Arrancar Rey de la Cancha (3-5 equipos)", "Start King of the Court (3-5 teams)", "Começar Rei da Quadra (3-5 times)")}
+          </button>
+          {king ? (
+            <p className="text-[9px] text-volt">
+              🔥 {t(locale, "Racha", "Streak", "Sequência")}: {king.streakTeam ?? "—"} ×{king.streak} · {t(locale, "cola", "queue", "fila")}: {king.queue.join(", ") || "—"}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {preset === "oficial" ? (
+        <div className="mb-2 flex flex-wrap gap-1">
+          <button type="button" onClick={() => { setMatchFormat("bo3"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 3, { matchFormat: "bo3" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo3" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 3 (25/15)", "Best of 3 (25/15)", "Melhor de 3 (25/15)")}</button>
+          <button type="button" onClick={() => { setMatchFormat("bo5"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 5, { matchFormat: "bo5" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo5" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 5 (25/15)", "Best of 5 (25/15)", "Melhor de 5 (25/15)")}</button>
+        </div>
+      ) : null}
+      </>
+      ) : null}
+      <div className="mb-2 grid grid-cols-2 gap-1">
+        <select
+          aria-label={t(locale, "Equipo local", "Home team", "Time da casa")}
+          value={teamAId ?? ""}
+          onChange={(event) => {
+            const team = teams.find((item) => item.id === event.target.value);
+            if (team) applyRoster(team, "A");
+          }}
+          className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px] text-white"
+        >
+          <option value="">{t(locale, "Equipo A", "Team A", "Time A")}</option>
+          {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+        </select>
+        <select
+          aria-label={t(locale, "Equipo visitante", "Away team", "Time visitante")}
+          value={teamBId ?? ""}
+          onChange={(event) => {
+            const team = teams.find((item) => item.id === event.target.value);
+            if (team) applyRoster(team, "B");
+          }}
+          className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px] text-white"
+        >
+          <option value="">{t(locale, "Equipo B", "Team B", "Time B")}</option>
+          {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+        </select>
+        {uiMode === "pro" ? (
+          <button type="button" className={`${BTN} col-span-2`} onClick={() => setRosterOpen((open) => !open)}>
+            {t(locale, "Administrar plantillas", "Manage rosters", "Gerenciar elencos")}
+          </button>
+        ) : null}
+      </div>
+      {rosterOpen && uiMode === "pro" ? (
+        <div className="mb-2 space-y-1 rounded-xl border border-white/10 bg-obsidian/80 p-2">
+          <div className="grid grid-cols-[1fr_4rem] gap-1">
+            <input value={rosterName} onChange={(event) => setRosterName(event.target.value)} placeholder={t(locale, "Nombre del equipo", "Team name", "Nome do time")} className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px]" />
+            <input value={rosterCode} onChange={(event) => setRosterCode(event.target.value)} placeholder="ABC" maxLength={3} className="rounded-lg border border-white/10 bg-obsidian px-2 py-1 text-[10px] uppercase" />
+          </div>
+          <textarea
+            value={rosterSheet}
+            onChange={(event) => setRosterSheet(event.target.value)}
+            rows={5}
+            placeholder={"1 Sofia S C\n7 Martina L\n4 Valentina OH\n9 Renata MB\n11 Carla OPP\n14 Julieta MB"}
+            className="w-full rounded-lg border border-white/10 bg-obsidian px-2 py-1 font-mono text-[10px]"
+          />
+          <p className="text-[9px] text-white/40">{t(locale, "Dorsal nombre rol (S OH MB OPP L) y C/L para capitán o líbero.", "Number name role (S OH MB OPP L), C/L for captain or libero.", "Número nome posição (S OH MB OPP L), C/L para capitão ou líbero.")}</p>
+          <PlayerChips locale={locale} onPick={(name) => setRosterSheet((current) => (current ? `${current}
+${name}` : name))} testId="cancha-player-chips" />
+          {rosterError ? <p className="text-[10px] text-crimson">{rosterError}</p> : null}
+          <button type="button" className={`${BTN} w-full`} onClick={saveRoster}>{t(locale, "Guardar plantilla", "Save roster", "Salvar elenco")}</button>
+          {teams.length > 0 ? (
+            <div className="space-y-1">
+              {teams.map((team) => (
+                <div key={team.id} className="flex items-center gap-1 text-[10px]">
+                  <span className="flex-1 truncate">{team.name} ({team.players.length})</span>
+                  <button type="button" className={BTN} onClick={() => applyRoster(team, "A")}>A</button>
+                  <button type="button" className={BTN} onClick={() => applyRoster(team, "B")}>B</button>
+                  <button type="button" className={BTN} onClick={() => setTeams(deleteTeam(team.id))}>×</button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {moreOpen ? (
         <div
           data-testid="cancha-more-drawer"

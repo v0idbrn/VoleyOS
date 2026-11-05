@@ -308,6 +308,18 @@ html.solar :focus-visible {
   }
 }
 
+/* v11.0.3 — Cancha scoreboard: full opacity, broadcast contrast, no dimming. */
+.vos-score-arena,
+.vos-score-arena button,
+.vos-score-arena p,
+.vos-score-arena span {
+  opacity: 1 !important;
+  pointer-events: auto;
+}
+.vos-score-arena p {
+  color: #f8fafc;
+}
+
 /* v9.4: outdoor sun mode — pure daylight scoreboard for open courts */
 .vos-sun {
   background: #ffffff !important;

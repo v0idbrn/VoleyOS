@@ -1,0 +1,4 @@
+🔊 Cancha: el locutor ya no calla — voz nativa Android + Web con chime de respaldo y aviso en pantalla.
+🎚️ Ajustes ↔ Cancha comparten el interruptor TTS al instante, con botón "Probar Locutor TTS Ahora".
+🏐 Placar de Cancha a contraste total: tablero arriba, dock en flujo (ya no tapa al Juez) y herramientas abajo.
+🧭 Píldora de modo legible, barra inferior en 1 fila, Pizarra 5-1 con roles (S, OH1, MB1…) y Lab & IA 100% en tu idioma.

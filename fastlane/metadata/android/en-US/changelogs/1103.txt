@@ -1,0 +1,4 @@
+🔊 Cancha: the announcer is back — native Android voice + Web speech with a chime fallback and on-screen banner.
+🎚️ Ajustes ↔ Cancha share one TTS switch instantly, plus a "Test Announcer TTS Now" button.
+🏐 Cancha scoreboard at full contrast: board on top, dock in flow (no more covering El Juez), tools below.
+🧭 Readable mode pill, single-row bottom bar, Pizarra 5-1 role tags (S, OH1, MB1…) and Lab & IA fully localized.

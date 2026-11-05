@@ -601,6 +601,8 @@ export const FIVB_HORN_PCM_SPEC = {
 
 type NativeBridge = {
   speakNativeTts?: (text: string, langCode: string) => boolean;
+  /** v11.0.3 spec alias with the (text, langTag) signature. */
+  speakTts?: (text: string, langTag: string) => boolean;
   stopNativeTts?: () => void;
   playNativeHardwareCue?: (cueType: string) => boolean;
 };
@@ -902,31 +904,63 @@ function normalizeLang(tag: string | undefined): string {
   return (tag ?? "").replace("_", "-").toLowerCase();
 }
 
+/** Window event carrying the `🗣️ Locutor: "…"` visual announcer toast text. */
+export const TTS_TOAST_EVENT = "voleyos-tts-toast";
+
+/** 2-tone broadcast announcer chime (E5 → A5), audible even with zero OS voices. */
+export function announcerChimePcm(sampleRate = UNIVERSAL_PCM_SPEC.sampleRate): Float32Array {
+  const toneSec = 0.14;
+  const total = Math.floor(toneSec * 2 * sampleRate);
+  const pcm = new Float32Array(total);
+  for (let index = 0; index < total; index += 1) {
+    const t = index / sampleRate;
+    const hz = t < toneSec ? 659.25 : 880;
+    const local = t < toneSec ? t : t - toneSec;
+    const envelope = Math.min(1, local / 0.01) * Math.exp(-3.5 * local);
+    pcm[index] = clampSample(0.55 * envelope * Math.sin(2 * Math.PI * hz * t));
+  }
+  return pcm;
+}
+
+/** Broadcasts the visual announcer toast so any shell can render it. */
+export function dispatchTtsToast(text: string): void {
+  if (typeof window === "undefined" || !text) return;
+  try {
+    window.dispatchEvent(new CustomEvent(TTS_TOAST_EVENT, { detail: text }));
+  } catch {
+    /* toast is best-effort */
+  }
+}
+
 /**
  * v10.1 4-tier zero-fail court announcer. The cascade runs synchronously so
  * the winning tier speaks before the returned promise settles:
- *   1. native Android TextToSpeech (VoleyOSBridge.speakNativeTts)
+ *   1. native Android TextToSpeech (VoleyOSBridge.speakTts / speakNativeTts)
  *   2. speechSynthesis with a locale-matched installed voice (es-AR ➔ es-*)
  *   3. speechSynthesis with whatever voice the device does have
- *   4. acoustic 3-formant vocal cadence through playUniversalPcm
- * A device with zero OS voices (or no speechSynthesis at all) jumps straight
- * to tier 4 — no device is ever silent.
+ *   4. acoustic 2-tone chime + visual toast when the OS has zero voices
+ * A device with zero OS voices (or no speechSynthesis at all) still gets
+ * audio + the `🗣️ Locutor` banner — no device is ever silent.
  */
 export async function speakCourtVoice(text: string, locale = "es"): Promise<VoiceTier> {
   if (!text || typeof window === "undefined") return "off";
   const lang = (locale || "es").slice(0, 2).toLowerCase();
 
-  // Tier 1 — native Android TTS.
+  // Tier 1 — native Android TTS (v11.0.3 speakTts first, legacy alias second).
   const bridge = nativeBridge();
-  if (bridge?.speakNativeTts) {
-    try {
-      if (bridge.speakNativeTts(text, lang)) return "native";
-    } catch {
-      // Native engine refused: fall through to the Web Speech tiers.
+  for (const method of [bridge?.speakTts, bridge?.speakNativeTts]) {
+    if (method) {
+      try {
+        if (method(text, lang)) return "native";
+      } catch {
+        // Native engine refused: fall through to the Web Speech tiers.
+      }
     }
   }
 
-  // Tiers 2/3 — Web Speech API with the cancel()+resume() anti-freeze guard.
+  // Tiers 2/3 — Web Speech API with the Chromium anti-silent sequence:
+  // cancel() ➔ (40 ms later) resume() ➔ voice pick ➔ speak. Calling
+  // cancel() and speak() in the same tick leaves Brave/Chrome muted.
   const synth = typeof window.speechSynthesis === "object" ? window.speechSynthesis : null;
   // Resolve the constructor from the window first, then the bare global, so
   // embedded stubs of either shape keep the announcer talking.
@@ -938,40 +972,62 @@ export async function speakCourtVoice(text: string, locale = "es"): Promise<Voic
         : null;
   if (synth && Utterance && typeof synth.speak === "function") {
     const voices = typeof synth.getVoices === "function" ? synth.getVoices() : null;
-    if (voices === null || voices.length > 0) {
-      try {
-        synth.cancel();
-        if (typeof synth.resume === "function") synth.resume();
-        const utterance = new Utterance(text);
-        let tier: VoiceTier = "web-any";
-        if (voices && voices.length > 0) {
-          const preferred = PREFERRED_VOICE_TAGS[lang] ?? [lang];
-          const exact = preferred.find((tag) =>
-            voices.some((voice) => normalizeLang(voice.lang) === tag),
-          );
-          const match =
-            (exact
-              ? voices.find((voice) => normalizeLang(voice.lang) === exact)
-              : voices.find((voice) => normalizeLang(voice.lang).startsWith(lang))) ?? voices[0];
-          if (match) {
-            utterance.voice = match;
-            utterance.lang = match.lang || lang;
-            tier = normalizeLang(match.lang).startsWith(lang) ? "web-locale" : "web-any";
-          }
-        } else {
-          utterance.lang = PREFERRED_VOICE_TAGS[lang]?.[0] ?? lang;
+    if (voices !== null && voices.length === 0) {
+      // Zero installed OS voices: chime + visual toast instead of silence.
+      playUniversalPcm(announcerChimePcm());
+      dispatchTtsToast(text);
+      return "formant";
+    }
+    try {
+      synth.cancel();
+      let tier: VoiceTier = "web-any";
+      let match: SpeechSynthesisVoice | undefined;
+      if (voices && voices.length > 0) {
+        const preferred = PREFERRED_VOICE_TAGS[lang] ?? [lang];
+        const exact = preferred.find((tag) =>
+          voices.some((voice) => normalizeLang(voice.lang) === tag),
+        );
+        match =
+          (exact
+            ? voices.find((voice) => normalizeLang(voice.lang) === exact)
+            : voices.find((voice) => normalizeLang(voice.lang).startsWith(lang))) ?? voices[0];
+        if (match) {
+          tier = normalizeLang(match.lang).startsWith(lang) ? "web-locale" : "web-any";
         }
-        utterance.rate = 1.05;
-        utterance.volume = 1;
-        synth.speak(utterance);
-        return tier;
-      } catch {
-        // The Web Speech engine exploded: formant tier below.
       }
+      const utterance = new Utterance(text);
+      if (match) {
+        utterance.voice = match;
+        utterance.lang = match.lang || lang;
+      } else {
+        utterance.lang = PREFERRED_VOICE_TAGS[lang]?.[0] ?? lang;
+      }
+      utterance.volume = 1.0;
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+      utterance.onerror = () => {
+        playUniversalPcm(announcerChimePcm());
+        dispatchTtsToast(text);
+      };
+      // Chromium/Brave anti-silent sequence: resume() 40 ms after cancel(),
+      // then speak — cancel()+speak() in one tick stays muted.
+      setTimeout(() => {
+        try {
+          if (typeof synth.resume === "function") synth.resume();
+          synth.speak(utterance);
+        } catch {
+          playUniversalPcm(announcerChimePcm());
+          dispatchTtsToast(text);
+        }
+      }, 40);
+      return tier;
+    } catch {
+      // The Web Speech engine exploded: chime tier below.
     }
   }
 
-  // Tier 4 — acoustic formant cadence: audible with zero OS voices.
-  playUniversalPcm(formantCadencePcm(text));
+  // Tier 4 — acoustic chime + visual toast: audible with zero OS voices.
+  playUniversalPcm(announcerChimePcm());
+  dispatchTtsToast(text);
   return "formant";
 }

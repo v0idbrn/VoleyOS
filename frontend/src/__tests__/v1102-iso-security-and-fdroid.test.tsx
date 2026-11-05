@@ -1,8 +1,8 @@
 /* v11.0.2 — ISO/OWASP hardening, OS-rotation bypass, F-Droid compliance. */
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   checkClockRollbackTamper,
@@ -14,6 +14,7 @@ import {
   verifyProLicenseToken,
 } from "../lib/security-hardening";
 import { ScoreboardStation } from "@/components/stations";
+import { VolleyOSHub } from "@/components/VolleyOSHub";
 import { MODULE_BY_SLUG } from "@/lib/modules";
 
 const meta = (slug: string) => {
@@ -203,5 +204,79 @@ describe("v11.0.2 ISO security, rotation bypass & F-Droid", () => {
     expect(main).toContain("413 Payload Too Large");
     expect(main).toContain("SCREEN_ORIENTATION_FULL_SENSOR");
     expect(main).toContain("isSystemAutoRotateEnabled");
+    // v11.0.3 — native TTS bridge + ready flag + lifecycle teardown.
+    expect(main).toContain("public boolean speakTts(String text, String langTag)");
+    expect(main).toContain("ttsReady = true");
+    expect(main).toContain("ttsReady = false");
+  });
+
+  /* v11.0.3 — Cancha dock stays in flow ------------------------------------ */
+  it("renders the Cancha primary dock in flow (never fixed or absolute)", () => {
+    render(<ScoreboardStation meta={meta("scoreboard")} locale="es" onSave={noop} />);
+    const dock = screen.getByTestId("cancha-primary-dock") as HTMLElement;
+    expect(dock.className).not.toMatch(/\bfixed\b/);
+    expect(dock.className).not.toMatch(/\babsolute\b/);
+    expect(["", "relative", "static"]).toContain(dock.style.position);
+    // Scoreboard arena renders above the dock (compact match bar first).
+    const card = screen.getByTestId("score-card");
+    expect(card.compareDocumentPosition(dock) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  /* v11.0.3 — TTS announcer end-to-end ------------------------------------- */
+  it("PROBAR VOZ enables voleyos_tts_enabled and speaks through the native bridge", () => {
+    const spoken: string[] = [];
+    setBridge({ setSensorAutoRotateMode: () => undefined, speakTts: (text: string) => { spoken.push(text); return true; } } as TestBridge & { speakTts?: (text: string, langTag: string) => boolean });
+    render(<ScoreboardStation meta={meta("scoreboard")} locale="es" onSave={noop} />);
+    fireEvent.click(screen.getByRole("button", { name: /Probar Voz/ }));
+    expect(window.localStorage.getItem("voleyos_tts_enabled")).toBe("true");
+    expect(window.localStorage.getItem("volleyos.voice")).toBe("1");
+    expect(spoken.length).toBeGreaterThan(0);
+    expect(spoken[0]).toMatch(/\d+\s*a\s*\d+/);
+  });
+
+  it("falls back to speechSynthesis with the Chromium cancel→resume sequence", async () => {
+    const speak = vi.fn();
+    const cancel = vi.fn();
+    const resume = vi.fn();
+    class FakeUtterance {
+      text: string;
+      lang = "";
+      volume = 0;
+      rate = 0;
+      pitch = 0;
+      onerror: (() => void) | null = null;
+      constructor(text: string) {
+        this.text = text;
+      }
+    }
+    Object.defineProperty(window, "SpeechSynthesisUtterance", { value: FakeUtterance, configurable: true });
+    Object.defineProperty(window, "speechSynthesis", {
+      value: { speak, cancel, resume, getVoices: () => [{ lang: "es-ES", default: true }] },
+      configurable: true,
+    });
+    try {
+      render(<ScoreboardStation meta={meta("scoreboard")} locale="es" onSave={noop} />);
+      fireEvent.click(screen.getByRole("button", { name: /Probar Voz/ }));
+      expect(cancel).toHaveBeenCalled();
+      await waitFor(() => expect(speak).toHaveBeenCalled(), { timeout: 2000 });
+      expect(resume).toHaveBeenCalled();
+      const utterance = speak.mock.calls.at(-1)?.[0] as { volume?: number; rate?: number; pitch?: number };
+      expect(utterance.volume).toBe(1);
+      expect(utterance.rate).toBe(1.05);
+      expect(utterance.pitch).toBe(1);
+    } finally {
+      delete (window as unknown as { speechSynthesis?: unknown }).speechSynthesis;
+      delete (window as unknown as { SpeechSynthesisUtterance?: unknown }).SpeechSynthesisUtterance;
+    }
+  });
+
+  /* v11.0.3 — header mode pill contrast ------------------------------------ */
+  it("renders the header mode pill with visible text fill", () => {
+    window.localStorage.setItem("voleyos_onboarding_done", "1");
+    render(<VolleyOSHub locale="es" />);
+    const pill = screen.getByTestId("header-mode-pill") as HTMLElement;
+    expect(pill.textContent).toContain("Modo Pro");
+    expect(pill.style.webkitTextFillColor).toBe("rgb(251, 191, 36)");
+    expect(pill.style.background).not.toBe("");
   });
 });

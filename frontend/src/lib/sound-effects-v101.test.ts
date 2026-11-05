@@ -266,7 +266,7 @@ describe("v10.1 4-tier court voice", () => {
     ]);
     expect(await speakCourtVoice("Ventaja 15 a 12", "es")).toBe("web-locale");
     expect(cancel).toHaveBeenCalled();
-    expect(spoken).toHaveLength(1);
+    await vi.waitFor(() => expect(spoken).toHaveLength(1));
     expect(spoken[0]?.text).toContain("15 a 12");
     expect(spoken[0]?.voice?.lang).toBe("es-AR");
   });
@@ -276,7 +276,7 @@ describe("v10.1 4-tier court voice", () => {
       { lang: "de-DE", name: "Deutsch", localService: true, default: false, voiceURI: "de-DE" },
     ]);
     expect(await speakCourtVoice("Set point", "es")).toBe("web-any");
-    expect(spoken).toHaveLength(1);
+    await vi.waitFor(() => expect(spoken).toHaveLength(1));
     expect(spoken[0]?.voice?.lang).toBe("de-DE");
   });
 
@@ -295,7 +295,7 @@ describe("v10.1 4-tier court voice", () => {
   it("keeps legacy engines talking when getVoices is unavailable", async () => {
     defineSynth(null); // no getVoices function at all
     expect(await speakCourtVoice("Saque corto", "es")).toBe("web-any");
-    expect(spoken).toHaveLength(1);
+    await vi.waitFor(() => expect(spoken).toHaveLength(1));
     expect(cancel).toHaveBeenCalled();
   });
 

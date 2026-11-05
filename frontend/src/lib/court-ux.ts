@@ -91,3 +91,19 @@ export function announceScoreTTS(text: string, enabled: boolean, locale = "es-ES
   void speakCourtVoice(text, locale.slice(0, 2));
   return true;
 }
+
+/** v11.0.3 — shared TTS switch key + cross-component sync event. */
+export const TTS_ENABLED_KEY = "voleyos_tts_enabled";
+export const TTS_ENABLED_EVENT = "voleyos-tts-changed";
+
+/** Persists the TTS switch and broadcasts it so Ajustes ↔ Cancha stay in sync. */
+export function persistTtsEnabled(enabled: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(TTS_ENABLED_KEY, enabled ? "true" : "false");
+  } catch {
+    /* storage unavailable */
+  }
+  window.localStorage.setItem("volleyos.voice", enabled ? "1" : "0");
+  window.dispatchEvent(new CustomEvent(TTS_ENABLED_EVENT, { detail: enabled ? "true" : "false" }));
+}

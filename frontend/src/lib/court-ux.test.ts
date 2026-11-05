@@ -15,7 +15,7 @@ describe("court-ux", () => {
     expect(announceScoreTTS("21-19", false)).toBe(false);
   });
 
-  it("speaks when enabled and the API exists", () => {
+  it("speaks when enabled and the API exists", async () => {
     const speak = vi.fn();
     class Utterance {
       lang = "";
@@ -25,7 +25,8 @@ describe("court-ux", () => {
     vi.stubGlobal("SpeechSynthesisUtterance", Utterance);
     vi.stubGlobal("window", { speechSynthesis: { cancel: vi.fn(), speak } });
     expect(announceScoreTTS("21-19", true)).toBe(true);
-    expect(speak).toHaveBeenCalledOnce();
+    // v11.0.3 — the Chromium anti-silent sequence defers speak() by 40 ms.
+    await vi.waitFor(() => expect(speak).toHaveBeenCalledOnce());
     vi.unstubAllGlobals();
   });
 });

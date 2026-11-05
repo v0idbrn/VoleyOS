@@ -18,7 +18,7 @@ import { canAskSupport, persistSupporterChip, supporterChipActive } from "@/lib/
 import { APP_VERSION, checkForUpdate, type UpdateCheck } from "@/lib/update-check";
 import { addVaultEntry, loadVault } from "@/lib/vault";
 import { downloadXlsx, openPrintableReport, type ReportSpec } from "@/lib/offline-xlsx";
-import { LIVE_SCORE_EVENT, announceScoreTTS, isMatchActive, persistLiveScoreboard, readLiveScoreboard, requestCourtWakeLock, triggerCourtHaptics } from "@/lib/court-ux";
+import { LIVE_SCORE_EVENT, announceScoreTTS, isMatchActive, persistLiveScoreboard, persistTtsEnabled, readLiveScoreboard, requestCourtWakeLock, triggerCourtHaptics } from "@/lib/court-ux";
 import { playWhistle, setCourtAudioEnabled } from "@/lib/court-audio";
 import { loadCrowdAmbience, saveCrowdAmbience, setSoundEffectsEnabled } from "@/lib/sound-effects";
 import { EphemeralVaultBar } from "@/components/EphemeralVaultBar";
@@ -463,7 +463,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
       }
     }
     setSolar(window.localStorage.getItem(THEME_KEY) === "solar");
-    setVoice(window.localStorage.getItem(VOICE_KEY) === "1");
+    setVoice(window.localStorage.getItem("voleyos_tts_enabled") === "true" || window.localStorage.getItem(VOICE_KEY) === "1");
     setCourtAudio(window.localStorage.getItem(AUDIO_KEY) !== "0");
     setCrowdVolume(loadCrowdAmbience());
     setSupporter(supporterChipActive());
@@ -713,7 +713,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const toggleVoice = (): void => {
     const next = !voice;
     setVoice(next);
-    window.localStorage.setItem(VOICE_KEY, next ? "1" : "0");
+    // v11.0.3 — one shared switch: Ajustes and Cancha stay in sync instantly.
+    persistTtsEnabled(next);
     setToast(next ? shell.voiceOn : shell.voiceOff);
     announceScoreTTS(next ? shell.voiceOn : shell.voiceOff, next, locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : "es-ES");
   };
@@ -953,7 +954,27 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
               </span>
             </button>
             <span
-              className={"flex rounded-full border-2 border-white/15 bg-panel/90 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider sm:inline-flex" + (uiMode === "simple" ? " bg-emerald text-emerald" : " bg-volt text-volt")}
+              data-testid="header-mode-pill"
+              className="flex rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-wider sm:inline-flex"
+              style={
+                uiMode === "simple"
+                  ? {
+                      background: "rgba(16, 185, 129, 0.16)",
+                      border: "1.5px solid #10B981",
+                      color: "#34D399",
+                      WebkitTextFillColor: "#34D399",
+                      fontWeight: 800,
+                      borderRadius: "999px",
+                    }
+                  : {
+                      background: "rgba(245, 158, 11, 0.16)",
+                      border: "1.5px solid #F59E0B",
+                      color: "#FBBF24",
+                      WebkitTextFillColor: "#FBBF24",
+                      fontWeight: 800,
+                      borderRadius: "999px",
+                    }
+              }
             >
               {uiMode === "simple" ? `⚡ ${t(locale, "Modo Simple", "Simple Mode", "Modo Simples")}` : `🧠 ${t(locale, "Modo Pro (61)", "Pro Mode (61)", "Modo Pro (61)")}`}
             </span>
@@ -1264,7 +1285,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   ))}
                 </div>
 
-                <div data-testid="workstation-bar" className="snap-row mt-3 flex gap-1.5 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label={t(locale, "Workstations", "Workstations", "Workstations")}>
+                <div data-testid="workstation-bar" className="snap-row mt-3 flex gap-1.5 no-scrollbar" role="tablist" aria-label={t(locale, "Workstations", "Workstations", "Workstations")} style={{ overflowX: "auto", paddingBottom: "4px" }}>
                   {WORKSTATIONS.map((workstation) => {
                     const isActive = workstationId === workstation.id;
                     return (
@@ -1472,9 +1493,10 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                             {EXPERIMENTAL_SLUGS.has(meta.slug) ? (
                               <span
                                 data-testid="experimental-beta-badge"
-                                className="rounded-full border border-amber-400/50 bg-amber-400/10 px-2 py-0.5 text-[9px] font-black leading-tight text-amber-200"
+                                className="inline-flex items-center whitespace-nowrap rounded-full border border-amber-400/50 bg-amber-400/10 text-amber-200"
+                                style={{ fontSize: "0.68rem", padding: "2px 8px", fontWeight: 800, lineHeight: 1.2 }}
                               >
-                                🧪 {t(locale, "Beta Experimental (Estimación No Calibrada)", "Experimental Beta (Uncalibrated Estimate)", "Beta Experimental (Estimativa Não Calibrada)")}
+                                🧪 {t(locale, "Beta Experimental", "Experimental Beta", "Beta Experimental")}
                               </span>
                             ) : null}
                           </button>
@@ -1542,6 +1564,12 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   </div>
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar px-3 pb-24 pt-3">
+                  {/* v11.0.3 — Picadito & Amigos hub tools first, court station below. */}
+                  {tab === "court" ? (
+                    <div className="mb-3">
+                      <CasualPlayerSuite key={suiteNonce} locale={locale} initialSection={suiteSection ?? undefined} />
+                    </div>
+                  ) : null}
                   {PickedStation ? (
                     <PickedStation meta={MODULE_BY_SLUG.get(pickedSlug) ?? MODULES[0]!} locale={locale} onSave={handleSave} />
                   ) : null}
@@ -1643,6 +1671,27 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                     />
                   </label>
                   <SwitchRow label={shell.voice} checked={voice} onToggle={toggleVoice} />
+                  <button
+                    type="button"
+                    data-testid="probar-locutor-tts"
+                    onClick={() => {
+                      // v11.0.3 — one shared switch: turning it on here also arms Cancha.
+                      if (!voice) {
+                        setVoice(true);
+                        persistTtsEnabled(true);
+                      }
+                      const spoken = announceScoreTTS(
+                        t(locale, "15 a 12, saca Tiburones", "15 to 12, Sharks serve", "15 a 12, saque Tubarões"),
+                        true,
+                        locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : "es-ES",
+                      );
+                      setToast(spoken ? `🗣️ ${t(locale, "Locutor", "Announcer", "Locutor")}: 15-12` : shell.voiceOff);
+                      triggerCourtHaptics(20);
+                    }}
+                    className="w-full rounded-2xl border border-volt/50 bg-volt/10 px-4 py-3 text-[13px] font-bold text-volt transition hover:bg-volt/20"
+                  >
+                    🔊 {t(locale, "Probar Locutor TTS Ahora", "Test Announcer TTS Now", "Testar Locutor TTS Agora")}
+                  </button>
                   <SwitchRow
                     label={t(locale, "Pantalla despierta", "Keep screen awake", "Tela acordada")}
                     checked={awake}
@@ -1923,7 +1972,19 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
 
       {!activeMeta ? (
         <nav aria-label={shell.tabsLabel} className="safe-bottom z-30 shrink-0 border-t border-white/10 bg-obsidian/95">
-            <div role="tablist" aria-label={shell.tabsLabel} className="mx-auto grid h-16 max-w-3xl grid-cols-3">
+            {/* v11.0.3 — always one single row: 3 tabs (Simple) or 5 tabs (Pro). */}
+            <div
+              role="tablist"
+              aria-label={shell.tabsLabel}
+              className="mx-auto max-w-3xl"
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${uiMode === "simple" ? 3 : 5}, minmax(0, 1fr))`,
+                alignItems: "center",
+                height: "60px",
+                padding: "4px 8px",
+              }}
+            >
               {uiMode === "simple"
                 ? (["court", "home", "settings"] as const).map((value) => {
                     const labels: Record<"court" | "home" | "settings", string> = {

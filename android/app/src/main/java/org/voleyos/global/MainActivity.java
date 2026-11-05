@@ -62,6 +62,8 @@ public class MainActivity extends Activity {
     private WebView webView;
     /** Native multi-locale TTS — Tier 1 of the universal court voice. */
     private TextToSpeech nativeTts;
+    /** True once the TextToSpeech init callback reports SUCCESS (v11.0.3). */
+    private volatile boolean ttsReady;
     /** When JS last told us to hold the Back press awaiting a double-press exit. */
     private long lastBackPressMs;
     /** Tab requested by the home widget / launcher shortcut before the page is ready. */
@@ -415,6 +417,17 @@ public class MainActivity extends Activity {
             } catch (Throwable t) {
                 return false; // any native failure → JS Tier 2/3
             }
+        }
+
+        /**
+         * v11.0.3 spec alias: same native engine, spec signature (text, langTag).
+         * Gated on ttsReady so the WebView never queues into a dead engine.
+         */
+        @JavascriptInterface
+        public boolean speakTts(String text, String langTag) {
+            MainActivity host = activity;
+            if (host == null || !host.ttsReady) return false;
+            return speakNativeTts(text, langTag);
         }
 
         /** Hard-stops any in-flight announcement (new score call wins). */
@@ -1122,6 +1135,7 @@ public class MainActivity extends Activity {
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .build());
+                ttsReady = true;
             }
         });
 
@@ -1215,6 +1229,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        ttsReady = false;
         if (nativeTts != null) {
             try {
                 nativeTts.stop();
