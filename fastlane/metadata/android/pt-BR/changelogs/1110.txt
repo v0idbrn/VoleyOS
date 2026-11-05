@@ -1,0 +1,6 @@
+🧪 Auditoria visual zero defects 360×800 & 1366×768 em 61 módulos ES/EN/PT.
+🎨 Tokens de design, cards, inputs, selects, focus rings.
+🧹 UI huérfano purgado, relabelado.
+📜 Todos os 61 módulos localizados trilíngue.
+🔒 Paywall modal glassmórfico, badge, cópia de ID.
+📈 v11.1.0/1110.

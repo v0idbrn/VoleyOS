@@ -120,7 +120,7 @@ describe("v9.5 flight-time jump lab", () => {
     expect(screen.getByTestId("flight-report")).toBeTruthy();
     fireEvent.click(screen.getByTestId("contact-clock-toggle"));
 
-    fireEvent.click(screen.getByRole("button", { name: /Cargar ejemplo/ }));
+    fireEvent.click(screen.getByRole("button", { name: /🔄 Cargar Datos de Prueba/ }));
     expect(screen.queryByTestId("flight-report")).toBeNull();
     expect(screen.queryByTestId("contact-clock")).toBeNull();
   });

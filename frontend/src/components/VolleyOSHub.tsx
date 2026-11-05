@@ -291,6 +291,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [licenseValue, setLicenseValue] = useState("");
   const [licenseError, setLicenseError] = useState<string | null>(null);
+  const [paywallCopied, setPaywallCopied] = useState(false);
   const initialActiveTab = useMemo(() => {
     if (!isTestEnv && uiMode === "simple") return ("court" as const);
     return ("home" as const);
@@ -1042,7 +1043,9 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
               >
                 {uiMode === "simple"
                   ? `⚡ ${t(locale, "Modo Simple", "Simple Mode", "Modo Simples")}`
-                  : `🧠 ${t(locale, "Modo Pro (61)", "Pro Mode (61)", "Modo Pro (61)")}`}
+                  : proOk
+                    ? `🧠 ${t(locale, "Modo Pro (61)", "Pro Mode (61)", "Modo Pro (61)")}`
+                    : `🔒 ${t(locale, "Modo Pro (61)", "Pro Mode (61)", "Modo Pro (61)")}`}
               </span>
               {proOk ? null : (
                 <span
@@ -1601,17 +1604,19 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
             {groupKey ? (
               <div className="mx-auto flex h-full max-w-3xl flex-col">
                 <div className="shrink-0 px-3 pt-3">
-                  <div className="flex items-baseline justify-between">
+                  <div className="flex items-baseline justify-between gap-2">
                     <div>
                       <h1 className="text-lg font-black tracking-tight">{tabTitles[tab].title}</h1>
                       <p className="text-[11px] text-white/45">{tabTitles[tab].sub}</p>
                     </div>
+                    {/* v11.1.0 — the station is already rendered below: no "open module" orphan. */}
                     <button
                       type="button"
-                      onClick={() => openModule(pickedSlug)}
-                      className="tap rounded-full border border-white/10 px-2 py-1 text-[10px] font-bold text-white/60"
+                      data-testid="group-back-btn"
+                      onClick={() => goTab("home")}
+                      className="tap shrink-0 rounded-full border border-white/10 px-2 py-1 text-[10px] font-bold text-white/60"
                     >
-                      ⤢ {shell.openModule}
+                      ← {t(locale, "Inicio", "Home", "Início")}
                     </button>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2" role="tablist" aria-label={tabTitles[tab].title} style={{ width: "100%", overflow: "visible" }}>
@@ -2270,32 +2275,105 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
           role="dialog"
           aria-modal="true"
           aria-label={t(locale, "Paywall de VolleyOS Pro", "VolleyOS Pro paywall", "Paywall do VolleyOS Pro")}
-          className="fixed inset-0 z-[60] grid place-items-center bg-black/75 p-4"
           onClick={() => setPaywallOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9998,
+            background: "rgba(4, 5, 10, 0.85)",
+            backdropFilter: "blur(10px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
         >
-          <div className="max-h-[86vh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/15 bg-panel p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-crimson">🔒 VolleyOS Pro</p>
-            <h3 className="mt-1 text-xl font-black">{t(locale, "Desbloqueá el Modo Pro", "Unlock Pro Mode", "Desbloqueie o Modo Pro")}</h3>
-            <ul className="mt-2 space-y-1 text-[11px] text-white/70">
-              <li>🧠 {t(locale, "61 módulos Pro completos", "All 61 Pro modules", "61 módulos Pro completos")}</li>
-              <li>🏐 {t(locale, "Pizarra 5-1 y tableros tácticos", "Pizarra 5-1 & tactical boards", "Pizarra 5-1 e quadros táticos")}</li>
-              <li>💻 {t(locale, "Suite DataVolley (.dvw)", "DataVolley (.dvw) suite", "Suíte DataVolley (.dvw)")}</li>
-              <li>🔬 {t(locale, "Lab & IA con biomecánica", "Lab & AI with biomechanics", "Lab & IA com biomecânica")}</li>
-              <li>🧤 {t(locale, "Auto-Líbero y rotador con banco", "Auto-Libero & bench rotator", "Auto-Líbero e rodízio de banco")}</li>
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              maxWidth: 480,
+              width: "100%",
+              maxHeight: "86vh",
+              overflowY: "auto",
+              background: "#0E1017",
+              border: "1.5px solid rgba(245, 158, 11, 0.45)",
+              borderRadius: 22,
+              padding: 24,
+              boxShadow: "0 24px 60px rgba(0,0,0,0.8)",
+            }}
+          >
+            <span
+              style={{
+                display: "inline-block",
+                borderRadius: 999,
+                border: "1px solid rgba(245, 158, 11, 0.5)",
+                background: "rgba(245, 158, 11, 0.12)",
+                color: "#F59E0B",
+                padding: "4px 10px",
+                fontSize: 10,
+                fontWeight: 900,
+                letterSpacing: "0.08em",
+              }}
+            >
+              🧠 VOLEYOS PRO · 61 MOTORES + SCOUTING .DVW
+            </span>
+            <h3 style={{ marginTop: 10, fontSize: 22, fontWeight: 900, color: "#F8FAFC" }}>
+              {t(locale, "Desbloqueá el Modo Pro", "Unlock Pro Mode", "Desbloqueie o Modo Pro")}
+            </h3>
+            <ul style={{ marginTop: 10, display: "grid", gap: 6, fontSize: 12, lineHeight: 1.45, color: "#CBD5E1" }}>
+              <li>📐 {t(locale, "Pizarras Tácticas 5-1, Costuras y Sombra de Bloqueo", "5-1 tactical boards, seams and block shadow", "Quadros táticos 5-1, costuras e sombra de bloqueio")}</li>
+              <li>⌨️ {t(locale, "Scouting DataVolley (.dvw) en 2 Toques + Linter", "DataVolley (.dvw) scouting in 2 taps + linter", "Scouting DataVolley (.dvw) em 2 toques + linter")}</li>
+              <li>🦺 {t(locale, "Auto-Líbero Reglamentario y Diagnóstico 15s", "Legal Auto-Libero and 15s timeout diagnostic", "Auto-Líbero regimental e diagnóstico de 15s")}</li>
+              <li>⚡ {t(locale, "Laboratorio Biomecánico y Monitor ACWR", "Biomechanics lab and ACWR monitor", "Laboratório biomecânico e monitor ACWR")}</li>
             </ul>
-            <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-white/40">{t(locale, "Tu ID de dispositivo", "Your device ID", "Seu ID de aparelho")}</p>
-            <p data-testid="paywall-device-id" className="mt-1 rounded-lg border border-white/10 bg-obsidian px-2 py-1 font-mono text-[12px] text-volt">{proDeviceId()}</p>
+            <p style={{ marginTop: 14, fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(248,250,252,0.45)" }}>
+              {t(locale, "Tu ID de dispositivo", "Your device ID", "Seu ID de aparelho")}
+            </p>
+            <p
+              data-testid="paywall-device-id"
+              style={{
+                marginTop: 4,
+                borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.18)",
+                background: "#12151E",
+                padding: "8px 12px",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                fontSize: 13,
+                fontWeight: 700,
+                color: "#F59E0B",
+                wordBreak: "break-all",
+              }}
+            >
+              {proDeviceId()}
+            </p>
             <button
               type="button"
               data-testid="paywall-copy-device-id-btn"
-              className="tap mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-white"
+              style={{
+                marginTop: 8,
+                width: "100%",
+                minHeight: 40,
+                borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.18)",
+                background: "#151822",
+                color: "#F8FAFC",
+                padding: "8px 12px",
+                fontSize: 11,
+                fontWeight: 800,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+              }}
               onClick={() => {
                 void copyTextUniversal(proDeviceId()).then((done) => {
-                  if (done) setToast(t(locale, "📋 ID copiado. Envialo para recibir tu clave VOS-PRO.", "📋 ID copied. Send it to receive your VOS-PRO key.", "📋 ID copiado. Envie para receber sua chave VOS-PRO."));
+                  if (!done) return;
+                  setPaywallCopied(true);
+                  setToast(t(locale, "📋 ID copiado. Envialo para recibir tu clave VOS-PRO.", "📋 ID copied. Send it to receive your VOS-PRO key.", "📋 ID copiado. Envie para receber sua chave VOS-PRO."));
                 });
               }}
             >
-              📋 {t(locale, "Copiar mi ID de Dispositivo", "Copy my Device ID", "Copiar meu ID de Aparelho")}
+              {paywallCopied
+                ? `✅ ${t(locale, "¡ID Copiado!", "ID Copied!", "ID Copiado!")}`
+                : `📋 ${t(locale, "Copiar ID", "Copy ID", "Copiar ID")}`}
             </button>
             <input
               type="text"
@@ -2309,12 +2387,37 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
               }}
               placeholder="VOS-PRO-…"
               aria-label={t(locale, "Clave de licencia VOS-PRO", "VOS-PRO license key", "Chave de licença VOS-PRO")}
-              className="mt-3 w-full rounded-lg border border-white/15 bg-obsidian px-3 py-2 font-mono text-sm text-white outline-none focus:border-volt"
+              style={{
+                marginTop: 12,
+                width: "100%",
+                minHeight: 40,
+                borderRadius: 10,
+                border: licenseError ? "1px solid rgba(225,29,72,0.9)" : "1px solid rgba(255,255,255,0.18)",
+                background: "#12151E",
+                padding: "8px 12px",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                fontSize: 13,
+                color: "#F8FAFC",
+                outline: "none",
+              }}
             />
             <button
               type="button"
               data-testid="paywall-activate-btn"
-              className="tap mt-2 w-full rounded-lg bg-crimson px-3 py-2 text-[11px] font-black uppercase tracking-wider text-white"
+              style={{
+                marginTop: 8,
+                width: "100%",
+                minHeight: 40,
+                borderRadius: 10,
+                border: "1px solid rgba(225,29,72,0.8)",
+                background: "#E11D48",
+                color: "#FFFFFF",
+                padding: "8px 12px",
+                fontSize: 11,
+                fontWeight: 900,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+              }}
               onClick={() => {
                 const token = licenseValue.trim();
                 const check = verifyProLicenseToken(token, { deviceId: proDeviceId() });
@@ -2326,21 +2429,40 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                   setLicenseError(null);
                   setToast(t(locale, "🧠 Modo Pro activado.", "🧠 Pro Mode unlocked.", "🧠 Modo Pro ativado."));
                 } else {
-                  setLicenseError(t(locale, "Licencia inválida o vinculada a otro dispositivo.", "Invalid license or bound to another device.", "Licença inválida ou vinculada a outro aparelho."));
+                  setLicenseError(t(locale, "❌ Clave inválida o correspondiente a otro dispositivo.", "❌ Invalid key or bound to another device.", "❌ Chave inválida ou de outro aparelho."));
                 }
               }}
             >
               🔓 {t(locale, "Activar Licencia VOS-PRO", "Activate VOS-PRO License", "Ativar Licença VOS-PRO")}
             </button>
             {licenseError ? (
-              <p role="alert" className="mt-2 text-[11px] font-semibold text-crimson">{licenseError}</p>
+              <p role="alert" style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: "#FB7185" }}>
+                {licenseError}
+              </p>
+            ) : proOk ? (
+              <p role="status" style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: "#34D399" }}>
+                ✅ {t(locale, "¡Licencia Pro Activada!", "Pro license active!", "Licença Pro ativada!")}
+              </p>
             ) : null}
             <button
               type="button"
-              className="tap mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-white"
+              style={{
+                marginTop: 8,
+                width: "100%",
+                minHeight: 40,
+                borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "transparent",
+                color: "rgba(248,250,252,0.75)",
+                padding: "8px 12px",
+                fontSize: 11,
+                fontWeight: 800,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+              }}
               onClick={() => setPaywallOpen(false)}
             >
-              {shell.close}
+              ✕ {shell.close}
             </button>
           </div>
         </div>

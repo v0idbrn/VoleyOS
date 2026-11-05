@@ -62,11 +62,11 @@ describe("native app shell", () => {
   it("saves a station report into the local vault from the full-screen view", () => {
     render(<VolleyOSHub locale="es" />);
     fireEvent.click(screen.getAllByTestId("module-card")[0]!);
-    const save = screen.getAllByRole("button", { name: "Guardar reporte" })[0];
+    const save = screen.getAllByRole("button", { name: "📥 Guardar en Bóveda Local" })[0];
     expect(save).toBeDefined();
     if (save) fireEvent.click(save);
     expect(loadVault()).toHaveLength(1);
-    expect(screen.getByRole("status").textContent).toContain("bóveda");
+    expect(screen.getByTestId("station-toast").textContent).toContain("Bóveda");
   });
 
   it("toggles the outdoor theme from native settings", () => {

@@ -256,6 +256,7 @@ import {
   teamFromRosterSheet,
   type KingOfCourtState,
 } from "@/lib/local-engines";
+import { humanizeKey, translateEnum, translateInputLabel, translateOutputKey } from "@/lib/module-labels";
 import {
   PICKUP_SAMPLE,
   SCOUT_SAMPLE,
@@ -363,8 +364,20 @@ function defaultOpenGuide(): boolean {
   return window.localStorage.getItem("volleyos.guided") === "novice";
 }
 
-/** v11.0.3 — live stations keep the court clean: no guide banner / report footer. */
-const LIVE_STATION_SLUGS = new Set(["scoreboard", "rotation"]);
+/**
+ * v11.1.0 — live interactive stations keep the court clean: no guide banner
+ * and no "load example / save report" calculator footer. A scoreboard, a
+ * timeout board or the gym TV has no report to save and no data to load.
+ */
+const LIVE_STATION_SLUGS = new Set([
+  "scoreboard",
+  "rotation",
+  "beach",
+  "referee-console",
+  "timeout-chalkboard",
+  "gym-screen",
+  "system-transition",
+]);
 
 function StationShell({
   meta,
@@ -381,11 +394,18 @@ function StationShell({
   rows: number;
   children: ReactNode;
 }) {
+  const [note, setNote] = useState<string | null>(null);
   useEffect(() => {
     const loadExample = (): void => onExample();
     window.addEventListener("voleyos:demo", loadExample);
     return () => window.removeEventListener("voleyos:demo", loadExample);
   }, [onExample]);
+
+  useEffect(() => {
+    if (!note) return;
+    const id = window.setTimeout(() => setNote(null), 2600);
+    return () => window.clearTimeout(id);
+  }, [note]);
 
   return (
     <article className={CARD} id={`station-${meta.slug}`}>
@@ -407,15 +427,36 @@ function StationShell({
       {LIVE_STATION_SLUGS.has(meta.slug) ? null : <ModuleGuideBanner slug={meta.slug} locale={locale} defaultOpen={defaultOpenGuide()} />}
       <div className="flex-1 text-sm text-white/80">{localizeReactTree(children, locale)}</div>
       {LIVE_STATION_SLUGS.has(meta.slug) ? null : (
-        <footer className="flex flex-wrap gap-2 border-t border-white/10 pt-3">
-          <button type="button" className={BTN_PRIMARY} onClick={onExample}>
-            {COPY[locale].loadExample}
+        <footer className="mt-1 flex flex-wrap gap-2 border-t border-white/10 pt-3">
+          <button
+            type="button"
+            data-testid="station-load-example"
+            className={BTN_PRIMARY}
+            onClick={() => {
+              onExample();
+              setNote(t(locale, "🔄 Datos de prueba cargados.", "🔄 Test data loaded.", "🔄 Dados de teste carregados."));
+            }}
+          >
+            🔄 {t(locale, "Cargar Datos de Prueba", "Load Test Data", "Carregar Dados de Teste")}
           </button>
-          <button type="button" className={BTN} onClick={() => onSave(meta.slug, rows)}>
-            {t(locale, "Guardar reporte", "Save report", "Salvar relatório")}
+          <button
+            type="button"
+            data-testid="station-save-report"
+            className={BTN}
+            onClick={() => {
+              onSave(meta.slug, rows);
+              setNote(t(locale, "📥 Guardado en la Bóveda Local.", "📥 Saved to the Local Vault.", "📥 Salvo na Cofre Local."));
+            }}
+          >
+            📥 {t(locale, "Guardar en Bóveda Local", "Save to Local Vault", "Salvar no Cofre Local")}
           </button>
         </footer>
       )}
+      {note ? (
+        <p role="status" data-testid="station-toast" className="vos-toast">
+          {note}
+        </p>
+      ) : null}
     </article>
   );
 }
@@ -2713,6 +2754,18 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         </span>
         <button
           type="button"
+          data-testid="focus-mode-toggle"
+          aria-pressed={focusMode}
+          onClick={() => {
+            setFocusMode((previous) => !previous);
+            triggerCourtHaptics(10);
+          }}
+          className={BTN}
+        >
+          🎯 {t(locale, "Modo Concentración", "Focus Mode", "Modo Foco")}
+        </button>
+        <button
+          type="button"
           data-testid="score-edit-open"
           aria-expanded={editingScore !== null}
           className={BTN}
@@ -3687,23 +3740,10 @@ ${name}` : name))} testId="cancha-player-chips" />
         </div>
       ) : null}
       {moreOpen ? (
-        <div
-          data-testid="cancha-more-drawer"
-          className="fixed bottom-20 left-1/2 z-30 max-h-[60vh] w-[min(94vw,28rem)] -translate-x-1/2 space-y-2 overflow-y-auto rounded-2xl border border-white/15 bg-obsidian/95 p-3 shadow-2xl backdrop-blur"
-        >
+        <div data-testid="cancha-more-drawer" className="mb-2 space-y-2">
+          <section className="vos-item-card" data-testid="drawer-match-controls">
+            <p className="vos-card-title">🛠️ {t(locale, "Control de Partido y Equipos", "Match & Team Control", "Controle de Partida e Equipes")}</p>
           <div className="flex flex-wrap gap-1">
-            <button
-              type="button"
-              data-testid="focus-mode-toggle"
-              aria-pressed={focusMode}
-              onClick={() => {
-                setFocusMode((previous) => !previous);
-                triggerCourtHaptics(10);
-              }}
-              className={BTN}
-            >
-              🎯 {t(locale, "Modo Concentración", "Focus Mode", "Modo Foco")}
-            </button>
             <button
               type="button"
               data-testid="oled-theme-toggle"
@@ -3753,6 +3793,9 @@ ${name}` : name))} testId="cancha-player-chips" />
               </button>
             ))}
           </div>
+          </section>
+          <section className="vos-item-card" data-testid="drawer-judge-and-bench">
+            <p className="vos-card-title">⚖️ {t(locale, "El Juez y Rotador de Banco", "Referee & Bench Rotator", "O Juiz e Rodízio de Banco")}</p>
           <div className="space-y-1 rounded-xl border border-white/10 bg-white/5 p-2 text-[10px] text-white/70">
             <div className="flex flex-wrap items-center gap-1">
               <span className="font-bold uppercase tracking-wider text-white/60">{t(locale, "Rotación 5-1", "5-1 Rotation", "Rotação 5-1")}:</span>
@@ -3839,6 +3882,9 @@ ${name}` : name))} testId="cancha-player-chips" />
               />
             </div>
           </div>
+          </section>
+          <section className="vos-item-card" data-testid="drawer-scouting-and-diagnostics">
+            <p className="vos-card-title">📊 {t(locale, "Scouting .DVW y Diagnóstico", "Scouting .DVW & Diagnostics", "Scouting .DVW e Diagnóstico")}</p>
           {/* 15-second timeout diagnostic: 1 problem + 2 evidences + 1 action, zero NaN */}
           <div data-testid="timeout-diagnostic-card" className="space-y-1 rounded-xl border p-2 text-[10px] text-white/80" style={{ borderColor: "rgba(225, 29, 72, 0.55)", background: "rgba(225, 29, 72, 0.10)", fontVariantNumeric: "tabular-nums" }}>
             <p className="font-black uppercase tracking-wider text-crimson">⏱️ {t(locale, "Sacada de 15s", "15s Timeout Card", "Sacada de 15s")}</p>
@@ -3872,6 +3918,7 @@ ${name}` : name))} testId="cancha-player-chips" />
               <li>{t(locale, `Efic. ataque ${fmtPct(statsA.efficiency)} · errores ${statsA.errors + statsB.errors}`, `Attack eff. ${fmtPct(statsA.efficiency)} · errors ${statsA.errors + statsB.errors}`, `Efic. ataque ${fmtPct(statsA.efficiency)} · erros ${statsA.errors + statsB.errors}`)}</li>
             </ul>
           </div>
+          </section>
         </div>
       ) : null}
       {hubOpen ? (
@@ -4708,7 +4755,7 @@ export function VarStation({ meta, locale, onSave }: StationProps) {
       </label>
       <div className="mt-2 rounded-xl border border-white/10 bg-obsidian/60 p-3">
         <p className="text-xs font-bold text-volt">{decision.title}</p>
-        <p className="mt-1 text-[11px] text-crimson">{decision.verdict}</p>
+        <p className="mt-1 text-[11px] text-crimson">{translateEnum(decision.verdict, locale)}</p>
         <p className="mt-1 text-[10px] text-white/60">{decision.explanation}</p>
         <p className="mt-1 text-[10px] font-mono text-emerald">{decision.citation}</p>
       </div>
@@ -4943,7 +4990,7 @@ export function TempoStation({ meta, locale, onSave }: StationProps) {
         <span className={LABEL}>Offset: {offset} ms</span>
         <input className="mt-1 w-full accent-crimson" type="range" min={-300} max={500} step={5} value={offset} onChange={(event) => setOffset(Number(event.target.value))} />
       </label>
-      <p className={`mt-1 text-xs font-bold ${timing.status === "PERFECT" ? "text-emerald" : "text-crimson"}`}>{timing.status} · {timing.message}</p>
+      <p className={`mt-1 text-xs font-bold ${timing.status === "PERFECT" ? "text-emerald" : "text-crimson"}`}>{translateEnum(timing.status, locale)} · {timing.message}</p>
     </StationShell>
   );
 }
@@ -5765,7 +5812,7 @@ export function SubstitutionTrackerStation({ meta, locale, onSave }: StationProp
         {report.events.map((event) => (
           <div key={event.index} className={`rounded-lg px-2 py-1 text-[10px] ${event.status === "LEGAL" ? "bg-emerald/10 text-emerald" : "bg-crimson/10 text-crimson"}`}>
             <p className="font-bold">
-              {event.team} · P{event.position} · #{event.outNumber} → #{event.inNumber} · {event.status.replaceAll("_", " ")}
+              {event.team} · P{event.position} · #{event.outNumber} → #{event.inNumber} · {translateEnum(event.status, locale)}
             </p>
             <p className="text-white/60">{event.reason} · {t(locale, "quedan", "left", "restam")} {event.remainingSubs}</p>
           </div>
@@ -6292,7 +6339,7 @@ export function MomentumCoachStation({ meta, locale, onSave }: StationProps) {
       </div>
       <p className="mt-2 rounded-lg border border-white/10 bg-obsidian/60 px-2 py-2 text-[11px] text-white/70">{report.message}</p>
       <p className="mt-1 text-[10px] text-white/40">
-        {report.recommendation} · {t(locale, "peor rotación", "worst rotation", "pior rotação")}: {report.worstRotation ?? "-"}
+        {translateEnum(report.recommendation, locale)} · {t(locale, "peor rotación", "worst rotation", "pior rotação")}: {report.worstRotation ?? "-"}
       </p>
     </StationShell>
   );
@@ -6820,13 +6867,13 @@ export function PlayerCareerStation({ meta, locale, onSave }: StationProps) {
     <StationShell meta={meta} locale={locale} rows={2} onSave={onSave} onExample={() => undefined}>
       <div className="grid grid-cols-3 gap-2">
         <Metric label="Index" value={`${report.evolutionIndex}/100`} tone="text-volt" />
-        <Metric label={t(locale, "Categoría", "Category", "Categoria")} value={report.category.replaceAll("_", " ")} tone="text-emerald" />
+        <Metric label={t(locale, "Categoría", "Category", "Categoria")} value={translateEnum(report.category, locale)} tone="text-emerald" />
         <Metric label={t(locale, "Cuello", "Bottleneck", "Gargalo")} value={report.bottleneck} tone="text-crimson" />
       </div>
       <div className="mt-3 grid grid-cols-2 gap-1 text-[11px]">
         {Object.entries(report.deltas).map(([key, value]) => (
           <span key={key} className="flex justify-between rounded bg-white/5 px-2 py-1">
-            <span className="text-white/55">{key}</span>
+            <span className="text-white/55">{formatModuleOutputKey(key, locale)}</span>
             <span className={value >= 0 ? "text-emerald" : "text-crimson"}>{value > 0 ? "+" : ""}{value}</span>
           </span>
         ))}
@@ -7687,7 +7734,7 @@ export function PlaybookAnimatorStation({ meta, locale, onSave }: StationProps) 
         </button>
         {report.phases.map((frame) => (
           <button key={frame.phase} type="button" className={`${BTN} ${index === frame.order - 1 ? "border-volt text-volt" : ""}`} onClick={() => setIndex(frame.order - 1)}>
-            {frame.phase}
+            {translateEnum(frame.phase, locale)}
           </button>
         ))}
       </div>
@@ -8009,10 +8056,20 @@ export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
     const overrides: Record<string, unknown> = {};
     for (const def of paramDefs) {
       const raw = paramValues[def.key] ?? def.def;
-      if (def.kind === "number") overrides[def.key] = Number(raw);
-      else if (def.kind === "boolean") overrides[def.key] = raw === "true";
-      else if (def.kind === "numberlist") overrides[def.key] = raw.split(",").map((part) => Number(part.trim())).filter((value) => Number.isFinite(value));
-      else overrides[def.key] = raw;
+      if (def.kind === "number") {
+        // v11.1.0 — a cleared field means zero, never NaN/Infinity downstream.
+        const parsed = Number(raw);
+        const finite = Number.isFinite(parsed) ? parsed : 0;
+        const lower = typeof def.min === "number" ? def.min : -Infinity;
+        const upper = typeof def.max === "number" ? def.max : Infinity;
+        overrides[def.key] = Math.min(upper, Math.max(lower, finite));
+      } else if (def.kind === "boolean") overrides[def.key] = raw === "true";
+      else if (def.kind === "numberlist") {
+        const list = Array.isArray(raw) ? raw : raw.split(",");
+        overrides[def.key] = list
+          .map((part) => Number(String(part).trim()))
+          .filter((value) => Number.isFinite(value));
+      } else overrides[def.key] = raw;
     }
     try {
       const value = builder(overrides);
@@ -8035,7 +8092,7 @@ export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
           <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
             {paramDefs.map((def) => (
               <label key={def.key} className="block">
-                <span className="block text-[9px] font-bold uppercase tracking-wider text-white/40">{def.key}</span>
+                <span className="block text-[9px] font-bold uppercase tracking-wider text-white/50">{translateInputLabel(def.key, locale)}</span>
                 {def.kind === "boolean" ? (
                   <button
                     type="button"
@@ -8301,28 +8358,9 @@ export function GymScreenStation({ meta, locale, onSave }: StationProps) {
   );
 }
 
-/** v11.0.4 — engine keys become coach words; never a raw camelCase dump. */
-const OUTPUT_KEY_LABELS: Record<string, [string, string, string]> = {
-  systems: ["Sistemas", "Systems", "Sistemas"],
-  recommended: ["Recomendado", "Recommended", "Recomendado"],
-  infiltrationMap: ["Mapa de infiltración", "Infiltration map", "Mapa de infiltração"],
-  message: ["Mensaje", "Message", "Mensagem"],
-  frontAttackersByRotation: ["Atacantes frontales por rotación", "Front attackers by rotation", "Atacantes de rede por rodízio"],
-  status: ["Estado", "Status", "Estado"],
-  priority: ["Prioridad", "Priority", "Prioridade"],
-  drills: ["Ejercicios", "Drills", "Exercícios"],
-  warnings: ["Advertencias", "Warnings", "Avisos"],
-  name: ["Nombre", "Name", "Nome"],
-  description: ["Descripción", "Description", "Descrição"],
-};
-
+/** v11.1.0 — every engine key has an ES/EN/PT label; no raw identifiers. */
 export function formatModuleOutputKey(key: string, locale: Locale): string {
-  const hit = OUTPUT_KEY_LABELS[key];
-  if (hit) return t(locale, hit[0], hit[1], hit[2]);
-  return key
-    .replace(/_/g, " ")
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/^./, (char) => char.toUpperCase());
+  return translateOutputKey(key, locale) ?? humanizeKey(key);
 }
 
 const OUTPUT_CARD_STYLE: CSSProperties = {
@@ -8332,8 +8370,22 @@ const OUTPUT_CARD_STYLE: CSSProperties = {
 
 /** Recursive visual formatter: arrays/maps become mini-card grids, never JSON. */
 export function formatModuleOutputValue(key: string, value: unknown, locale: Locale): ReactNode {
-  if (value === null || value === undefined || typeof value !== "object") {
-    return <span className="text-white/85">{String(value)}</span>;
+  if (value === null || value === undefined) {
+    return <span className="text-white/45">—</span>;
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return <span className="text-white/45">—</span>;
+    const rounded = Math.round(value * 100) / 100;
+    return <span className="text-white/85 tabular-nums">{String(rounded)}</span>;
+  }
+  if (typeof value === "boolean") {
+    return <span className="text-white/85">{t(locale, value ? "Sí" : "No", value ? "Yes" : "No", value ? "Sim" : "Não")}</span>;
+  }
+  if (typeof value === "string") {
+    if (key === "status" || key === "regime" || key === "tier" || key === "riskLevel" || key === "priority" || key === "phase" || key === "mode" || key === "waveform" || key === "event" || key === "outcome" || key === "skill" || key === "primaryDefender" || key === "regime") {
+      return <span className="text-white/85">{translateEnum(value, locale)}</span>;
+    }
+    return <span className="text-white/85">{translateEnum(value, locale)}</span>;
   }
   if (Array.isArray(value)) {
     if (value.every((item) => item === null || typeof item !== "object")) {

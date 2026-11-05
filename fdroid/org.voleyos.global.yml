@@ -17,9 +17,9 @@ Repo: https://github.com/v0idbrn/VoleyOS.git
 AntiFeatures:
 
 Builds:
-  - versionName: 11.0.5
-    versionCode: 1105
-    commit: v11.0.5
+  - versionName: 11.1.0
+    versionCode: 1110
+    commit: v11.1.0
     subdir: android/app
     sudo: false
     gradle:
