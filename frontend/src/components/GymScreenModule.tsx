@@ -15,6 +15,10 @@ interface GymScreenModuleProps {
 export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
   const [payload, setPayload] = useState<typeof DEFAULT_GYM_PAYLOAD>(DEFAULT_GYM_PAYLOAD);
   const [swapped, setSwapped] = useState(false);
+  const [nameA, setNameA] = useState(t(locale, "EQUIPO A", "TEAM A", "EQUIPE A"));
+  const [nameB, setNameB] = useState(t(locale, "EQUIPO B", "TEAM B", "EQUIPE B"));
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -24,6 +28,40 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
       onClose();
       return;
     }
+  }, []);
+
+  // v11.0.5 — a real running clock, not a one-tap-per-second button.
+  useEffect(() => {
+    if (!timerRunning) return undefined;
+    const interval = window.setInterval(() => {
+      setPayload((current) => ({ ...current, timer: tick(current.timer) }));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [timerRunning]);
+
+  const toggleFullscreen = useCallback(async (): Promise<void> => {
+    const element = rootRef.current;
+    if (element && typeof element.requestFullscreen === "function") {
+      try {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+          setFullscreen(false);
+        } else {
+          await element.requestFullscreen();
+          setFullscreen(true);
+        }
+        return;
+      } catch {
+        /* fall through to the CSS overlay */
+      }
+    }
+    setFullscreen((current) => !current);
+  }, []);
+
+  useEffect(() => {
+    const onFsChange = (): void => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
 
   const bump = useCallback((key: keyof typeof payload, delta: number) => {
@@ -37,15 +75,24 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
     });
   }, []);
 
+  const timerMinutes = (): number => {
+    const parts = payload.timer.split(":").map((value) => Number(value));
+    return (parts[0] ?? 0) * 60 + (parts[1] ?? 0);
+  };
+  const setTimerMinutes = (total: number): void => {
+    const clamped = Math.max(0, total);
+    setPayload((current) => ({ ...current, timer: `${String(Math.floor(clamped / 60)).padStart(2, "0")}:${String(clamped % 60).padStart(2, "0")}` }));
+  };
+
   return (
     <div
       ref={rootRef}
       role="dialog"
       aria-modal="true"
       aria-label={t(locale, "Pantalla Gigante de Gimnasio", "Gym Giant Screen", "Tela Gigante do Ginásio")}
-      className="fixed inset-0 z-50 grid place-items-center bg-obsidian/95 p-4"
+      className={`${fullscreen ? "fixed inset-0 z-[9995]" : "fixed inset-0 z-50"} overflow-y-auto bg-obsidian/95 p-4`}
     >
-      <div className="w-full max-w-5xl rounded-3xl border border-white/10 bg-panel p-6 shadow-2xl shadow-black/60">
+      <div className={`mx-auto flex min-h-full w-full max-w-5xl flex-col rounded-3xl border border-white/10 bg-panel p-6 shadow-2xl shadow-black/60 ${fullscreen ? "justify-center" : ""}`}>
         <div className="flex items-center justify-between">
           <p className="text-[10px] font-black uppercase tracking-[0.24em] text-crimson">
             Módulo
@@ -59,11 +106,15 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
           </button>
         </div>
 
-        <div className="mt-6 grid aspect-video max-h-[70vh] grid-cols-3 gap-6">
+        <div className="mt-6 grid grid-cols-3 gap-6">
           <div className="flex flex-col items-center gap-3">
-            <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
-              {swapped ? t(locale, "Equipo B", "Team B", "Equipe B") : t(locale, "Equipo A", "Team A", "Equipe A")}
-            </p>
+            <input
+              type="text"
+              value={swapped ? nameB : nameA}
+              onChange={(event) => (swapped ? setNameB(event.target.value) : setNameA(event.target.value))}
+              aria-label={swapped ? t(locale, "Nombre Equipo B", "Team B name", "Nome Equipe B") : t(locale, "Nombre Equipo A", "Team A name", "Nome Equipe A")}
+              className="w-full max-w-56 rounded-lg border border-white/15 bg-transparent px-2 py-1 text-center text-[11px] font-black uppercase tracking-widest text-white/70 outline-none focus:border-volt"
+            />
             <p className="text-8xl font-black text-crimson tabular-nums">{swapped ? payload.scoreB : payload.scoreA}</p>
             <p className="text-xl font-bold text-volt">Sets {swapped ? payload.setB : payload.setA}</p>
             <div className="flex gap-2">
@@ -86,6 +137,42 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
 
           <div className="flex flex-col items-center justify-center gap-3">
             <p className="text-7xl font-black text-white tabular-nums">{payload.timer}</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                data-testid="gym-timer-toggle-btn"
+                aria-pressed={timerRunning}
+                onClick={() => setTimerRunning((current) => !current)}
+                className="tap h-12 rounded-full bg-volt/20 px-4 text-xl font-black text-volt hover:bg-volt/40"
+              >
+                {timerRunning ? "⏸️" : "▶️"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimerMinutes(timerMinutes() + 60)}
+                className="tap h-12 rounded-full bg-white/10 px-3 text-[11px] font-black text-white/80"
+              >
+                +1 Min
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTimerRunning(false);
+                  setTimerMinutes(0);
+                }}
+                className="tap h-12 rounded-full bg-crimson/20 px-3 text-[11px] font-black text-crimson"
+              >
+                ↺ Reset
+              </button>
+            </div>
+            <button
+              type="button"
+              data-testid="gym-fullscreen-btn"
+              onClick={() => void toggleFullscreen()}
+              className="tap rounded-2xl bg-white/10 px-4 py-2 text-[11px] font-black uppercase tracking-wider text-white/80 hover:bg-white/20"
+            >
+              ⛶ {t(locale, "Pantalla Completa (TV / Proyector)", "Fullscreen (TV / Projector)", "Tela Cheia (TV / Projetor)")}
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -96,28 +183,16 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
             >
               🔄 {t(locale, "Cambio de Cancha", "Swap Sides", "Troca de Lado")}
             </button>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setPayload((current) => ({ ...current, timer: tick(current.timer) }))}
-                className="tap h-12 w-12 rounded-full bg-white/10 text-white/70 text-xl font-black"
-              >
-                ⏱
-              </button>
-              <button
-                type="button"
-                onClick={() => setPayload((current) => ({ ...current, timer: "00:00" }))}
-                className="tap h-12 w-12 rounded-full bg-crimson/20 text-crimson text-xl font-black"
-              >
-                Reset
-              </button>
-            </div>
           </div>
 
           <div className="flex flex-col items-center gap-3">
-            <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
-              {swapped ? t(locale, "Equipo A", "Team A", "Equipe A") : t(locale, "Equipo B", "Team B", "Equipe B")}
-            </p>
+            <input
+              type="text"
+              value={swapped ? nameA : nameB}
+              onChange={(event) => (swapped ? setNameA(event.target.value) : setNameB(event.target.value))}
+              aria-label={swapped ? t(locale, "Nombre Equipo A", "Team A name", "Nome Equipe A") : t(locale, "Nombre Equipo B", "Team B name", "Nome Equipe B")}
+              className="w-full max-w-56 rounded-lg border border-white/15 bg-transparent px-2 py-1 text-center text-[11px] font-black uppercase tracking-widest text-white/70 outline-none focus:border-volt"
+            />
             <p className="text-8xl font-black text-crimson tabular-nums">{swapped ? payload.scoreA : payload.scoreB}</p>
             <p className="text-xl font-bold text-volt">Sets {swapped ? payload.setA : payload.setB}</p>
             <div className="flex gap-2">

@@ -1,0 +1,4 @@
+🔒 Modo Pro ahora exige licencia real: la web/APK pública muestra 🔒 PRO y el modal de activación hasta ingresar una clave VOS-PRO vinculada al dispositivo.
+📊 Monitor ACWR: 7 campos editables de saltos diarios y carga crónica, con carga aguda, ratio y zona en vivo.
+🎯 Matriz de Cruces 6x6 totalmente interactiva; nunca repite la misma rotación como mejor y peor.
+🏐 Pantalla de gimnasio: nombres editables, reloj play/pausa y pantalla completa real.

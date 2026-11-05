@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -22,6 +22,7 @@ import {
   TTS_TOAST_EVENT,
 } from "@/lib/sound-effects";
 import { announceScoreTTS, isMatchActive, persistLiveScoreboard, persistTtsEnabled, readLiveScoreboard, TTS_ENABLED_EVENT, triggerCourtHaptics } from "@/lib/court-ux";
+import { isUserProEntitled } from "@/lib/pro-entitlement";
 import { clearClonedScoreboard, createQrFrames, emptyIngest, ingestQrFrame, readClonedScoreboard, renderQrSvg, storeClonedScoreboard, type IngestResult, type QrFrame } from "@/lib/qr-transfer";
 import { localizeReactTree } from "@/lib/engine-l10n";
 import { COPY, t } from "@/lib/i18n";
@@ -3442,7 +3443,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         </button>
       </nav>
 
-      {(uiMode === "pro" || moreOpen) && !isTableLandscapeMode ? (
+      {(uiMode === "pro" || (moreOpen && isUserProEntitled())) && !isTableLandscapeMode ? (
         <div className="vos-item-card mb-2 space-y-2" data-testid="dvw-courtside-console">
           <p className="text-[10px] font-black uppercase tracking-wider text-white/60">
             ⌨️{" "}
@@ -4961,20 +4962,104 @@ export function AcwrStation({ meta, locale, onSave }: StationProps) {
   useEffect(() => {
     window.localStorage.setItem("volleyos.acwrLoad", String(load));
   }, [load]);
-  const days = useMemo(() => acwrDays(load), [load]);
-  const report = useMemo(() => jumpLoad(days), [days]);
+  // v11.0.5 — the last 7 days are directly editable; presets regenerate them.
+  const [dayJumps, setDayJumps] = useState<number[]>(() => acwrDays(load).slice(-7).map((day) => day.jumps));
+  const [chronicOverride, setChronicOverride] = useState<number | null>(null);
+  const applyPreset = (value: number): void => {
+    setLoad(value);
+    setDayJumps(acwrDays(value).slice(-7).map((day) => day.jumps));
+  };
+  const setDay = (index: number, value: number): void => {
+    setDayJumps((current) => current.map((jumps, position) => (position === index ? value : jumps)));
+  };
+  const baseDays = useMemo(() => acwrDays(load), [load]);
+  const days = useMemo(() => {
+    const tail = baseDays.slice(-7);
+    return [...baseDays.slice(0, baseDays.length - 7), ...dayJumps.map((jumps, index) => ({ date: tail[index]?.date ?? "", jumps }))];
+  }, [baseDays, dayJumps]);
+  const engineReport = useMemo(() => jumpLoad(days), [days]);
+  // With a chronic override the ratio/zone are computed locally; the engine
+  // keeps handling the pure case so both paths stay auditable.
+  const report = useMemo(() => {
+    if (chronicOverride === null || chronicOverride <= 0) return engineReport;
+    const ratio = engineReport.acute / chronicOverride;
+    const zone =
+      ratio < 0.8
+        ? t(locale, "SUBCARGA", "UNDERLOAD", "SUBCARGA")
+        : ratio <= 1.3
+          ? t(locale, "ZONA ÓPTIMA SEGURA", "OPTIMAL SAFE ZONE", "ZONA ÓTIMA SEGURA")
+          : ratio <= 1.49
+            ? t(locale, "PRECAUCIÓN", "CAUTION", "PRECAUÇÃO")
+            : t(locale, "RIESGO ALTO DE LESIÓN", "HIGH INJURY RISK", "ALTO RISCO DE LESÃO");
+    const color = ratio < 0.8 ? "amber" : ratio <= 1.3 ? "emerald" : ratio <= 1.49 ? "amber" : "crimson";
+    return {
+      ...engineReport,
+      chronicWeekly: chronicOverride,
+      ratio: Math.round(ratio * 100) / 100,
+      zone,
+      color: color as typeof engineReport.color,
+      recommendation:
+        ratio >= 1.5
+          ? t(locale, "Reducí la carga aguda esta semana.", "Reduce acute load this week.", "Reduza a carga aguda esta semana.")
+          : ratio < 0.8
+            ? t(locale, "Aumentá gradualmente el volumen.", "Increase volume gradually.", "Aumente o volume gradualmente.")
+            : t(locale, "Mantené la progresión actual.", "Keep the current progression.", "Mantenha a progressão atual."),
+    };
+  }, [chronicOverride, engineReport, locale]);
   const tone = report.color === "emerald" ? "text-emerald" : report.color === "amber" ? "text-volt" : "text-crimson";
   const bg = report.color === "emerald" ? "bg-emerald" : report.color === "amber" ? "bg-volt" : "bg-crimson";
 
   return (
-    <StationShell meta={meta} locale={locale} rows={28} onSave={onSave} onExample={() => setLoad(185)}>
+    <StationShell meta={meta} locale={locale} rows={28} onSave={onSave} onExample={() => applyPreset(185)}>
       <div className="flex items-center gap-2">
         {[{ label: t(locale, "Suave", "Light", "Leve"), value: 110 }, { label: t(locale, "Carga", "Load", "Carga"), value: 150 }, { label: t(locale, "Alta", "High", "Alta"), value: 185 }].map((option) => (
-          <button key={option.value} type="button" onClick={() => setLoad(option.value)} className={`rounded-lg border px-2 py-1 text-[10px] font-bold ${load === option.value ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>
+          <button key={option.value} type="button" onClick={() => applyPreset(option.value)} className={`rounded-lg border px-2 py-1 text-[10px] font-bold ${load === option.value ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>
             {option.label}
           </button>
         ))}
       </div>
+      <div className="mt-2 grid grid-cols-7 gap-1">
+        {dayJumps.map((jumps, index) => (
+          <label key={index} className="block text-center">
+            <span className="block text-[9px] font-bold uppercase tracking-wider text-white/40">{t(locale, `Día ${index + 1}`, `Day ${index + 1}`, `Dia ${index + 1}`)}</span>
+            <input
+              type="number"
+              min={0}
+              max={500}
+              data-testid={`acwr-day-input-${index}`}
+              value={jumps}
+              onChange={(event) => setDay(index, Math.max(0, Math.min(500, Number(event.target.value) || 0)))}
+              className="w-full rounded-lg border border-white/15 bg-obsidian px-1 py-1 text-center text-[11px] font-bold text-white outline-none focus:border-volt"
+            />
+          </label>
+        ))}
+      </div>
+      <label className="mt-2 block">
+        <span className="text-[9px] font-bold uppercase tracking-wider text-white/40">{t(locale, "Carga Crónica Semanal (Promedio 4 semanas)", "Weekly Chronic Load (4-week average)", "Carga Crônica Semanal (Média 4 semanas)")}</span>
+        <div className="mt-1 flex items-center gap-2">
+          <input
+            type="range"
+            min={100}
+            max={2000}
+            step={5}
+            value={chronicOverride ?? Math.round(engineReport.chronicWeekly)}
+            onChange={(event) => setChronicOverride(Number(event.target.value))}
+            className="flex-1"
+          />
+          <input
+            type="number"
+            min={100}
+            max={2000}
+            data-testid="acwr-chronic-input"
+            value={chronicOverride ?? Math.round(engineReport.chronicWeekly)}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              setChronicOverride(Number.isFinite(value) ? Math.max(100, Math.min(2000, value)) : null);
+            }}
+            className="w-20 rounded-lg border border-white/15 bg-obsidian px-2 py-1 text-center text-[11px] font-bold text-white outline-none focus:border-volt"
+          />
+        </div>
+      </label>
       <div className="mt-2 grid grid-cols-3 gap-2">
         <Metric label="Aguda 7d" value={String(report.acute)} />
         <Metric label={t(locale, "Crónica", "Chronic", "Crônica")} value={report.chronicWeekly.toFixed(1)} />
@@ -6522,10 +6607,51 @@ const MATCHUP_ATTACK = [90, 72, 64, 58, 46, 38];
 const MATCHUP_BLOCK = [52, 58, 64, 70, 76, 82];
 
 export function MatchupMatrixStation({ meta, locale, onSave }: StationProps) {
-  const report = useMemo(() => matchupMatrix({ opponentAttack: MATCHUP_ATTACK, ownBlock: MATCHUP_BLOCK }), []);
+  // v11.0.5 — fully editable: per-rotation block power vs attack threat.
+  const [ownBlock, setOwnBlock] = useState<number[]>([...MATCHUP_BLOCK]);
+  const [opponentAttack, setOpponentAttack] = useState<number[]>([...MATCHUP_ATTACK]);
+  const report = useMemo(() => matchupMatrix({ opponentAttack, ownBlock }), [opponentAttack, ownBlock]);
+  const setAt = (setter: (next: number[]) => void, current: number[]) => (index: number, value: number) => {
+    setter(current.map((entry, position) => (position === index ? value : entry)));
+  };
+  const setBlock = setAt((next) => setOwnBlock(next), ownBlock);
+  const setAttack = setAt((next) => setOpponentAttack(next), opponentAttack);
   return (
-    <StationShell meta={meta} locale={locale} rows={6} onSave={onSave} onExample={() => undefined}>
-      <div className="grid grid-cols-3 gap-2">
+    <StationShell meta={meta} locale={locale} rows={6} onSave={onSave} onExample={() => { setOwnBlock([...MATCHUP_BLOCK]); setOpponentAttack([...MATCHUP_ATTACK]); }}>
+      <div data-testid="matchup-matrix-editor" className="rounded-xl border border-white/10 bg-obsidian/60 p-2">
+        <div className="grid grid-cols-6 gap-1">
+          {ownBlock.map((value, index) => (
+            <label key={`block-${index}`} className="block text-center">
+              <span className="block text-[9px] font-bold uppercase tracking-wider text-white/40">🛡️ R{index + 1}</span>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={Math.round(value / 10)}
+                onChange={(event) => setBlock(index, Math.max(1, Math.min(10, Number(event.target.value) || 1)) * 10)}
+                className="w-full rounded-lg border border-white/15 bg-obsidian px-1 py-1 text-center text-[11px] font-bold text-white outline-none focus:border-volt"
+              />
+            </label>
+          ))}
+        </div>
+        <div className="mt-1 grid grid-cols-6 gap-1">
+          {opponentAttack.map((value, index) => (
+            <label key={`attack-${index}`} className="block text-center">
+              <span className="block text-[9px] font-bold uppercase tracking-wider text-white/40">⚔️ R{index + 1}</span>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={Math.round(value / 10)}
+                onChange={(event) => setAttack(index, Math.max(1, Math.min(10, Number(event.target.value) || 1)) * 10)}
+                className="w-full rounded-lg border border-white/15 bg-obsidian px-1 py-1 text-center text-[11px] font-bold text-white outline-none focus:border-volt"
+              />
+            </label>
+          ))}
+        </div>
+        <p className="mt-1 text-[9px] text-white/40">🛡️ {t(locale, "Poder de bloqueo 1-10 por rotación", "Block power 1-10 per rotation", "Poder de bloqueio 1-10 por rodízio")} · ⚔️ {t(locale, "Amenaza de ataque rival 1-10", "Opponent attack threat 1-10", "Ameaça de ataque rival 1-10")}</p>
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2">
         <Metric label={t(locale, "Mejor inicio", "Best start", "Melhor inicio")} value={report.bestStartingRotation} tone="text-emerald" />
         <Metric label={t(locale, "Evitar", "Avoid", "Evitar")} value={report.worstStartingRotation} tone="text-crimson" />
         <Metric label="Top rival" value={`R${report.topAttackerIndex + 1}`} tone="text-volt" />
@@ -7727,44 +7853,214 @@ function ReactionDrill({ locale }: { locale: Locale }) {
   );
 }
 
+/** v11.0.5 — every preview engine is live-editable through this param table. */
+type PreviewParamDef =
+  | { key: string; kind: "number"; def: string; min?: number; max?: number; step?: number }
+  | { key: string; kind: "text"; def: string }
+  | { key: string; kind: "boolean"; def: string }
+  | { key: string; kind: "numberlist"; def: string };
+
+const PREVIEW_PARAMS: Record<string, PreviewParamDef[]> = {
+  "ball-aerodynamics": [
+    { key: "speedKmh", kind: "number", def: "68", min: 0, max: 200, step: 1 },
+    { key: "spinRps", kind: "number", def: "0.8", min: 0, max: 10, step: 0.1 },
+    { key: "launchAngleDeg", kind: "number", def: "12", min: -20, max: 60, step: 1 },
+    { key: "impactHeightM", kind: "number", def: "2.1", min: 0.5, max: 3.5, step: 0.05 },
+  ],
+  "rally-clipper": [
+    { key: "playerNumber", kind: "number", def: "7", min: 1, max: 99 },
+    { key: "minDurationSec", kind: "number", def: "3", min: 1, max: 30 },
+  ],
+  "recruiting-dossier": [
+    { key: "graduationYear", kind: "number", def: "2028", min: 2024, max: 2040 },
+    { key: "position", kind: "text", def: "outside" },
+    { key: "heightCm", kind: "number", def: "188", min: 140, max: 230 },
+    { key: "reachOneHandCm", kind: "number", def: "245", min: 180, max: 300 },
+    { key: "reachTwoHandCm", kind: "number", def: "248", min: 180, max: 300 },
+    { key: "verticalJumpCm", kind: "number", def: "78", min: 20, max: 130 },
+    { key: "attackReachCm", kind: "number", def: "323", min: 200, max: 380 },
+    { key: "kills", kind: "number", def: "280", min: 0, max: 2000 },
+    { key: "attackEfficiencyPct", kind: "number", def: "46", min: 0, max: 100 },
+  ],
+  "system-transition": [
+    { key: "setters", kind: "number", def: "2", min: 1, max: 6 },
+    { key: "pureHitters", kind: "number", def: "5", min: 0, max: 6 },
+    { key: "transitionReadGrade", kind: "number", def: "8", min: 0, max: 10 },
+    { key: "rotation", kind: "number", def: "1", min: 1, max: 6 },
+  ],
+  "deception-reader": [
+    { key: "approachSpeedKmh", kind: "number", def: "19", min: 0, max: 40 },
+    { key: "elbowHeightCm", kind: "number", def: "172", min: 100, max: 230 },
+    { key: "ballFrontOffsetCm", kind: "number", def: "8", min: -30, max: 30 },
+    { key: "setterFrontZoneJump", kind: "boolean", def: "true" },
+    { key: "blockersCommitted", kind: "number", def: "2", min: 0, max: 3 },
+  ],
+  "inclusive-adaptive": [
+    { key: "mode", kind: "text", def: "sitting" },
+    { key: "sex", kind: "text", def: "male" },
+    { key: "players", kind: "number", def: "6", min: 2, max: 12 },
+  ],
+  "elo-ranking": [
+    { key: "teamARating", kind: "number", def: "1820", min: 800, max: 3000 },
+    { key: "teamBRating", kind: "number", def: "1760", min: 800, max: 3000 },
+    { key: "kWeight", kind: "number", def: "40", min: 8, max: 80 },
+    { key: "result", kind: "text", def: "3-1" },
+  ],
+  "team-treasury": [
+    { key: "jerseyCostTotal", kind: "number", def: "360", min: 0, max: 100000 },
+    { key: "monthlyFeePerPlayer", kind: "number", def: "12.5", min: 0, max: 1000, step: 0.5 },
+    { key: "months", kind: "number", def: "3", min: 1, max: 12 },
+    { key: "ballFund", kind: "number", def: "90", min: 0, max: 100000 },
+    { key: "registrationFee", kind: "number", def: "60", min: 0, max: 100000 },
+  ],
+  "house-rules": [
+    { key: "scoreA", kind: "number", def: "14", min: 0, max: 50 },
+    { key: "scoreB", kind: "number", def: "14", min: 0, max: 50 },
+  ],
+  "arena-dj": [{ key: "event", kind: "text", def: "MONSTER_BLOCK" }],
+  "court-slang": [
+    { key: "term", kind: "text", def: "pipe" },
+    { key: "origin", kind: "text", def: "AR" },
+  ],
+  "qr-sync": [{ key: "matrixSize", kind: "number", def: "21", min: 9, max: 45 }],
+  "fivb-escoresheet": [
+    { key: "substitutions", kind: "number", def: "6", min: 0, max: 12 },
+    { key: "sanctions", kind: "number", def: "2", min: 0, max: 10 },
+  ],
+  "tournament-nutrition": [
+    { key: "weightKg", kind: "number", def: "78", min: 30, max: 160 },
+    { key: "matches", kind: "number", def: "2", min: 1, max: 8 },
+    { key: "minutesPerMatch", kind: "number", def: "90", min: 15, max: 240 },
+    { key: "tempC", kind: "number", def: "31", min: -10, max: 50 },
+    { key: "sweatRateLh", kind: "number", def: "1.1", min: 0, max: 4, step: 0.1 },
+  ],
+  "injury-prehab": [
+    { key: "weeklyJumps", kind: "number", def: "420", min: 0, max: 2000 },
+    { key: "weeklySpikes", kind: "number", def: "260", min: 0, max: 2000 },
+    { key: "sleepHours", kind: "number", def: "6.5", min: 0, max: 14, step: 0.5 },
+    { key: "kneePain", kind: "number", def: "3", min: 0, max: 10 },
+    { key: "shoulderPain", kind: "number", def: "0", min: 0, max: 10 },
+    { key: "priorInjury", kind: "boolean", def: "true" },
+  ],
+  "tiebreak-commander": [
+    { key: "scoreA", kind: "number", def: "13", min: 0, max: 30 },
+    { key: "scoreB", kind: "number", def: "12", min: 0, max: 30 },
+    { key: "serving", kind: "text", def: "A" },
+    { key: "bestOf", kind: "number", def: "3", min: 1, max: 5 },
+    { key: "goldenPoint", kind: "boolean", def: "true" },
+  ],
+  "sponsor-deck": [
+    { key: "impressions", kind: "number", def: "24000", min: 0, max: 10000000 },
+    { key: "reach", kind: "number", def: "8000", min: 0, max: 10000000 },
+    { key: "cpm", kind: "number", def: "12", min: 0, max: 500 },
+    { key: "engagementPct", kind: "number", def: "6", min: 0, max: 100 },
+    { key: "currency", kind: "text", def: "USD" },
+  ],
+  "peripheral-reflex": [{ key: "timesMs", kind: "numberlist", def: "210,195,240,205,220" }],
+  "club-white-label": [
+    { key: "club", kind: "text", def: "Tiburones Voley" },
+    { key: "primary", kind: "text", def: "#0f766e" },
+    { key: "secondary", kind: "text", def: "#111827" },
+    { key: "accent", kind: "text", def: "#f59e0b" },
+  ],
+};
+
+/** Defaults stay in the builders; overrides flow straight into each engine. */
+const PREVIEW_BUILDERS: Record<string, (overrides: Record<string, unknown>) => Record<string, unknown> | Promise<Record<string, unknown>>> = {
+  "ball-aerodynamics": (o) => analyzeAerodynamics({ speedKmh: 68, spinRps: 0.8, launchAngleDeg: 12, impactHeightM: 2.1, ...o } as never) as unknown as Record<string, unknown>,
+  "rally-clipper": (o) => buildClipPlan({ playerNumber: 7, minDurationSec: 3, rallies: [{ startSec: 0, endSec: 4.5, playerNumber: 7, skill: "spike", outcome: "kill" }, { startSec: 5.5, endSec: 10, playerNumber: 7, skill: "ace", outcome: "ace" }], ...o } as never) as unknown as Record<string, unknown>,
+  "recruiting-dossier": (o) => buildRecruitingDossier({ graduationYear: 2028, position: "outside", heightCm: 188, reachOneHandCm: 245, reachTwoHandCm: 248, verticalJumpCm: 78, attackReachCm: 323, kills: 280, attackEfficiencyPct: 46, ...o } as never) as unknown as Promise<Record<string, unknown>>,
+  "system-transition": (o) => analyzeSystem({ setters: 2, pureHitters: 5, transitionReadGrade: 8, rotation: 1, ...o } as never) as unknown as Record<string, unknown>,
+  "deception-reader": (o) => readDeception({ approachSpeedKmh: 19, elbowHeightCm: 172, ballFrontOffsetCm: 8, setterFrontZoneJump: true, blockersCommitted: 2, ...o } as never) as unknown as Record<string, unknown>,
+  "inclusive-adaptive": (o) => buildAdaptiveRulebook({ mode: "sitting", sex: "male", players: 6, ...o } as never) as unknown as Record<string, unknown>,
+  "elo-ranking": (o) => calculateElo({ teamARating: 1820, teamBRating: 1760, kWeight: 40, result: "3-1", ...o } as never) as unknown as Record<string, unknown>,
+  "team-treasury": (o) => buildTreasury({ jerseyCostTotal: 360, monthlyFeePerPlayer: 12.5, months: 3, ballFund: 90, registrationFee: 60, players: [{ name: "Valentina", paid: 80 }, { name: "Carla", paid: 45 }], ...o } as never) as unknown as Record<string, unknown>,
+  "house-rules": (o) => validateHouseRules({ format: "mixed_6v6", teamAGenders: ["M", "F", "M", "F", "M", "F"], teamBGenders: ["F", "M", "F", "M", "F", "M"], benchOrder: ["Ana"], scoreA: 14, scoreB: 14, ...o } as never) as unknown as Record<string, unknown>,
+  "arena-dj": (o) => buildArenaCue({ event: "MONSTER_BLOCK", ...o } as never) as unknown as Record<string, unknown>,
+  "court-slang": (o) => translateSlang({ term: "pipe", origin: "AR", ...o } as never) as unknown as Record<string, unknown>,
+  "qr-sync": (o) => buildQrSync({ kind: "match", payload: { home: "Tiburones", score_a: 24 }, matrixSize: 21, ...o } as never) as unknown as Promise<Record<string, unknown>>,
+  "fivb-escoresheet": (o) => buildScoresheet({ teamA: "Tiburones", teamB: "Cóndores", sets: [{ a: 25, b: 21 }, { a: 23, b: 25 }, { a: 25, b: 19 }, { a: 25, b: 22 }], substitutions: 6, sanctions: 2, ...o } as never) as unknown as Record<string, unknown>,
+  "tournament-nutrition": (o) => planMatchNutrition({ weightKg: 78, matches: 2, minutesPerMatch: 90, tempC: 31, sweatRateLh: 1.1, ...o } as never) as unknown as Record<string, unknown>,
+  "injury-prehab": (o) => assessPrehab({ weeklyJumps: 420, weeklySpikes: 260, sleepHours: 6.5, kneePain: 3, shoulderPain: 0, priorInjury: true, ...o } as never) as unknown as Record<string, unknown>,
+  "tiebreak-commander": (o) => commandTiebreak({ scoreA: 13, scoreB: 12, serving: "A", bestOf: 3, goldenPoint: true, ...o } as never) as unknown as Record<string, unknown>,
+  "bracket-architect": () => buildBracket({ teams: ["Tiburones", "Lobos", "Titanes", "Vinchas", "Piranhas"] }) as unknown as Record<string, unknown>,
+  "sponsor-deck": (o) => buildSponsorDeck({ impressions: 24000, reach: 8000, cpm: 12, engagementPct: 6, currency: "USD", ...o } as never) as unknown as Record<string, unknown>,
+  "head-to-head": () => buildHeadToHead({ teamA: "Tiburones", teamB: "Lobos", matches: [{ setsA: 3, setsB: 1 }, { setsA: 2, setsB: 3 }, { setsA: 3, setsB: 0 }] }) as unknown as Record<string, unknown>,
+  "peripheral-reflex": (o) => scoreReflex({ timesMs: [210, 195, 240, 205, 220], ...o } as never) as unknown as Record<string, unknown>,
+  "club-white-label": (o) => buildWhiteLabel({ club: "Tiburones Voley", primary: "#0f766e", secondary: "#111827", accent: "#f59e0b", ...o } as never) as unknown as Record<string, unknown>,
+};
+
 export function EnginePreviewStation({ meta, locale, onSave }: StationProps) {
   const [report, setReport] = useState<Record<string, unknown> | null>(null);
+  // v11.0.5 — user-edited param values (strings, coerced per param kind).
+  const [paramState, setParamState] = useState<Record<string, Record<string, string>>>({});
+  const paramDefs = PREVIEW_PARAMS[meta.slug] ?? [];
+  const paramValues = paramState[meta.slug] ?? Object.fromEntries(paramDefs.map((def) => [def.key, def.def]));
+  const setParam = (key: string, value: string): void => {
+    setParamState((current) => ({ ...current, [meta.slug]: { ...(current[meta.slug] ?? Object.fromEntries(paramDefs.map((def) => [def.key, def.def]))), [key]: value } }));
+  };
   useEffect(() => {
     let alive = true;
-    const load = async (): Promise<void> => {
-      const previews: Record<string, () => Record<string, unknown> | Promise<Record<string, unknown>>> = {
-        "ball-aerodynamics": () => analyzeAerodynamics({ speedKmh: 68, spinRps: 0.8, launchAngleDeg: 12, impactHeightM: 2.1 }) as unknown as Record<string, unknown>,
-        "rally-clipper": () => buildClipPlan({ playerNumber: 7, minDurationSec: 3, rallies: [{ startSec: 0, endSec: 4.5, playerNumber: 7, skill: "spike", outcome: "kill" }, { startSec: 5.5, endSec: 10, playerNumber: 7, skill: "ace", outcome: "ace" }] }) as unknown as Record<string, unknown>,
-        "recruiting-dossier": () => buildRecruitingDossier({ graduationYear: 2028, position: "outside", heightCm: 188, reachOneHandCm: 245, reachTwoHandCm: 248, verticalJumpCm: 78, attackReachCm: 323, kills: 280, attackEfficiencyPct: 46 }) as unknown as Promise<Record<string, unknown>>,
-        "system-transition": () => analyzeSystem({ setters: 2, pureHitters: 5, transitionReadGrade: 8, rotation: 1 }) as unknown as Record<string, unknown>,
-        "deception-reader": () => readDeception({ approachSpeedKmh: 19, elbowHeightCm: 172, ballFrontOffsetCm: 8, setterFrontZoneJump: true, blockersCommitted: 2 }) as unknown as Record<string, unknown>,
-        "inclusive-adaptive": () => buildAdaptiveRulebook({ mode: "sitting", sex: "male", players: 6 }) as unknown as Record<string, unknown>,
-        "elo-ranking": () => calculateElo({ teamARating: 1820, teamBRating: 1760, kWeight: 40, result: "3-1" }) as unknown as Record<string, unknown>,
-        "team-treasury": () => buildTreasury({ jerseyCostTotal: 360, monthlyFeePerPlayer: 12.5, months: 3, ballFund: 90, registrationFee: 60, players: [{ name: "Valentina", paid: 80 }, { name: "Carla", paid: 45 }] }) as unknown as Record<string, unknown>,
-        "house-rules": () => validateHouseRules({ format: "mixed_6v6", teamAGenders: ["M", "F", "M", "F", "M", "F"], teamBGenders: ["F", "M", "F", "M", "F", "M"], benchOrder: ["Ana"], scoreA: 14, scoreB: 14 }) as unknown as Record<string, unknown>,
-        "arena-dj": () => buildArenaCue({ event: "MONSTER_BLOCK" }) as unknown as Record<string, unknown>,
-        "court-slang": () => translateSlang({ term: "pipe", origin: "AR" }) as unknown as Record<string, unknown>,
-        "qr-sync": () => buildQrSync({ kind: "match", payload: { home: "Tiburones", score_a: 24 }, matrixSize: 21 }) as unknown as Promise<Record<string, unknown>>,
-        "fivb-escoresheet": () => buildScoresheet({ teamA: "Tiburones", teamB: "Cóndores", sets: [{ a: 25, b: 21 }, { a: 23, b: 25 }, { a: 25, b: 19 }, { a: 25, b: 22 }], substitutions: 6, sanctions: 2 }) as unknown as Record<string, unknown>,
-        "tournament-nutrition": () => planMatchNutrition({ weightKg: 78, matches: 2, minutesPerMatch: 90, tempC: 31, sweatRateLh: 1.1 }) as unknown as Record<string, unknown>,
-        "injury-prehab": () => assessPrehab({ weeklyJumps: 420, weeklySpikes: 260, sleepHours: 6.5, kneePain: 3, shoulderPain: 0, priorInjury: true }) as unknown as Record<string, unknown>,
-        "tiebreak-commander": () => commandTiebreak({ scoreA: 13, scoreB: 12, serving: "A", bestOf: 3, goldenPoint: true }) as unknown as Record<string, unknown>,
-        "bracket-architect": () => buildBracket({ teams: ["Tiburones", "Lobos", "Titanes", "Vinchas", "Piranhas"] }) as unknown as Record<string, unknown>,
-        "sponsor-deck": () => buildSponsorDeck({ impressions: 24000, reach: 8000, cpm: 12, engagementPct: 6, currency: "USD" }) as unknown as Record<string, unknown>,
-        "head-to-head": () => buildHeadToHead({ teamA: "Tiburones", teamB: "Lobos", matches: [{ setsA: 3, setsB: 1 }, { setsA: 2, setsB: 3 }, { setsA: 3, setsB: 0 }] }) as unknown as Record<string, unknown>,
-        "peripheral-reflex": () => scoreReflex({ timesMs: [210, 195, 240, 205, 220] }) as unknown as Record<string, unknown>,
-        "club-white-label": () => buildWhiteLabel({ club: "Tiburones Voley", primary: "#0f766e", secondary: "#111827", accent: "#f59e0b" }) as unknown as Record<string, unknown>,
-      };
-      const preview = previews[meta.slug];
-      if (!preview) return;
-      const value = await preview();
-      if (alive) setReport(value);
-    };
-    void load();
+    const builder = PREVIEW_BUILDERS[meta.slug];
+    if (!builder) {
+      setReport(null);
+      return;
+    }
+    const overrides: Record<string, unknown> = {};
+    for (const def of paramDefs) {
+      const raw = paramValues[def.key] ?? def.def;
+      if (def.kind === "number") overrides[def.key] = Number(raw);
+      else if (def.kind === "boolean") overrides[def.key] = raw === "true";
+      else if (def.kind === "numberlist") overrides[def.key] = raw.split(",").map((part) => Number(part.trim())).filter((value) => Number.isFinite(value));
+      else overrides[def.key] = raw;
+    }
+    try {
+      const value = builder(overrides);
+      Promise.resolve(value)
+        .then((result) => {
+          if (alive) setReport(result);
+        })
+        .catch(() => {
+          if (alive) setReport(null);
+        });
+    } catch {
+      if (alive) setReport(null);
+    }
     return () => { alive = false; };
-  }, [meta.slug]);
+  }, [meta.slug, paramValues]);
   return (
-    <StationShell meta={meta} locale={locale} rows={2} onSave={onSave} onExample={() => setReport(null)}>
+    <StationShell meta={meta} locale={locale} rows={2} onSave={onSave} onExample={() => { setParamState((current) => ({ ...current, [meta.slug]: {} })); setReport(null); }}>
+      {paramDefs.length > 0 ? (
+        <div data-testid="module-live-input-panel" className="rounded-xl border border-white/10 bg-obsidian/60 p-2">
+          <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+            {paramDefs.map((def) => (
+              <label key={def.key} className="block">
+                <span className="block text-[9px] font-bold uppercase tracking-wider text-white/40">{def.key}</span>
+                {def.kind === "boolean" ? (
+                  <button
+                    type="button"
+                    aria-pressed={(paramValues[def.key] ?? def.def) === "true"}
+                    onClick={() => setParam(def.key, (paramValues[def.key] ?? def.def) === "true" ? "false" : "true")}
+                    className={`tap w-full rounded-lg border px-2 py-1 text-[11px] font-bold ${(paramValues[def.key] ?? def.def) === "true" ? "border-volt bg-volt/20 text-volt" : "border-white/15 text-white/60"}`}
+                  >
+                    {(paramValues[def.key] ?? def.def) === "true" ? "✓ true" : "✗ false"}
+                  </button>
+                ) : (
+                  <input
+                    type={def.kind === "number" ? "number" : "text"}
+                    min={def.kind === "number" ? def.min : undefined}
+                    max={def.kind === "number" ? def.max : undefined}
+                    step={def.kind === "number" ? def.step : undefined}
+                    value={paramValues[def.key] ?? def.def}
+                    onChange={(event) => setParam(def.key, event.target.value)}
+                    className="w-full rounded-lg border border-white/15 bg-obsidian px-2 py-1 text-[11px] font-bold text-white outline-none focus:border-volt"
+                  />
+                )}
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {report && meta.slug === "arena-dj" ? (
         <button
           type="button"

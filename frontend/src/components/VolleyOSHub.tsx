@@ -6,6 +6,8 @@ import { copyTextUniversal } from "@/lib/security-shield";
 import { LOCALE_NAMES, SHELL, t } from "@/lib/i18n";
 import { awardIndoorPoint, buildTarget, jumpLoad, newScoreboard, paywallEnabled, swapCourt, type Locale, type Profile, type ScoreboardState } from "@/lib/local-engines";
 import { clearCreatorUnlock, creatorUnlocked, matchesCreatorKey, persistCreatorToken } from "@/lib/creator-unlock";
+import { PRO_LICENSE_KEY, isUserProEntitled, proDeviceId } from "@/lib/pro-entitlement";
+import { verifyProLicenseToken } from "@/lib/security-hardening";
 import { clearLicenseToken, unlockCreatorOnServer } from "@/lib/api-client";
 import { EXPERIMENTAL_SLUGS, MODULES, MODULE_BY_SLUG, PROFILE_LABELS, WORKSTATIONS, WORKSTATION_BY_ID, type WorkstationId } from "@/lib/modules";
 import { DIFFICULTY_BADGES, GUIDED_MODES, GUIDED_MODE_BY_ID, type GuidedModeId } from "@/lib/guided-modes";
@@ -266,15 +268,29 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const shell = SHELL[locale];
   const isTestEnv = typeof process !== "undefined" && (process.env.NODE_ENV === "test" || Boolean(process.env.VITEST));
   const [uiMode, setUiMode] = useState<"simple" | "pro">(() => {
-    if (typeof window === "undefined" || isTestEnv) return "pro";
-    const saved = window.localStorage.getItem("volleyos.uiMode");
+    if (typeof window === "undefined") return "pro";
+    // v11.0.5 — a Pro mode stored under any historic key never bypasses the
+    // paywall on a public build without a licence.
+    const saved = window.localStorage.getItem("volleyos.uiMode") ?? window.localStorage.getItem("voleyos_ui_mode");
+    if (saved === "pro" && !isUserProEntitled()) {
+      window.localStorage.setItem("volleyos.uiMode", "simple");
+      window.localStorage.removeItem("voleyos_ui_mode");
+      return "simple";
+    }
+    if (isTestEnv) return "pro";
     if (saved === "simple") return "simple";
-    if (saved === "pro") return "pro";
+    // v11.0.5 — a stored "pro" mode never bypasses the paywall on public builds.
+    if (saved === "pro" && isUserProEntitled()) return "pro";
     return "simple";
   });
   // Precomputed outside the JSX ternary so both toggle branches can read the
   // Simple flag without TypeScript narrowing uiMode to "pro".
   const uiIsSimple = uiMode === "simple";
+  // v11.0.5 — real Pro entitlement gate (Creator APK bridge, VOS-PRO license or tests).
+  const [proOk, setProOk] = useState(() => isUserProEntitled());
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [licenseValue, setLicenseValue] = useState("");
+  const [licenseError, setLicenseError] = useState<string | null>(null);
   const initialActiveTab = useMemo(() => {
     if (!isTestEnv && uiMode === "simple") return ("court" as const);
     return ("home" as const);
@@ -315,6 +331,12 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
 
   const toggleUiMode = (): void => {
     const next: "simple" | "pro" = uiMode === "simple" ? "pro" : "simple";
+    if (next === "pro" && !proOk) {
+      // v11.0.5 — no free Pro: open the paywall and stay in Simple.
+      setPaywallOpen(true);
+      triggerCourtHaptics(14);
+      return;
+    }
     setUiMode(next);
     window.localStorage.setItem("volleyos.uiMode", next);
     window.dispatchEvent(new CustomEvent("volleyos:uimode", { detail: { mode: next } }));
@@ -447,10 +469,22 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     return () => document.documentElement.classList.remove("app-shell");
   }, []);
 
+  // v11.0.5 — a Pro mode kept in localStorage can never outlive the paywall.
+  useEffect(() => {
+    if (uiMode === "pro" && !proOk) {
+      setUiMode("simple");
+      window.localStorage.setItem("volleyos.uiMode", "simple");
+    }
+    if (!proOk) window.localStorage.removeItem("voleyos_ui_mode");
+  }, [uiMode, proOk]);
+
   useEffect(() => {
     let active = true;
     void creatorUnlocked().then((unlocked) => {
-      if (active) setCreator(unlocked);
+      if (active) {
+        setCreator(unlocked);
+        if (unlocked) setProOk(true);
+      }
     });
     const storedRole = window.localStorage.getItem(ROLE_KEY);
     if (isProfile(storedRole)) setProfile(storedRole);
@@ -579,6 +613,10 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   }, []);
 
   const closeOverlays = useCallback((): boolean => {
+    if (paywallOpen) {
+      setPaywallOpen(false);
+      return true;
+    }
     if (keyOpen) {
       setKeyOpen(false);
       return true;
@@ -588,7 +626,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
       return true;
     }
     return false;
-  }, [checkout, keyOpen]);
+  }, [checkout, keyOpen, paywallOpen]);
 
   const closeModule = useCallback(() => setActiveSlug(null), []);
 
@@ -625,6 +663,11 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
 
   const openModule = useCallback((slug: string) => {
     if (!STATIONS[slug]) return;
+    if (!proOk) {
+      // v11.0.5 — the 61-module catalog is Pro; Simple stays on Cancha.
+      setPaywallOpen(true);
+      return;
+    }
     setActiveSlug(slug);
     setRecent((current) => {
       const next = [slug, ...current.filter((value) => value !== slug)].slice(0, 6);
@@ -632,7 +675,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
       return next;
     });
     triggerCourtHaptics(18);
-  }, []);
+  }, [proOk]);
 
   const togglePin = (slug: string): void => {
     const next = pinned.includes(slug) ? pinned.filter((value) => value !== slug) : [...pinned, slug];
@@ -823,6 +866,12 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   };
 
   const goTab = (next: Tab): void => {
+    if (!proOk && (next === "board" || next === "lab")) {
+      // v11.0.5 — Pizarra and Lab & IA are Pro tabs.
+      setPaywallOpen(true);
+      triggerCourtHaptics(16);
+      return;
+    }
     setTab(next);
     setActiveSlug(null);
     triggerCourtHaptics(16);
@@ -953,31 +1002,57 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 Volley<span className="text-crimson">OS</span>
               </span>
             </button>
-            <span
-              data-testid="header-mode-pill"
-              className="flex rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-wider sm:inline-flex"
-              style={
+            {/* v11.0.5 — the header mode control is a real button: on a public
+                build without a VOS-PRO licence it opens the paywall instead of
+                switching modes, and it always shows the lock badge. */}
+            <button
+              type="button"
+              data-testid="header-mode-toggle"
+              aria-pressed={uiMode === "pro"}
+              aria-label={
                 uiMode === "simple"
-                  ? {
-                      background: "rgba(16, 185, 129, 0.16)",
-                      border: "1.5px solid #10B981",
-                      color: "#34D399",
-                      WebkitTextFillColor: "#34D399",
-                      fontWeight: 800,
-                      borderRadius: "999px",
-                    }
-                  : {
-                      background: "rgba(245, 158, 11, 0.16)",
-                      border: "1.5px solid #F59E0B",
-                      color: "#FBBF24",
-                      WebkitTextFillColor: "#FBBF24",
-                      fontWeight: 800,
-                      borderRadius: "999px",
-                    }
+                  ? t(locale, "Cambiar a Modo Pro (requiere licencia)", "Switch to Pro Mode (licence required)", "Mudar para Modo Pro (requer licença)")
+                  : t(locale, "Cambiar a Modo Simple", "Switch to Simple Mode", "Mudar para Modo Simples")
               }
+              onClick={toggleUiMode}
+              className="tap flex shrink-0 items-center gap-1"
             >
-              {uiMode === "simple" ? `⚡ ${t(locale, "Modo Simple", "Simple Mode", "Modo Simples")}` : `🧠 ${t(locale, "Modo Pro (61)", "Pro Mode (61)", "Modo Pro (61)")}`}
-            </span>
+              <span
+                data-testid="header-mode-pill"
+                className="flex rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-wider sm:inline-flex"
+                style={
+                  uiMode === "simple"
+                    ? {
+                        background: "rgba(16, 185, 129, 0.16)",
+                        border: "1.5px solid #10B981",
+                        color: "#34D399",
+                        WebkitTextFillColor: "#34D399",
+                        fontWeight: 800,
+                        borderRadius: "999px",
+                      }
+                    : {
+                        background: "rgba(245, 158, 11, 0.16)",
+                        border: "1.5px solid #F59E0B",
+                        color: "#FBBF24",
+                        WebkitTextFillColor: "#FBBF24",
+                        fontWeight: 800,
+                        borderRadius: "999px",
+                      }
+                }
+              >
+                {uiMode === "simple"
+                  ? `⚡ ${t(locale, "Modo Simple", "Simple Mode", "Modo Simples")}`
+                  : `🧠 ${t(locale, "Modo Pro (61)", "Pro Mode (61)", "Modo Pro (61)")}`}
+              </span>
+              {proOk ? null : (
+                <span
+                  data-testid="pro-lock-badge"
+                  className="rounded-full border border-crimson/60 bg-crimson/20 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-crimson"
+                >
+                  🔒 PRO
+                </span>
+              )}
+            </button>
             {supporter ? (
               <span
                 data-testid="supporter-badge"
@@ -1550,6 +1625,11 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                           role="tab"
                           aria-selected={pickedSlug === slug}
                           onClick={() => {
+                            // v11.0.5 — court sub-tools beyond the free scoreboard are Pro.
+                            if (!proOk && slug !== "scoreboard") {
+                              setPaywallOpen(true);
+                              return;
+                            }
                             setTabPick((current) => ({ ...current, [groupKey]: slug }));
                             triggerCourtHaptics(18);
                           }}
@@ -2181,6 +2261,88 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
               {shell.close}
             </button>
           </form>
+        </div>
+      ) : null}
+
+      {paywallOpen ? (
+        <div
+          data-testid="pro-paywall-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t(locale, "Paywall de VolleyOS Pro", "VolleyOS Pro paywall", "Paywall do VolleyOS Pro")}
+          className="fixed inset-0 z-[60] grid place-items-center bg-black/75 p-4"
+          onClick={() => setPaywallOpen(false)}
+        >
+          <div className="max-h-[86vh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/15 bg-panel p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-crimson">🔒 VolleyOS Pro</p>
+            <h3 className="mt-1 text-xl font-black">{t(locale, "Desbloqueá el Modo Pro", "Unlock Pro Mode", "Desbloqueie o Modo Pro")}</h3>
+            <ul className="mt-2 space-y-1 text-[11px] text-white/70">
+              <li>🧠 {t(locale, "61 módulos Pro completos", "All 61 Pro modules", "61 módulos Pro completos")}</li>
+              <li>🏐 {t(locale, "Pizarra 5-1 y tableros tácticos", "Pizarra 5-1 & tactical boards", "Pizarra 5-1 e quadros táticos")}</li>
+              <li>💻 {t(locale, "Suite DataVolley (.dvw)", "DataVolley (.dvw) suite", "Suíte DataVolley (.dvw)")}</li>
+              <li>🔬 {t(locale, "Lab & IA con biomecánica", "Lab & AI with biomechanics", "Lab & IA com biomecânica")}</li>
+              <li>🧤 {t(locale, "Auto-Líbero y rotador con banco", "Auto-Libero & bench rotator", "Auto-Líbero e rodízio de banco")}</li>
+            </ul>
+            <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-white/40">{t(locale, "Tu ID de dispositivo", "Your device ID", "Seu ID de aparelho")}</p>
+            <p data-testid="paywall-device-id" className="mt-1 rounded-lg border border-white/10 bg-obsidian px-2 py-1 font-mono text-[12px] text-volt">{proDeviceId()}</p>
+            <button
+              type="button"
+              data-testid="paywall-copy-device-id-btn"
+              className="tap mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-white"
+              onClick={() => {
+                void copyTextUniversal(proDeviceId()).then((done) => {
+                  if (done) setToast(t(locale, "📋 ID copiado. Envialo para recibir tu clave VOS-PRO.", "📋 ID copied. Send it to receive your VOS-PRO key.", "📋 ID copiado. Envie para receber sua chave VOS-PRO."));
+                });
+              }}
+            >
+              📋 {t(locale, "Copiar mi ID de Dispositivo", "Copy my Device ID", "Copiar meu ID de Aparelho")}
+            </button>
+            <input
+              type="text"
+              data-testid="paywall-license-input"
+              autoFocus
+              spellCheck={false}
+              value={licenseValue}
+              onChange={(event) => {
+                setLicenseValue(event.target.value);
+                setLicenseError(null);
+              }}
+              placeholder="VOS-PRO-…"
+              aria-label={t(locale, "Clave de licencia VOS-PRO", "VOS-PRO license key", "Chave de licença VOS-PRO")}
+              className="mt-3 w-full rounded-lg border border-white/15 bg-obsidian px-3 py-2 font-mono text-sm text-white outline-none focus:border-volt"
+            />
+            <button
+              type="button"
+              data-testid="paywall-activate-btn"
+              className="tap mt-2 w-full rounded-lg bg-crimson px-3 py-2 text-[11px] font-black uppercase tracking-wider text-white"
+              onClick={() => {
+                const token = licenseValue.trim();
+                const check = verifyProLicenseToken(token, { deviceId: proDeviceId() });
+                if (check.ok) {
+                  window.localStorage.setItem(PRO_LICENSE_KEY, token);
+                  setProOk(true);
+                  setPaywallOpen(false);
+                  setLicenseValue("");
+                  setLicenseError(null);
+                  setToast(t(locale, "🧠 Modo Pro activado.", "🧠 Pro Mode unlocked.", "🧠 Modo Pro ativado."));
+                } else {
+                  setLicenseError(t(locale, "Licencia inválida o vinculada a otro dispositivo.", "Invalid license or bound to another device.", "Licença inválida ou vinculada a outro aparelho."));
+                }
+              }}
+            >
+              🔓 {t(locale, "Activar Licencia VOS-PRO", "Activate VOS-PRO License", "Ativar Licença VOS-PRO")}
+            </button>
+            {licenseError ? (
+              <p role="alert" className="mt-2 text-[11px] font-semibold text-crimson">{licenseError}</p>
+            ) : null}
+            <button
+              type="button"
+              className="tap mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-white"
+              onClick={() => setPaywallOpen(false)}
+            >
+              {shell.close}
+            </button>
+          </div>
         </div>
       ) : null}
 

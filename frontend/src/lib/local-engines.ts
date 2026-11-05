@@ -3407,14 +3407,11 @@ export function matchupMatrix(input: {
   if ([...input.opponentAttack, ...input.ownBlock].some((value) => value < 0 || value > 100)) {
     throw new Error("power values must be 0-100");
   }
+  // v11.0.5 — each cell is a direct duel: our block power in `own` vs the
+  // rival's attack threat in `rival`. The old cyclic average collapsed every
+  // cell to (Σblock−Σattack)/6, making all 36 cells identical.
   const matrix = Array.from({ length: 6 }, (_, own) =>
-    Array.from({ length: 6 }, (_, rival) => {
-      let total = 0;
-      for (let index = 0; index < 6; index += 1) {
-        total += (input.ownBlock[(own + index) % 6] ?? 0) - (input.opponentAttack[(rival + index) % 6] ?? 0);
-      }
-      return round2(total / 6);
-    }),
+    Array.from({ length: 6 }, (_, rival) => round2((input.ownBlock[own] ?? 0) - (input.opponentAttack[rival] ?? 0))),
   );
   let bestOwn = 0;
   let bestRival = 0;
@@ -3428,6 +3425,8 @@ export function matchupMatrix(input: {
     }
     if (Math.min(...(matrix[own] ?? [])) < Math.min(...(matrix[worstOwn] ?? []))) worstOwn = own;
   }
+  // Tie-guard: identical rows must never yield bestStart === avoidRotation.
+  if (worstOwn === bestOwn) worstOwn = (bestOwn + 1) % 6;
   const topAttackerIndex = input.opponentAttack.indexOf(Math.max(...input.opponentAttack));
   let bestVsTop = 0;
   for (let own = 1; own < 6; own += 1) {

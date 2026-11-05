@@ -1,0 +1,4 @@
+🔒 Modo Pro now requires a real licence: public web/APK shows 🔒 PRO and the activation modal until a device-bound VOS-PRO key is entered.
+📊 Monitor ACWR: 7 editable daily jump fields plus a chronic-load input, with live acute load, ratio and zone.
+🎯 Matriz de Cruces 6x6 is fully interactive and never ties best and worst rotation.
+🏐 Gym screen: editable team names, play/pause clock, real fullscreen.
