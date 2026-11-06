@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     id "com.android.application"
 }
 
@@ -10,8 +10,8 @@ android {
         applicationId "org.voleyos.global"
         minSdk 24
         targetSdk 34
-        versionCode 1130
-        versionName "11.3.0"
+        versionCode 1131
+        versionName "11.3.1"
     }
 
     // Android's asset merger ignores directories whose name starts with an underscore
@@ -55,7 +55,7 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    // v11.0.2 — F-Droid scanner: strip Google's DependencyInfo blobs from
+    // v11.0.2 â€” F-Droid scanner: strip Google's DependencyInfo blobs from
     // artifacts so no third-party metadata rides inside the APK/AAB.
     dependenciesInfo {
         includeInApk = false
@@ -92,3 +92,4 @@ afterEvaluate {
 // compileSdk clashes can never break assembleRelease again.
 dependencies {
 }
+

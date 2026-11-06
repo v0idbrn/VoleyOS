@@ -1,4 +1,4 @@
-# F-Droid package metadata for VolleyOS (fastlane x fdroiddata-ready).
+﻿# F-Droid package metadata for VolleyOS (fastlane x fdroiddata-ready).
 Categories:
   - Sports & Health
 License: AGPL-3.0-or-later
@@ -17,8 +17,8 @@ Repo: https://github.com/v0idbrn/VoleyOS.git
 AntiFeatures:
 
 Builds:
-  - versionName: 11.3.0
-    versionCode: 1130
+  - versionName: 11.3.1
+    versionCode: 1131
     commit: v11.2.0
     subdir: android/app
     sudo: false
@@ -39,3 +39,4 @@ AutoUpdateMode: None
 UpdateCheckMode: Tags
 CurrentVersion: 11.2.0
 CurrentVersionCode: 1105
+

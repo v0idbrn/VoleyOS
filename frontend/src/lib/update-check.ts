@@ -1,6 +1,6 @@
-/** On-demand GitHub release checker: fires only when the user taps it. */
+﻿/** On-demand GitHub release checker: fires only when the user taps it. */
 
-export const APP_VERSION = "11.3.0";
+export const APP_VERSION = "11.3.1";
 
 export const RELEASES_URL = "https://api.github.com/repos/v0idbrn/VoleyOS/releases/latest";
 export const RELEASES_PAGE = "https://github.com/v0idbrn/VoleyOS/releases";
@@ -10,7 +10,7 @@ export type UpdateCheck =
   | { status: "update"; version: string; url: string }
   | { status: "error"; message: string };
 
-/** "v9.2.0" / "9.2" → numeric segments for comparison. */
+/** "v9.2.0" / "9.2" â†’ numeric segments for comparison. */
 export function parseVersion(tag: string): number[] {
   return tag
     .trim()
@@ -73,3 +73,4 @@ export async function checkForUpdate(
     return { status: "error", message: error instanceof Error ? error.message : "network error" };
   }
 }
+
