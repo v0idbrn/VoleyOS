@@ -1,0 +1,1 @@
+Lanzamiento mundial: detección automática de idioma (ES/EN/PT), interceptor de botón Atrás en Android, tarjeta OpenGraph 1200x630 y un video promocional GIF automatizado.

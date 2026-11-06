@@ -1,0 +1,1 @@
+Lançamento mundial: detecção automática de idioma (PT/EN/ES), interceptor do botão Voltar nativo no Android, card OpenGraph 1200x630 e um video promocional GIF automatizado.

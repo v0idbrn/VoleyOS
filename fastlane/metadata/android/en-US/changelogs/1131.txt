@@ -1,0 +1,1 @@
+World Launch Edition: first-visit locale auto-detection (EN/PT/ES), native Android hardware back-button interceptor, 1200x630 OpenGraph card, and an automated 25s Reddit promo video plus README GIF.

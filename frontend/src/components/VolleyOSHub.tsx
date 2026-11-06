@@ -61,6 +61,54 @@ import {
 import { loadFlowRoster } from "@/lib/season-vault";
 import { acwrSample } from "@/lib/samples";
 
+declare global {
+  interface Window {
+    /** v11.3.1 — Android hardware Back + PWA popstate router. */
+    __voleyosHandleBackButton?: () => string;
+  }
+}
+
+/** Persisted language choice; wins over first-visit detection forever. */
+export const LOCALE_PREF_KEY = "voleyos_locale";
+/** Lets a test opt into the real navigator-language detection path. */
+export const LOCALE_AUTODETECT_TEST_KEY = "voleyos_test_auto_locale";
+
+function isLocaleCode(value: string | null): value is Locale {
+  return value === "es" || value === "en" || value === "pt";
+}
+
+/**
+ * v11.3.1 — first visit speaks the visitor's language: a stored choice always
+ * wins, then `navigator.languages[0]`, and ES is the final fallback. Test runs
+ * keep the route locale unless they opt in with `voleyos_test_auto_locale`.
+ */
+export function detectInitialLocale(routeLocale: Locale): Locale {
+  if (typeof window === "undefined") return routeLocale;
+  let stored: string | null = null;
+  try {
+    stored = window.localStorage.getItem(LOCALE_PREF_KEY);
+  } catch {
+    return routeLocale;
+  }
+  if (isLocaleCode(stored)) return stored;
+  const isTest =
+    typeof process !== "undefined" && (process.env.NODE_ENV === "test" || Boolean(process.env.VITEST));
+  let autoInTest = false;
+  try {
+    autoInTest = window.localStorage.getItem(LOCALE_AUTODETECT_TEST_KEY) === "1";
+  } catch {
+    autoInTest = false;
+  }
+  if (isTest && !autoInTest) return routeLocale;
+  const raw = (navigator.languages?.[0] ?? navigator.language ?? "").toLowerCase();
+  if (raw.startsWith("en")) return "en";
+  if (raw.startsWith("pt")) return "pt";
+  return "es";
+}
+
+/** Paywall reference currency that matches the visitor's language. */
+export const CURRENCY_FOR_LOCALE: Record<Locale, ProCurrency> = { es: "ARS", en: "USD", pt: "BRL" };
+
 const FILTERS: Array<Profile | "all"> = ["all", "players", "coaches", "court", "referees", "fans", "tournaments"];
 const LOCALES: Locale[] = ["es", "en", "pt"];
 const ROLE_KEY = "volleyos.role";
@@ -284,9 +332,11 @@ export function StickyMiniScoreboard({
   );
 }
 
-export function VolleyOSHub({ locale }: { locale: Locale }) {
-  const shell = SHELL[locale];
+export function VolleyOSHub({ locale: routeLocale }: { locale: Locale }) {
   const isTestEnv = typeof process !== "undefined" && (process.env.NODE_ENV === "test" || Boolean(process.env.VITEST));
+  // v11.3.1 — the effective language: stored choice, else navigator detection.
+  const locale = useMemo(() => detectInitialLocale(routeLocale), [routeLocale]);
+  const shell = SHELL[locale];
   const [uiMode, setUiMode] = useState<"simple" | "pro">(() => {
     if (typeof window === "undefined") return "pro";
     // v11.0.5 — a Pro mode stored under any historic key never bypasses the
@@ -318,6 +368,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [paywallMethod, setPaywallMethod] = useState<ProPaymentMethodId>("ars_mp_alias");
   const [paywallAliasCopied, setPaywallAliasCopied] = useState(false);
   const [paywallOrderCopied, setPaywallOrderCopied] = useState(false);
+  /** v11.3.1 — once the buyer picks a currency, the language stops overriding it. */
+  const [paywallCurrencyPinned, setPaywallCurrencyPinned] = useState(false);
   const initialActiveTab = useMemo(() => {
     if (!isTestEnv && uiMode === "simple") return ("court" as const);
     return ("home" as const);
@@ -514,6 +566,24 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     return () => document.documentElement.classList.remove("app-shell");
   }, []);
 
+  // v11.3.1 — persist the resolved language and keep the URL in sync, so the
+  // next visit (and the paywall) speaks the same language.
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LOCALE_PREF_KEY, locale);
+      const isHttp = window.location.protocol === "http:" || window.location.protocol === "https:";
+      if (isHttp && locale !== routeLocale) window.history.replaceState(null, "", `/${locale}/`);
+    } catch {
+      /* private mode or file:// shell: the stored choice is best effort */
+    }
+  }, [locale, routeLocale]);
+
+  // v11.3.1 — the reference currency follows the language until the buyer picks.
+  useEffect(() => {
+    if (paywallCurrencyPinned) return;
+    setPaywallCurrency(CURRENCY_FOR_LOCALE[locale]);
+  }, [locale, paywallCurrencyPinned]);
+
   // v11.0.5 — a Pro mode kept in localStorage can never outlive the paywall.
   useEffect(() => {
     if (uiMode === "pro" && !proOk) {
@@ -522,6 +592,69 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
     }
     if (!proOk) window.localStorage.removeItem("voleyos_ui_mode");
   }, [uiMode, proOk]);
+
+  // v11.3.1 — Android hardware Back / PWA popstate: never drop the user out of
+  // the app while a modal, the giant gym board or a secondary tab is open.
+  useEffect(() => {
+    const handleBack = (): string => {
+      if (paywallOpen) {
+        setPaywallOpen(false);
+        return "HANDLED";
+      }
+      if (keyOpen) {
+        setKeyOpen(false);
+        return "HANDLED";
+      }
+      if (monetizationOpen) {
+        setMonetizationOpen(false);
+        return "HANDLED";
+      }
+      if (checkout) {
+        setCheckout(null);
+        return "HANDLED";
+      }
+      if (activeSlug === "gym-screen" || isImmersiveTableMode) {
+        setActiveSlug("scoreboard");
+        setIsImmersiveTableMode(false);
+        window.dispatchEvent(new CustomEvent("voleyos-exit-gym-board"));
+        return "HANDLED";
+      }
+      const onScoreboardRoot = activeSlug === null || activeSlug === "scoreboard";
+      if (!onScoreboardRoot || tab !== "court") {
+        setActiveSlug("scoreboard");
+        setTab("court");
+        return "HANDLED";
+      }
+      return "EXIT_APP";
+    };
+    window.__voleyosHandleBackButton = handleBack;
+    const onPopState = (): void => {
+      handleBack();
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      delete window.__voleyosHandleBackButton;
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, [paywallOpen, keyOpen, monetizationOpen, checkout, activeSlug, isImmersiveTableMode, tab]);
+
+  // v11.3.1 — give browser Back something to pop while an overlay is open.
+  const overlayHistoryPushed = useRef(false);
+  useEffect(() => {
+    const isHttp = window.location.protocol === "http:" || window.location.protocol === "https:";
+    const overlayOpen = paywallOpen || activeSlug === "gym-screen" || isImmersiveTableMode;
+    if (!isHttp) return;
+    if (overlayOpen && !overlayHistoryPushed.current) {
+      try {
+        window.history.pushState({ voleyosOverlay: true }, "");
+        overlayHistoryPushed.current = true;
+      } catch {
+        /* history unavailable: the in-app handler still works */
+      }
+    } else if (!overlayOpen) {
+      overlayHistoryPushed.current = false;
+    }
+  }, [paywallOpen, activeSlug, isImmersiveTableMode]);
 
   useEffect(() => {
     let active = true;
@@ -1148,6 +1281,14 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
               </button>
               <a
                 href={`/${LOCALES[(LOCALES.indexOf(locale) + 1) % LOCALES.length]}`}
+                onClick={() => {
+                  const next = LOCALES[(LOCALES.indexOf(locale) + 1) % LOCALES.length] ?? "es";
+                  try {
+                    window.localStorage.setItem(LOCALE_PREF_KEY, next);
+                  } catch {
+                    /* private mode */
+                  }
+                }}
                 aria-label={shell.language}
                 className="tap grid h-10 min-w-9 place-items-center rounded-xl px-1 text-[11px] font-black text-white/60"
               >
@@ -1732,6 +1873,13 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                       <a
                         key={code}
                         href={`/${code}`}
+                        onClick={() => {
+                          try {
+                            window.localStorage.setItem(LOCALE_PREF_KEY, code);
+                          } catch {
+                            /* private mode */
+                          }
+                        }}
                         aria-current={code === locale ? "page" : undefined}
                         className={`tap rounded-2xl border px-3 py-3 text-center text-[12px] font-bold ${
                           code === locale ? "border-volt bg-volt/15 text-volt" : "border-white/10 bg-panel text-white/60"
@@ -2468,7 +2616,10 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                     type="button"
                     data-testid={`paywall-currency-${currency}`}
                     aria-pressed={active}
-                    onClick={() => setPaywallCurrency(currency)}
+                    onClick={() => {
+                      setPaywallCurrency(currency);
+                      setPaywallCurrencyPinned(true);
+                    }}
                     style={{
                       flex: "1 1 0",
                       minWidth: 0,

@@ -36,3 +36,7 @@ android/local.properties
 *.keystore
 *.jks
 *.apk
+
+# Local OpenCode configs
+opencode.json
+.env.apis

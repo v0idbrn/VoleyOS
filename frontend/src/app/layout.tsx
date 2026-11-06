@@ -4,8 +4,16 @@ import "./globals.css";
 
 import { PwaRegister } from "@/components/PwaRegister";
 
+/** v11.3.1 — the public launch origin (Pages build) owns the share card. */
+const SOCIAL_ORIGIN = "https://v0idbrn.github.io/VoleyOS";
+const SOCIAL_CARD = `${SOCIAL_ORIGIN}/og-preview.png`;
+const SOCIAL_TITLE =
+  "VoleyOS v11.3 — Offline Volleyball Scoreboard, 5-1 Tactical Suite & .DVW Scout";
+const SOCIAL_DESCRIPTION =
+  "61 offline volleyball engines: 2-tap DataVolley .DVW scouting, FIVB 5-1 overlap boards, giant gym scoreboards and tournaments. ES/EN/PT, no telemetry. AGPL-3.0.";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://volleyos.app"),
+  metadataBase: new URL(SOCIAL_ORIGIN),
   title: {
     default: "VolleyOS Global — El sistema operativo del vóley",
     template: "%s · VolleyOS",
@@ -19,13 +27,20 @@ export const metadata: Metadata = {
   icons: { icon: "/favicon.ico", apple: "/apple-touch-icon.png" },
   appleWebApp: { capable: true, title: "VolleyOS", statusBarStyle: "black-translucent" },
   openGraph: {
-    title: "VolleyOS Global",
-    description: "61 módulos de vóley en una app offline-first. Sin telemetría.",
+    title: SOCIAL_TITLE,
+    description: SOCIAL_DESCRIPTION,
     type: "website",
     locale: "es_ES",
     siteName: "VolleyOS Global",
+    url: SOCIAL_ORIGIN,
+    images: [{ url: SOCIAL_CARD, width: 1200, height: 630, alt: "VoleyOS v11.3 — offline volleyball scoreboard and 5-1 tactical suite" }],
   },
-  twitter: { card: "summary", title: "VolleyOS Global", description: "61 módulos de vóley, offline-first." },
+  twitter: {
+    card: "summary_large_image",
+    title: SOCIAL_TITLE,
+    description: SOCIAL_DESCRIPTION,
+    images: [SOCIAL_CARD],
+  },
 };
 
 export const viewport: Viewport = {

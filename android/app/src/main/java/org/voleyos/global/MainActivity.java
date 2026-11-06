@@ -1193,36 +1193,47 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * v10.1 back-gesture guard: swiping back never kills the Activity behind
-     * React's back. The page decides first:
-     *   "handled" -> swallow (modal/drawer/sub-module already closed),
-     *   "exit"    -> only a second Back within 2 s really leaves the app,
-     *   anything else (page still booting) -> park the app in background.
+     * v11.3.1 back-gesture router: the page answers first through
+     * window.__voleyosHandleBackButton():
+     *   "HANDLED"  -> a modal, the giant gym board or a secondary tab closed,
+     *   "EXIT_APP" -> already on the Cancha scoreboard root,
+     *   anything else (page still booting) -> fall back to history.
+     * The legacy "handled"/"exit" contract stays supported, and only a
+     * deliberate second Back within 2 s really leaves the app.
      */
     @Override
     public void onBackPressed() {
         if (webView == null) {
-            moveTaskToBack(true);
+            super.onBackPressed();
             return;
         }
         String probe = "(function(){try{"
-                + "if(typeof window.__vosHandleAndroidBack==='function'){"
+                + "if(typeof window.__voleyosHandleBackButton==='function'){"
+                + "return window.__voleyosHandleBackButton();"
+                + "}if(typeof window.__vosHandleAndroidBack==='function'){"
                 + "return window.__vosHandleAndroidBack();"
-                + "}return 'unhandled';}catch(e){return 'unhandled';}})();";
+                + "}return 'UNHANDLED';}catch(e){return 'UNHANDLED';}})();";
         webView.evaluateJavascript(probe, (ValueCallback<String>) value -> {
-            String result = value == null ? "\"unhandled\"" : value;
-            if (result.contains("\"handled\"")) {
-                return; // consumed inside the app
+            String result = value == null ? "\"UNHANDLED\"" : value;
+            if (result.contains("HANDLED") || result.contains("\"handled\"")) {
+                return; // consumed inside the app: stay here
             }
-            if (!result.contains("\"exit\"")) {
-                moveTaskToBack(true); // no JS decision: background, never kill
+            boolean wantsExit = result.contains("EXIT_APP") || result.contains("\"exit\"");
+            if (!wantsExit) {
+                // No JS decision yet (page booting): follow the WebView history.
+                if (webView.canGoBack()) {
+                    webView.goBack();
+                } else {
+                    moveTaskToBack(true);
+                }
                 return;
             }
             long now = System.currentTimeMillis();
             if (now - lastBackPressMs < 2000L) {
-                finish(); // deliberate double-back within 2 seconds
+                super.onBackPressed(); // deliberate double-back within 2 seconds
             } else {
                 lastBackPressMs = now; // first press: hold for the second
+                showToastMessage("\u21A9 Presion\u00E1 otra vez para salir");
             }
         });
     }
