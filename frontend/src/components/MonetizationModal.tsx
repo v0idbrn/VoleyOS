@@ -25,6 +25,15 @@ import {
 } from "@/lib/creator-unlock";
 import type { Locale } from "@/lib/local-engines";
 import { persistSupporterChip, signSupporterChip, supporterChipActive } from "@/lib/support";
+import { generateBatchClubLicenses, type BatchLicenseTier } from "@/lib/security-hardening";
+
+/** v11.3.0 — the keygen's duration select also drives the Club batch tier. */
+const BATCH_TIER: Record<LicenseDuration, BatchLicenseTier> = {
+  "7d": "7D",
+  "30d": "30D",
+  "1y": "365D",
+  LIFE: "LIFE",
+};
 
 function t(locale: Locale, es: string, en: string, pt: string): string {
   return locale === "es" ? es : locale === "en" ? en : pt;
@@ -308,6 +317,34 @@ export function CreatorKeygenPanel({ locale }: KeygenPanelProps) {
   const [copied, setCopied] = useState(false);
   const [chip, setChip] = useState<string | null>(null);
   const [chipCopied, setChipCopied] = useState(false);
+  const [batchIds, setBatchIds] = useState("");
+  const [batchIssued, setBatchIssued] = useState<Array<{ deviceId: string; token: string }>>([]);
+  const [batchCopied, setBatchCopied] = useState(false);
+
+  const generateBatch = (): void => {
+    setError(null);
+    const issuedBatch = generateBatchClubLicenses(batchIds, BATCH_TIER[duration]);
+    setBatchIssued(issuedBatch);
+    if (issuedBatch.length === 0) {
+      setError(
+        t(
+          locale,
+          "Ningún Device ID válido en la lista (máximo 5).",
+          "No valid Device IDs in the list (max 5).",
+          "Nenhum Device ID válido na lista (máximo 5).",
+        ),
+      );
+    }
+  };
+
+  const copyBatch = async (): Promise<void> => {
+    if (batchIssued.length === 0) return;
+    const payload = batchIssued.map((entry) => `${entry.deviceId}\t${entry.token}`).join("\n");
+    if (await copyTextUniversal(payload)) {
+      setBatchCopied(true);
+      window.setTimeout(() => setBatchCopied(false), 2000);
+    }
+  };
 
   const generate = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
@@ -398,6 +435,38 @@ export function CreatorKeygenPanel({ locale }: KeygenPanelProps) {
       >
         👑 {t(locale, "Generar chip de Patrocinador", "Generate Supporter chip", "Gerar chip de Patrocinador")}
       </button>
+      {/* v11.3.0 — one Club purchase, up to five bound devices. */}
+      <div className="mt-1 grid gap-1.5 rounded-xl border border-volt/25 bg-obsidian/60 p-2">
+        <p className={LEGEND}>🛡️ {t(locale, "Pack Club · hasta 5 IDs", "Club Pack · up to 5 IDs", "Pacote Clube · até 5 IDs")}</p>
+        <textarea
+          data-testid="keygen-batch-input"
+          className={`${FIELD} font-mono text-[11px]`}
+          rows={3}
+          spellCheck={false}
+          value={batchIds}
+          onChange={(event) => setBatchIds(event.target.value)}
+          placeholder={"VOS-DEV-AAAA1111\nVOS-DEV-BBBB2222\nVOS-DEV-CCCC3333"}
+          aria-label={t(locale, "Device IDs del Pack Club", "Club Pack Device IDs", "Device IDs do Pacote Clube")}
+        />
+        <button type="button" data-testid="keygen-batch-generate-btn" onClick={generateBatch} className={`${BTN} bg-volt text-obsidian`}>
+          🛡️ {t(locale, "Generar Pack Club (Hasta 5 IDs)", "Generate Club Pack (up to 5 IDs)", "Gerar Pacote Clube (Até 5 IDs)")}
+        </button>
+        {batchIssued.length > 0 ? (
+          <div className="grid gap-1">
+            <p
+              data-testid="keygen-batch-output"
+              className="rounded-lg border border-white/10 bg-obsidian p-2 font-mono text-[10px] break-all text-emerald"
+            >
+              {batchIssued.map((entry) => `${entry.deviceId} → ${entry.token}`).join("\n")}
+            </p>
+            <button type="button" data-testid="keygen-batch-copy-btn" onClick={() => void copyBatch()} className={`${BTN} border border-white/15 bg-white/5`}>
+              {batchCopied
+                ? `✓ ${t(locale, "Copiado", "Copied", "Copiado")}`
+                : `📋 ${t(locale, `Copiar ${batchIssued.length} códigos`, `Copy ${batchIssued.length} codes`, `Copiar ${batchIssued.length} códigos`)}`}
+            </button>
+          </div>
+        ) : null}
+      </div>
       {chip ? (
         <div className="grid gap-1">
           <p className="rounded-lg border border-white/10 bg-obsidian p-2 font-mono text-[10px] break-all text-emerald" data-testid="chip-code">

@@ -28,6 +28,8 @@ const CHROME_CANDIDATES = [
 
 const argUrl = process.argv.indexOf("--url");
 const BASE_URL = argUrl > 0 ? process.argv[argUrl + 1] : "http://127.0.0.1:4173/es/";
+// `--paywall-only` audits the checkout on a build without NEXT_PUBLIC_DEV_UNLOCK.
+const PAYWALL_ONLY = process.argv.includes("--paywall-only");
 const PORT = 9333;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -104,6 +106,68 @@ const AUDIT_FN = `(() => {
     if (!brand.test(hit)) issues.push({ type: "camelCase", detail: hit });
   }
   return { issues, overflow, controls: controls.length };
+})()`;
+
+/** v11.3.0 — the gym board dock must live inside 96vw with no hidden scroll. */
+const GYM_DOCK_FN = `(() => {
+  const issues = [];
+  const root = document.querySelector('[data-testid="gym-fullscreen-root"]');
+  if (!root) return { issues: [{ type: "gym-missing", detail: "no fullscreen root" }] };
+  const doc = document.documentElement;
+  if (doc.scrollWidth - window.innerWidth > 1) {
+    issues.push({ type: "gym-page-overflow", detail: doc.scrollWidth - window.innerWidth + "px" });
+  }
+  const r = root.getBoundingClientRect();
+  if (Math.abs(r.width - window.innerWidth) > 2) issues.push({ type: "gym-width", detail: r.width + " vs " + window.innerWidth });
+  const anchor = document.querySelector('[data-testid="gym-timer-toggle-btn"]');
+  const dock = anchor ? anchor.parentElement : null;
+  if (!dock) return { issues: issues.concat([{ type: "gym-dock-missing", detail: "no dock" }]) };
+  const d = dock.getBoundingClientRect();
+  const maxW = window.innerWidth * 0.96;
+  if (d.width > maxW + 1) issues.push({ type: "gym-dock-too-wide", detail: d.width + " > " + maxW });
+  if (d.left < -0.5 || d.right > window.innerWidth + 0.5) {
+    issues.push({ type: "gym-dock-outside", detail: d.left + ".." + d.right });
+  }
+  if (dock.scrollWidth - dock.clientWidth > 1) {
+    issues.push({ type: "gym-dock-scroll", detail: dock.scrollWidth - dock.clientWidth + "px hidden" });
+  }
+  if (d.bottom > window.innerHeight + 0.5) issues.push({ type: "gym-dock-below", detail: d.bottom + " > " + window.innerHeight });
+  return { issues };
+})()`;
+
+/** v11.3.0 — the multi-currency paywall must never overflow a 360px screen. */
+const PAYWALL_FN = `(() => {
+  const issues = [];
+  const modal = document.querySelector('[data-testid="pro-paywall-modal"]');
+  if (!modal) return { issues: [{ type: "paywall-missing", detail: "modal did not open" }] };
+  const panel = modal.firstElementChild;
+  if (!panel) return { issues: [{ type: "paywall-empty", detail: "no panel" }] };
+  const p = panel.getBoundingClientRect();
+  if (p.left < -0.5 || p.right > window.innerWidth + 0.5) {
+    issues.push({ type: "paywall-panel-outside", detail: p.left + ".." + p.right });
+  }
+  const grid = panel.querySelector('[data-testid="paywall-plan-grid"]');
+  if (grid) {
+    const g = grid.getBoundingClientRect();
+    if (g.left < -0.5 || g.right > window.innerWidth + 0.5) issues.push({ type: "paywall-grid-outside", detail: g.left + ".." + g.right });
+    if (grid.scrollWidth - grid.clientWidth > 1) {
+      issues.push({ type: "paywall-grid-scroll", detail: grid.scrollWidth - grid.clientWidth + "px hidden" });
+    }
+  }
+  const cards = panel.querySelectorAll('[data-testid^="paywall-plan-"]');
+  const planCards = [...cards].filter((el) => el.tagName === "BUTTON");
+  if (planCards.length !== 5) issues.push({ type: "paywall-plan-count", detail: String(planCards.length) });
+  for (const el of panel.querySelectorAll('button, a[href], input')) {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0) continue;
+    if (r.left < -0.5 || r.right > window.innerWidth + 0.5) {
+      issues.push({ type: "paywall-control-outside", detail: (el.textContent || el.tagName).trim().slice(0, 28) + " " + r.left + ".." + r.right });
+    }
+  }
+  if (document.documentElement.scrollWidth - window.innerWidth > 1) {
+    issues.push({ type: "paywall-page-overflow", detail: document.documentElement.scrollWidth - window.innerWidth + "px" });
+  }
+  return { issues };
 })()`;
 
 class Cdp {
@@ -190,7 +254,7 @@ async function run() {
     const cdp = await openTarget(browserWs);
     await cdp.send("Page.enable");
     await cdp.send("Runtime.enable");
-    await cdp.send("Page.addScriptToEvaluateOnNewDocument", {
+    const bridgeHandle = await cdp.send("Page.addScriptToEvaluateOnNewDocument", {
       source: "window.VosleyOSBridge = { isCreatorUnlocked: () => true };",
     });
 
@@ -208,7 +272,7 @@ async function run() {
       }
     };
 
-    for (const viewport of viewports) {
+    for (const viewport of PAYWALL_ONLY ? [] : viewports) {
       await cdp.send("Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
@@ -255,11 +319,66 @@ async function run() {
         await sleep(220);
         const title = await cdp.eval(`(document.querySelector('#app-content h3') || {}).textContent || ''`);
         report(`${viewport.name} module-${String(index + 1).padStart(2, "0")} ${title.trim().slice(0, 28)}`, await cdp.eval(AUDIT_FN));
+        // v11.2.1 — the giant gym board is immersive: audit its dock, then leave
+        // through its own ✕ Salir so the sweep can reach the remaining modules.
+        const immersive = await cdp.eval(`!!document.querySelector('[data-testid="gym-fullscreen-root"]')`);
+        if (immersive) {
+          const gymResult = await cdp.eval(GYM_DOCK_FN);
+          report(`${viewport.name} gym-dock`, gymResult);
+          if (gymResult.issues.length === 0) console.log(`PASS ${viewport.name} gym-dock`);
+          await cdp.eval(`(() => {
+            const exit = document.querySelector('[data-testid="gym-exit-btn"]');
+            if (exit) exit.click();
+          })()`);
+          await sleep(260);
+        }
         await cdp.eval(`(() => {
           const back = [...document.querySelectorAll('header button')].find((b) => /volver|back/i.test(b.getAttribute('aria-label') || ''));
           if (back) back.click();
         })()`);
         await sleep(180);
+      }
+    }
+
+    // v11.3.0 — the multi-currency paywall needs an unentitled session to open.
+    await cdp.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: bridgeHandle.identifier });
+    await cdp.send("Page.addScriptToEvaluateOnNewDocument", {
+      source: "try { localStorage.setItem('voleyos_onboarding_done','1'); localStorage.setItem('volleyos.uiMode','simple'); } catch (e) {}",
+    });
+    for (const viewport of viewports) {
+      await cdp.send("Emulation.setDeviceMetricsOverride", {
+        width: viewport.width,
+        height: viewport.height,
+        deviceScaleFactor: 1,
+        mobile: viewport.width < 500,
+      });
+      await cdp.send("Page.navigate", { url: BASE_URL });
+      for (let i = 0; i < 80; i += 1) {
+        const ready = await cdp.eval('!!document.querySelector(\'[data-testid="header-mode-toggle"]\')');
+        if (ready) break;
+        await sleep(250);
+      }
+      // Hydration attaches the click handler after the markup is painted.
+      await sleep(1500);
+      let opened = false;
+      for (let attempt = 0; attempt < 10 && !opened; attempt += 1) {
+        await cdp.eval(`(() => {
+          const toggle = document.querySelector('[data-testid="header-mode-toggle"]');
+          if (toggle) toggle.click();
+        })()`);
+        for (let i = 0; i < 8; i += 1) {
+          opened = await cdp.eval('!!document.querySelector(\'[data-testid="pro-paywall-modal"]\')');
+          if (opened) break;
+          await sleep(200);
+        }
+        if (!opened) await sleep(300);
+      }
+      if (!opened) {
+        console.log(`SKIP ${viewport.name} paywall (export is creator-unlocked; rebuild without NEXT_PUBLIC_DEV_UNLOCK)`);
+      } else {
+        const paywallResult = await cdp.eval(PAYWALL_FN);
+        report(`${viewport.name} paywall`, paywallResult);
+        if (paywallResult.issues.length === 0) console.log(`PASS ${viewport.name} paywall`);
       }
     }
 

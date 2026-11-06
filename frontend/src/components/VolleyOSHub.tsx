@@ -6,7 +6,27 @@ import { copyTextUniversal } from "@/lib/security-shield";
 import { LOCALE_NAMES, SHELL, t } from "@/lib/i18n";
 import { awardIndoorPoint, buildTarget, jumpLoad, newScoreboard, paywallEnabled, swapCourt, type Locale, type Profile, type ScoreboardState } from "@/lib/local-engines";
 import { clearCreatorUnlock, creatorUnlocked, matchesCreatorKey, persistCreatorToken } from "@/lib/creator-unlock";
-import { PRO_LICENSE_KEY, isUserProEntitled, proDeviceId } from "@/lib/pro-entitlement";
+import {
+  CREATOR_KOFI_URL,
+  CREATOR_MP_ALIAS,
+  CREATOR_WHATSAPP_NUMBER,
+  PRO_COMMERCIAL_PLANS,
+  PRO_CURRENCIES,
+  PRO_CURRENCY_FLAGS,
+  PRO_CURRENCY_SYMBOLS,
+  PRO_LICENSE_KEY,
+  PRO_PAYMENT_METHODS,
+  buildLicenseOrderMessage,
+  buildWhatsAppOrderUrl,
+  formatPlanPrice,
+  getActiveLicenseSummary,
+  isUserProEntitled,
+  proDeviceId,
+  proPlan,
+  type ProCurrency,
+  type ProPaymentMethodId,
+  type ProPlanId,
+} from "@/lib/pro-entitlement";
 import { verifyProLicenseToken } from "@/lib/security-hardening";
 import { clearLicenseToken, unlockCreatorOnServer } from "@/lib/api-client";
 import { EXPERIMENTAL_SLUGS, MODULES, MODULE_BY_SLUG, PROFILE_LABELS, WORKSTATIONS, WORKSTATION_BY_ID, type WorkstationId } from "@/lib/modules";
@@ -292,6 +312,12 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
   const [licenseValue, setLicenseValue] = useState("");
   const [licenseError, setLicenseError] = useState<string | null>(null);
   const [paywallCopied, setPaywallCopied] = useState(false);
+  // v11.3.0 — real checkout rails: plan, reference currency and payment method.
+  const [paywallPlan, setPaywallPlan] = useState<ProPlanId>("30D");
+  const [paywallCurrency, setPaywallCurrency] = useState<ProCurrency>("ARS");
+  const [paywallMethod, setPaywallMethod] = useState<ProPaymentMethodId>("ars_mp_alias");
+  const [paywallAliasCopied, setPaywallAliasCopied] = useState(false);
+  const [paywallOrderCopied, setPaywallOrderCopied] = useState(false);
   const initialActiveTab = useMemo(() => {
     if (!isTestEnv && uiMode === "simple") return ("court" as const);
     return ("home" as const);
@@ -1807,6 +1833,12 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 </div>
 
                 <h2 className="mt-5 px-1 pb-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.license}</h2>
+                <p
+                  data-testid="active-license-status-badge"
+                  className="mb-2 rounded-xl border border-volt/30 bg-volt/10 px-3 py-2 text-[11px] font-black text-volt"
+                >
+                  {getActiveLicenseSummary(proDeviceId(), locale).badgeText}
+                </p>
                 <ValueRow
                   label={creator ? shell.licenseCreator : shell.licenseLocked}
                   value={creator ? t(locale, "Activo", "Active", "Ativo") : "***"}
@@ -2024,6 +2056,33 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 <details className="mt-5 rounded-2xl border border-white/10 bg-panel px-4 py-3">
                   <summary className="cursor-pointer text-[10px] font-black uppercase tracking-[0.2em] text-white/40">{shell.pricingTitle}</summary>
                   <p className="mt-2 text-[11px] leading-relaxed text-white/55">{shell.pricingNote}</p>
+                  {/* v11.3.0 — the same five plans in the four reference currencies. */}
+                  <div data-testid="pricing-currency-plans" className="mt-3 grid gap-1.5">
+                    {PRO_COMMERCIAL_PLANS.map((plan) => (
+                      <div key={plan.id} className="rounded-xl border border-white/10 bg-obsidian/60 p-2">
+                        <p className="text-[11px] font-black text-white">{plan.label[locale]}</p>
+                        <p className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] font-bold text-volt">
+                          {PRO_CURRENCIES.map((currency) => (
+                            <span key={currency}>{formatPlanPrice(plan.id, currency)}</span>
+                          ))}
+                        </p>
+                        <p className="mt-0.5 text-[9px] leading-relaxed text-white/45">{plan.tagline[locale]}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 grid gap-1 text-[10px] font-bold text-white/60">
+                    <p>
+                      🇦🇷 Mercado Pago / {t(locale, "Transferencia", "Transfer", "Transferência")}:{" "}
+                      <span className="font-mono text-emerald">{CREATOR_MP_ALIAS}</span>
+                    </p>
+                    <a className="tap text-volt underline" href={CREATOR_KOFI_URL} target="_blank" rel="noreferrer">
+                      🌎 Ko-fi: ko-fi.com/unfrgvnn
+                    </a>
+                    <p>
+                      📲 WhatsApp:{" "}
+                      <span className="font-mono text-emerald">+{CREATOR_WHATSAPP_NUMBER}</span>
+                    </p>
+                  </div>
                   <div className="mt-3 grid gap-2">
                     {PLANS.map((plan) => (
                       <div key={plan.name} className={`rounded-xl border p-3 ${plan.highlight ? "border-crimson/60 bg-crimson/10" : "border-white/10 bg-obsidian/60"}`}>
@@ -2395,6 +2454,280 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 ? `✅ ${t(locale, "¡ID Copiado!", "ID Copied!", "ID Copiado!")}`
                 : `📋 ${t(locale, "Copiar ID", "Copy ID", "Copiar ID")}`}
             </button>
+
+            {/* v11.3.0 — real payment rails: 4 reference currencies, 3 methods, 5 plans. */}
+            <p style={{ marginTop: 14, fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(248,250,252,0.45)" }}>
+              {t(locale, "Moneda de referencia", "Reference currency", "Moeda de referência")}
+            </p>
+            <div data-testid="paywall-currency-selector" style={{ marginTop: 6, display: "flex", gap: 6, width: "100%" }}>
+              {PRO_CURRENCIES.map((currency) => {
+                const active = paywallCurrency === currency;
+                return (
+                  <button
+                    key={currency}
+                    type="button"
+                    data-testid={`paywall-currency-${currency}`}
+                    aria-pressed={active}
+                    onClick={() => setPaywallCurrency(currency)}
+                    style={{
+                      flex: "1 1 0",
+                      minWidth: 0,
+                      minHeight: 36,
+                      borderRadius: 10,
+                      border: active ? "1.5px solid #34D399" : "1px solid rgba(255,255,255,0.16)",
+                      background: active ? "rgba(52,211,153,0.16)" : "#151822",
+                      color: active ? "#34D399" : "#CBD5E1",
+                      fontSize: 10,
+                      fontWeight: 900,
+                      letterSpacing: "0.02em",
+                      padding: "4px 2px",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {PRO_CURRENCY_FLAGS[currency]} {currency} ({PRO_CURRENCY_SYMBOLS[currency]})
+                  </button>
+                );
+              })}
+            </div>
+
+            <p style={{ marginTop: 14, fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(248,250,252,0.45)" }}>
+              {t(locale, "Cómo querés pagar", "How do you want to pay", "Como quer pagar")}
+            </p>
+            <div data-testid="paywall-payment-method" style={{ marginTop: 6, display: "grid", gap: 6 }}>
+              {PRO_PAYMENT_METHODS.map((method) => {
+                const active = paywallMethod === method.id;
+                return (
+                  <div
+                    key={method.id}
+                    data-testid={`paywall-method-${method.id}`}
+                    onClick={() => {
+                      setPaywallMethod(method.id);
+                      if (method.id === "ars_mp_alias") setPaywallCurrency("ARS");
+                    }}
+                    style={{
+                      borderRadius: 12,
+                      border: active ? "1.5px solid rgba(245,158,11,0.75)" : "1px solid rgba(255,255,255,0.12)",
+                      background: active ? "rgba(245,158,11,0.10)" : "#12151E",
+                      padding: 8,
+                      minWidth: 0,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      style={{
+                        width: "100%",
+                        minHeight: 32,
+                        textAlign: "left",
+                        background: "transparent",
+                        border: "none",
+                        color: active ? "#F8FAFC" : "#94A3B8",
+                        fontSize: 11,
+                        fontWeight: 800,
+                        lineHeight: 1.35,
+                        overflowWrap: "anywhere",
+                      }}
+                    >
+                      {method.label[locale]}
+                    </button>
+                    {active && method.id === "ars_mp_alias" ? (
+                      <button
+                        type="button"
+                        data-testid="paywall-copy-alias-btn"
+                        onClick={() => {
+                          void copyTextUniversal(CREATOR_MP_ALIAS).then((done) => {
+                            if (!done) return;
+                            setPaywallAliasCopied(true);
+                            setToast(t(locale, "📋 Alias copiado: unfrgvnn.dead", "📋 Alias copied: unfrgvnn.dead", "📋 Alias copiado: unfrgvnn.dead"));
+                          });
+                        }}
+                        style={{
+                          marginTop: 6,
+                          width: "100%",
+                          minHeight: 36,
+                          borderRadius: 9,
+                          border: "1px solid rgba(52,211,153,0.5)",
+                          background: "rgba(52,211,153,0.12)",
+                          color: "#34D399",
+                          fontSize: 11,
+                          fontWeight: 900,
+                        }}
+                      >
+                        {paywallAliasCopied
+                          ? `✅ ${t(locale, "Alias copiado", "Alias copied", "Alias copiado")}`
+                          : `📋 ${t(locale, "Copiar Alias: unfrgvnn.dead", "Copy Alias: unfrgvnn.dead", "Copiar Alias: unfrgvnn.dead")}`}
+                      </button>
+                    ) : null}
+                    {active && method.id === "global_kofi_paypal" ? (
+                      <a
+                        data-testid="paywall-open-kofi-btn"
+                        href={CREATOR_KOFI_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          marginTop: 6,
+                          display: "block",
+                          width: "100%",
+                          minHeight: 36,
+                          borderRadius: 9,
+                          border: "1px solid rgba(245,158,11,0.55)",
+                          background: "rgba(245,158,11,0.14)",
+                          color: "#F59E0B",
+                          fontSize: 11,
+                          fontWeight: 900,
+                          textAlign: "center",
+                          paddingTop: 9,
+                          textDecoration: "none",
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        ☕ {t(locale, "Abrir Ko-fi (ko-fi.com/unfrgvnn)", "Open Ko-fi (ko-fi.com/unfrgvnn)", "Abrir Ko-fi (ko-fi.com/unfrgvnn)")}
+                      </a>
+                    ) : null}
+                    {active && method.id === "whatsapp_direct" ? (
+                      <p style={{ marginTop: 6, fontSize: 10, fontWeight: 700, color: "#94A3B8", overflowWrap: "anywhere" }}>
+                        wa.me/{CREATOR_WHATSAPP_NUMBER}
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+
+            <p style={{ marginTop: 14, fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(248,250,252,0.45)" }}>
+              {t(locale, "Planes Pro", "Pro plans", "Planos Pro")}
+            </p>
+            <div
+              data-testid="paywall-plan-grid"
+              style={{ marginTop: 6, display: "grid", gap: 6, gridTemplateColumns: "repeat(auto-fit, minmax(128px, 1fr))" }}
+            >
+              {PRO_COMMERCIAL_PLANS.map((plan) => {
+                const active = paywallPlan === plan.id;
+                return (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    data-testid={`paywall-plan-${plan.id}`}
+                    aria-pressed={active}
+                    onClick={() => setPaywallPlan(plan.id)}
+                    style={{
+                      minWidth: 0,
+                      borderRadius: 12,
+                      border: active ? "1.5px solid #E11D48" : "1px solid rgba(255,255,255,0.12)",
+                      background: active ? "rgba(225,29,72,0.14)" : "#12151E",
+                      padding: 8,
+                      textAlign: "left",
+                      color: "#F8FAFC",
+                    }}
+                  >
+                    <span style={{ display: "block", fontSize: 10.5, fontWeight: 900, lineHeight: 1.3, overflowWrap: "anywhere" }}>
+                      {plan.label[locale]}
+                    </span>
+                    <span
+                      data-testid={`paywall-plan-price-${plan.id}`}
+                      style={{ display: "block", marginTop: 4, fontSize: 12, fontWeight: 900, color: "#F59E0B", overflowWrap: "anywhere" }}
+                    >
+                      {formatPlanPrice(plan.id, paywallCurrency)}
+                    </span>
+                    <span style={{ display: "block", marginTop: 2, fontSize: 9, fontWeight: 700, lineHeight: 1.3, color: "rgba(248,250,252,0.5)", overflowWrap: "anywhere" }}>
+                      {plan.tagline[locale]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div
+              data-testid="paywall-order-box"
+              style={{
+                marginTop: 10,
+                display: "grid",
+                gap: 6,
+                borderRadius: 12,
+                border: "1px solid rgba(52,211,153,0.35)",
+                background: "rgba(52,211,153,0.08)",
+                padding: 10,
+                minWidth: 0,
+              }}
+            >
+              <p style={{ fontSize: 10, fontWeight: 800, color: "rgba(248,250,252,0.6)", lineHeight: 1.45, overflowWrap: "anywhere" }}>
+                {t(
+                  locale,
+                  `${proPlan(paywallPlan).name.es} · ${formatPlanPrice(paywallPlan, paywallCurrency)}`,
+                  `${proPlan(paywallPlan).name.en} · ${formatPlanPrice(paywallPlan, paywallCurrency)}`,
+                  `${proPlan(paywallPlan).name.pt} · ${formatPlanPrice(paywallPlan, paywallCurrency)}`,
+                )}
+              </p>
+              <a
+                data-testid="paywall-whatsapp-order-btn"
+                href={buildWhatsAppOrderUrl({
+                  planId: paywallPlan,
+                  currency: paywallCurrency,
+                  paymentMethod: paywallMethod,
+                  deviceId: proDeviceId(),
+                  locale,
+                })}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "block",
+                  width: "100%",
+                  minHeight: 40,
+                  borderRadius: 10,
+                  background: "#16A34A",
+                  color: "#FFFFFF",
+                  fontSize: 11,
+                  fontWeight: 900,
+                  textAlign: "center",
+                  textDecoration: "none",
+                  paddingTop: 12,
+                  paddingLeft: 6,
+                  paddingRight: 6,
+                  boxSizing: "border-box",
+                  overflowWrap: "anywhere",
+                }}
+              >
+                📲 {t(locale, "Enviar Pedido + ID por WhatsApp", "Send order + ID via WhatsApp", "Enviar Pedido + ID pelo WhatsApp")}
+              </a>
+              <button
+                type="button"
+                data-testid="paywall-copy-order-btn"
+                onClick={() => {
+                  const message = buildLicenseOrderMessage({
+                    planId: paywallPlan,
+                    currency: paywallCurrency,
+                    paymentMethod: paywallMethod,
+                    deviceId: proDeviceId(),
+                    locale,
+                  });
+                  void copyTextUniversal(message).then((done) => {
+                    if (!done) return;
+                    setPaywallOrderCopied(true);
+                    setToast(t(locale, "📋 Pedido copiado con tu Device ID.", "📋 Order copied with your Device ID.", "📋 Pedido copiado com seu Device ID."));
+                  });
+                }}
+                style={{
+                  width: "100%",
+                  minHeight: 40,
+                  borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  background: "#151822",
+                  color: "#F8FAFC",
+                  fontSize: 11,
+                  fontWeight: 900,
+                  paddingLeft: 6,
+                  paddingRight: 6,
+                  boxSizing: "border-box",
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {paywallOrderCopied
+                  ? `✅ ${t(locale, "Pedido copiado", "Order copied", "Pedido copiado")}`
+                  : `📋 ${t(locale, "Copiar Pedido + Device ID", "Copy order + Device ID", "Copiar Pedido + Device ID")}`}
+              </button>
+            </div>
+
             <input
               type="text"
               data-testid="paywall-license-input"

@@ -10,7 +10,8 @@ import { VolleyOSHub } from "@/components/VolleyOSHub";
 import { matchupMatrix } from "@/lib/local-engines";
 import { MODULE_BY_SLUG } from "@/lib/modules";
 import { proDeviceId } from "@/lib/pro-entitlement";
-import { generateProLicenseToken } from "@/lib/security-hardening";
+import { generateBatchClubLicenses, generateProLicenseToken, verifyProLicenseToken } from "@/lib/security-hardening";
+import { getActiveLicenseSummary } from "@/lib/pro-entitlement";
 
 const meta = (slug: string) => {
   const value = MODULE_BY_SLUG.get(slug);
@@ -94,8 +95,100 @@ describe("v11.0.5 Paywall & Editable Inputs", () => {
     // +1 Min and Reset manipulate the clock.
     fireEvent.click(screen.getByText("+1 Min"));
     expect(screen.getByText("01:00")).toBeTruthy();
-    fireEvent.click(screen.getByText("↺ Reset"));
+    fireEvent.click(screen.getByTestId("gym-reset-btn"));
     expect(screen.getByText("00:00")).toBeTruthy();
+  });
+
+  it("renders the v11.3.0 real checkout: 4 currencies, 3 rails and the 5 Pro plans", async () => {
+    window.localStorage.setItem("voleyos_force_test_paywall", "1");
+    window.localStorage.setItem("volleyos.uiMode", "simple");
+    render(<VolleyOSHub locale="es" />);
+    await waitFor(() => expect(screen.getByTestId("header-mode-toggle").textContent).toContain("Modo Simple"));
+    fireEvent.click(screen.getByTestId("header-mode-toggle"));
+    const modal = screen.getByTestId("pro-paywall-modal");
+
+    expect(screen.getByTestId("paywall-currency-selector")).toBeTruthy();
+    for (const currency of ["USD", "ARS", "BRL", "EUR"]) {
+      expect(screen.getByTestId(`paywall-currency-${currency}`)).toBeTruthy();
+    }
+    expect(screen.getByTestId("paywall-payment-method")).toBeTruthy();
+    expect(screen.getByTestId("paywall-plan-grid")).toBeTruthy();
+    for (const plan of ["7D", "30D", "365D", "LIFE", "CLUB"]) {
+      expect(screen.getByTestId(`paywall-plan-${plan}`)).toBeTruthy();
+    }
+
+    // The Creator's real rails are visible and copyable.
+    const text = modal.textContent ?? "";
+    expect(text).toContain("unfrgvnn.dead");
+    expect(text).toContain("ko-fi.com/unfrgvnn");
+    expect(screen.getByTestId("paywall-copy-alias-btn")).toBeTruthy();
+
+    // Ko-fi rail exposes the real checkout link.
+    fireEvent.click(screen.getByTestId("paywall-method-global_kofi_paypal"));
+    expect(screen.getByTestId("paywall-open-kofi-btn").getAttribute("href")).toBe("https://ko-fi.com/unfrgvnn");
+
+    // WhatsApp rail opens the Creator chat with the pre-filled order.
+    fireEvent.click(screen.getByTestId("paywall-method-whatsapp_direct"));
+    const orderHref = screen.getByTestId("paywall-whatsapp-order-btn").getAttribute("href") ?? "";
+    expect(orderHref.startsWith("https://wa.me/5493874661269?text=")).toBe(true);
+    expect(decodeURIComponent(orderHref)).toContain("VOS-DEV-");
+    expect(screen.getByTestId("paywall-copy-order-btn")).toBeTruthy();
+  });
+
+  it("switches the plan grid between USD, ARS, BRL and EUR prices", async () => {
+    window.localStorage.setItem("voleyos_force_test_paywall", "1");
+    window.localStorage.setItem("volleyos.uiMode", "simple");
+    render(<VolleyOSHub locale="es" />);
+    await waitFor(() => expect(screen.getByTestId("header-mode-toggle").textContent).toContain("Modo Simple"));
+    fireEvent.click(screen.getByTestId("header-mode-toggle"));
+    expect(screen.getByTestId("pro-paywall-modal")).toBeTruthy();
+
+    const price = () => screen.getByTestId("paywall-plan-price-30D").textContent ?? "";
+    fireEvent.click(screen.getByTestId("paywall-currency-ARS"));
+    expect(price()).toBe("$7.500 ARS");
+    fireEvent.click(screen.getByTestId("paywall-currency-USD"));
+    expect(price()).toBe("$6.99 USD");
+    fireEvent.click(screen.getByTestId("paywall-currency-BRL"));
+    expect(price()).toBe("R$ 34,90 BRL");
+    fireEvent.click(screen.getByTestId("paywall-currency-EUR"));
+    expect(price()).toBe("6,50 € EUR");
+    // The club pack is five devices for a single price.
+    fireEvent.click(screen.getByTestId("paywall-currency-USD"));
+    expect(screen.getByTestId("paywall-plan-price-CLUB").textContent).toBe("$99.00 USD");
+  });
+
+  it("generates a Club batch where each token only validates its own device", () => {
+    const devices = ["VOS-DEV-CLUB01", "VOS-DEV-CLUB02", "VOS-DEV-CLUB03"];
+    const batch = generateBatchClubLicenses(devices, "365D");
+    expect(batch).toHaveLength(3);
+    expect(new Set(batch.map((entry) => entry.token)).size).toBe(3);
+    batch.forEach((entry) => {
+      expect(entry.token.startsWith("VOS-PRO-CLUB-")).toBe(true);
+      expect(verifyProLicenseToken(entry.token, { deviceId: entry.deviceId }).ok).toBe(true);
+      for (const other of devices.filter((device) => device !== entry.deviceId)) {
+        const check = verifyProLicenseToken(entry.token, { deviceId: other });
+        expect(check.ok).toBe(false);
+        expect(check.reason).toBe("device_mismatch");
+      }
+    });
+    // The cap holds and a pasted newline list is parsed.
+    const capped = generateBatchClubLicenses(devices.join("\n") + "\nVOS-DEV-CLUB04\nVOS-DEV-CLUB05\nVOS-DEV-CLUB06", "30D");
+    expect(capped).toHaveLength(5);
+  });
+
+  it("summarises an active licence with its remaining days and a locked Simple Mode", () => {
+    const locked = getActiveLicenseSummary(proDeviceId(), "es");
+    expect(locked.active).toBe(false);
+    expect(locked.badgeText).toContain("Modo Simple");
+
+    const token = generateProLicenseToken("PLAYER", 30, { deviceId: proDeviceId() });
+    expect(token).toBeTruthy();
+    window.localStorage.setItem("voleyos_pro_license", token ?? "");
+    const active = getActiveLicenseSummary(proDeviceId(), "es");
+    expect(active.active).toBe(true);
+    expect(active.tier).toBe("PLAYER");
+    expect(active.daysRemaining).toBe(30);
+    expect(active.badgeText).toContain("Pro activo");
   });
 
   it("guides are professional: zero slang phrases in module-guides.ts / modules.ts", () => {

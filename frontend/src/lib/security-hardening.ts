@@ -233,6 +233,47 @@ export function generateProLicenseToken(
   return `VOS-PRO-${tier}-${expiryB36}-${hash}-${signature}`;
 }
 
+/** v11.3.0 — one Club purchase covers a full technical staff. */
+export const BATCH_CLUB_MAX_DEVICES = 5;
+
+export type BatchLicenseTier = "24H" | "7D" | "30D" | "365D" | "LIFE";
+
+/** Lifetime tokens carry a 100-year expiry: still device-bound, effectively forever. */
+const BATCH_DURATION_DAYS: Record<BatchLicenseTier, number> = {
+  "24H": 1,
+  "7D": 7,
+  "30D": 30,
+  "365D": 365,
+  LIFE: 36_500,
+};
+
+/**
+ * Issue up to five CLUB licences at once from a pasted list of Device IDs
+ * (newline, comma, semicolon or space separated). Invalid IDs are skipped,
+ * duplicates collapse, and each token stays bound to its own device.
+ */
+export function generateBatchClubLicenses(
+  rawDeviceIds: string | string[],
+  tier: BatchLicenseTier = "365D",
+): Array<{ deviceId: string; token: string }> {
+  const requested = Array.isArray(rawDeviceIds)
+    ? rawDeviceIds
+    : String(rawDeviceIds ?? "").split(/[\n,;\s]+/);
+  const days = BATCH_DURATION_DAYS[tier];
+  const issued: Array<{ deviceId: string; token: string }> = [];
+  const seen = new Set<string>();
+  for (const candidate of requested) {
+    const deviceId = String(candidate ?? "").trim().toUpperCase();
+    if (deviceId.length === 0 || seen.has(deviceId)) continue;
+    const token = generateProLicenseToken("CLUB", days, { deviceId });
+    if (token === null) continue;
+    seen.add(deviceId);
+    issued.push({ deviceId, token });
+    if (issued.length >= BATCH_CLUB_MAX_DEVICES) break;
+  }
+  return issued;
+}
+
 /**
  * Verify a device-bound VOS-PRO token. Clock rollback beyond the 24h guard
  * rejects everything before any signature is checked.

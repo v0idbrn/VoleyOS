@@ -355,10 +355,10 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
           backdropFilter: "blur(14px)",
           border: "1px solid rgba(255,255,255,0.18)",
           borderRadius: 999,
-          padding: "6px 12px",
+          padding: "6px 8px",
           display: "flex",
           alignItems: "center",
-          gap: 8,
+          gap: 5,
           maxWidth: "96vw",
           overflowX: "auto",
         }}
@@ -375,11 +375,14 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
         <button type="button" onClick={() => setTimerMinutes(timerMinutes() + 60)} style={dockBtn}>
           +1 Min
         </button>
-        <button type="button" onClick={swapSides} style={dockBtn}>
-          🔄 {t(locale, "Cambio de Cancha", "Swap Sides", "Troca de Lado")}
+        <button type="button" aria-label={t(locale, "Cambio de Cancha", "Swap Sides", "Troca de Lado")} onClick={swapSides} style={dockBtn}>
+          🔄{" "}
+          <span className="hidden sm:inline">{t(locale, "Cambio de Cancha", "Swap Sides", "Troca de Lado")}</span>
         </button>
         <button
           type="button"
+          data-testid="gym-reset-btn"
+          aria-label={t(locale, "Reiniciar marcador y reloj", "Reset score and clock", "Reiniciar placar e relógio")}
           onClick={() => {
             setTimerRunning(false);
             setTimerMinutes(0);
@@ -387,13 +390,26 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
           }}
           style={{ ...dockBtn, color: "#FDA4AF" }}
         >
-          ↺ Reset
+          ↺ <span className="hidden sm:inline">Reset</span>
         </button>
-        <button type="button" data-testid="gym-fullscreen-btn" onClick={() => void toggleFullscreen()} style={dockBtn}>
-          ⛶ {t(locale, "Pantalla Completa", "Fullscreen", "Tela Cheia")}
+        <button
+          type="button"
+          data-testid="gym-fullscreen-btn"
+          aria-label={t(locale, "Pantalla Completa", "Fullscreen", "Tela Cheia")}
+          onClick={() => void toggleFullscreen()}
+          style={dockBtn}
+        >
+          ⛶{" "}
+          <span className="hidden sm:inline">{t(locale, "Pantalla Completa", "Fullscreen", "Tela Cheia")}</span>
         </button>
-        <button type="button" onClick={exitBoard} style={{ ...dockBtn, background: "rgba(225,29,72,0.25)", color: "#FDA4AF" }}>
-          ✕ {t(locale, "Salir", "Exit", "Sair")}
+        <button
+          type="button"
+          data-testid="gym-dock-exit-btn"
+          aria-label={t(locale, "Salir", "Exit", "Sair")}
+          onClick={exitBoard}
+          style={{ ...dockBtn, background: "rgba(225,29,72,0.25)", color: "#FDA4AF" }}
+        >
+          ✕ <span className="hidden sm:inline">{t(locale, "Salir", "Exit", "Sair")}</span>
         </button>
       </div>
     </div>
