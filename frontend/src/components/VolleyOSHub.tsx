@@ -299,6 +299,9 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
 
   const [tab, setTab] = useState<Tab>(initialActiveTab);
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
+  // v11.2.1 — Immersive Full-Board Mode: gym screen or Modo Mesa hide the app bars.
+  const [isImmersiveTableMode, setIsImmersiveTableMode] = useState(false);
+  const immersiveBoard = activeSlug === "gym-screen" || isImmersiveTableMode;
   const [tabPick, setTabPick] = useState<Record<string, string>>(() => {
     if (typeof window !== "undefined" && !window.localStorage.getItem("volleyos.uiMode") && uiMode === "simple") {
       return {
@@ -385,6 +388,21 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
       setCastJoinRoom(roomId);
       setCastOpen(true);
     }
+  }, []);
+
+  // v11.2.1 — Modo Mesa broadcasts immersion; ✕ Salir in the gym board lands
+  // the user back on the Indoor 6v6 scoreboard (module-04).
+  useEffect(() => {
+    const onImmersive = (event: Event): void => {
+      setIsImmersiveTableMode(Boolean((event as CustomEvent<{ active?: boolean }>).detail?.active));
+    };
+    const onExitGym = (): void => setActiveSlug("scoreboard");
+    window.addEventListener("voleyos-immersive-mode", onImmersive);
+    window.addEventListener("voleyos-exit-gym-board", onExitGym);
+    return () => {
+      window.removeEventListener("voleyos-immersive-mode", onImmersive);
+      window.removeEventListener("voleyos-exit-gym-board", onExitGym);
+    };
   }, []);
 
   // v9.4: restore a signed .vos full backup from a file pick.
@@ -932,7 +950,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
         {t(locale, "Saltar al contenido", "Skip to content", "Pular para o conteúdo")}
       </a>
 
-      {activeMeta ? (
+      {!immersiveBoard && activeMeta ? (
         <header className="safe-top z-30 shrink-0 border-b border-white/10 bg-obsidian/95">
           <div className="mx-auto flex h-14 max-w-3xl items-center gap-1 px-2">
             <button
@@ -972,7 +990,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
             </button>
           </div>
         </header>
-      ) : casualOpen ? (
+      ) : !immersiveBoard && casualOpen ? (
         <header className="safe-top z-30 shrink-0 border-b border-white/10 bg-obsidian/95">
           <div className="mx-auto flex h-14 max-w-3xl items-center gap-1 px-2">
             <button
@@ -994,7 +1012,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
             </div>
           </div>
         </header>
-      ) : (
+      ) : !immersiveBoard ? (
         <header className="safe-top z-30 shrink-0 border-b border-white/10 bg-obsidian/95">
           <div className="mx-auto flex h-14 max-w-3xl items-center gap-2 px-3">
             <button type="button" onClick={() => goTab("home")} className="tap flex items-center gap-2" aria-label="VolleyOS">
@@ -1127,7 +1145,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
             </div>
           </div>
         </header>
-      )}
+      ) : null}
 
       {stickyVisible && liveScore ? (
         <StickyMiniScoreboard state={liveScore} locale={locale} onPoint={livePoint} onSwap={liveSwap} onGoCourt={goCourtScoreboard} />
@@ -1136,7 +1154,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
       <div id="app-content" className="relative min-h-0 flex-1">
         {activeMeta ? (
           <>
-            <div className="h-full overflow-y-auto no-scrollbar px-3 pb-28 pt-3">
+            <div className={`h-full no-scrollbar px-3 pt-3 ${immersiveBoard ? "overflow-hidden p-0" : "overflow-y-auto pb-28"}`}>
               <div className="mx-auto w-full max-w-2xl">
                 {(() => {
                   if (activeMeta.slug === "gym-screen") {
@@ -1155,7 +1173,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 })()}
               </div>
             </div>
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-obsidian via-obsidian/90 to-transparent pb-1 pt-8">
+            {!immersiveBoard ? (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-obsidian via-obsidian/90 to-transparent pb-1 pt-8">
               <div className="safe-bottom pointer-events-auto mx-auto flex max-w-2xl gap-2 px-3">
                 <button
                   type="button"
@@ -1187,6 +1206,7 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
                 </button>
               </div>
             </div>
+            ) : null}
           </>
         ) : casualOpen ? (
           <div className="h-full overflow-y-auto no-scrollbar px-3 pb-28 pt-3">
@@ -2055,8 +2075,8 @@ export function VolleyOSHub({ locale }: { locale: Locale }) {
        </div>
 
 
-      {!activeMeta ? (
-        <nav aria-label={shell.tabsLabel} className="safe-bottom z-30 shrink-0 border-t border-white/10 bg-obsidian/95">
+      {!immersiveBoard && !activeMeta ? (
+        <nav data-testid="hub-bottom-nav" aria-label={shell.tabsLabel} className="safe-bottom z-30 shrink-0 border-t border-white/10 bg-obsidian/95">
             {/* v11.0.3 — always one single row: 3 tabs (Simple) or 5 tabs (Pro). */}
             <div
               role="tablist"

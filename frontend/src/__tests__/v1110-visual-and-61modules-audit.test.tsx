@@ -255,3 +255,55 @@ describe("v11.2.0 — live bus sync badge & official match sheet", () => {
     expect(card.textContent).not.toContain("undefined");
   });
 });
+
+/* ------------------------------------------------------------------ *
+ * v11.2.1 — true zero-scroll full-viewport boards
+ * ------------------------------------------------------------------ */
+
+function seedBus(): void {
+  window.localStorage.setItem(
+    "voleyos_live_match_bus_v1",
+    JSON.stringify({
+      teamA: "Tiburones",
+      teamB: "Cóndores",
+      scoreA: 12,
+      scoreB: 9,
+      setsA: 1,
+      setsB: 1,
+      serving: "A",
+      rotation: 3,
+      sanctions: [],
+    }),
+  );
+}
+
+describe("v11.2.1 — gym board fills the viewport with floating controls", () => {
+  it("renders a fixed 100dvh zero-scroll root with every floating control", () => {
+    seedBus();
+    render(<GymScreenModule locale="es" onClose={() => undefined} />);
+    const root = screen.getByTestId("gym-fullscreen-root");
+    expect(root.style.position).toBe("fixed");
+    expect(root.style.overflow).toBe("hidden");
+    expect(root.style.height).toBe("100dvh");
+    expect(screen.getByTestId("gym-timer-toggle-btn")).toBeTruthy();
+    expect(screen.getByTestId("gym-fullscreen-btn")).toBeTruthy();
+    expect(screen.getByTestId("gym-exit-btn")).toBeTruthy();
+    expect(screen.getByTestId("live-bus-sync-badge")).toBeTruthy();
+  });
+
+  it("hides the hub top header and bottom nav while the giant board is open", () => {
+    seedBus();
+    // The 61-module catalog opens only for Pro, so grant entitlement here.
+    proMock.entitled = true;
+    render(<VolleyOSHub locale="es" />);
+    expect(screen.getByTestId("hub-bottom-nav")).toBeTruthy();
+    const card = screen
+      .getAllByTestId("module-card")
+      .find((entry) => (entry.textContent ?? "").includes("Pantalla Gigante de Gimnasio"));
+    if (!card) throw new Error("gym screen card missing");
+    fireEvent.click(card);
+    expect(screen.getByTestId("gym-fullscreen-root")).toBeTruthy();
+    expect(screen.queryByTestId("hub-bottom-nav")).toBeNull();
+    expect(document.querySelectorAll("header").length).toBe(0);
+  });
+});

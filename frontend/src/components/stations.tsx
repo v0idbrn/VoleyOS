@@ -2784,6 +2784,14 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isTableLandscapeMode]);
 
+  // v11.2.1 — Modo Mesa tells the hub to hide its top header and bottom nav.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("voleyos-immersive-mode", { detail: { active: isTableLandscapeMode } }));
+    return () => {
+      window.dispatchEvent(new CustomEvent("voleyos-immersive-mode", { detail: { active: false } }));
+    };
+  }, [isTableLandscapeMode]);
+
   const tableHalves = [
     { key: "left", side: leftSide, data: left },
     { key: "right", side: rightSide, data: right },

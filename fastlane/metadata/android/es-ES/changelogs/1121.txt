@@ -1,0 +1,6 @@
+v11.2.1 — Marcador a pantalla completa real
+• Pantalla Gigante de Gimnasio y Modo Mesa ocupan 100vw × 100dvh.
+• Se ocultan la barra superior y la navegación inferior mientras el tablero está abierto.
+• Marcador 50/50 con puntos gigantes, sets y botones flotantes +1 / −1 / +1 Set.
+• Banda flotante: temporizador, +1 min, cambio de cancha, reinicio, pantalla completa y ✕ Salir.
+• ✕ Salir vuelve al Tablero Indoor 6v6 sin desplazamiento vertical.

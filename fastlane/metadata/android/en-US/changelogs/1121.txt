@@ -1,0 +1,6 @@
+v11.2.1 — True full-viewport scoreboard
+• Gym Giant Screen and Table Mode now fill 100vw × 100dvh with zero scrolling.
+• The top header bar and bottom navigation are hidden while a board is open.
+• 50/50 arena with giant tap-to-score numbers, sets and floating +1 / −1 / +1 Set buttons.
+• Floating control capsule: timer, +1 min, swap sides, reset, fullscreen and ✕ Exit.
+• ✕ Exit returns to the Indoor 6v6 Scoreboard with the normal app bars restored.

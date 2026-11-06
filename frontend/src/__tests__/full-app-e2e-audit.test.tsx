@@ -115,6 +115,18 @@ describe("hub E2E", () => {
       }
       fireEvent.click(card);
 
+      // v11.2.1 — the giant board is a true immersive mode: it hides the
+      // station chrome and the app header, so it is verified and closed with
+      // its own floating ✕ Salir control (which lands on Indoor 6v6).
+      if (module.slug === "gym-screen") {
+        expect(screen.getByTestId("gym-fullscreen-root")).toBeTruthy();
+        fireEvent.click(screen.getByTestId("gym-exit-btn"));
+        expect(screen.queryByTestId("gym-fullscreen-root")).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Volver" }));
+        expect(screen.queryByRole("button", { name: "Volver" })).toBeNull();
+        continue;
+      }
+
       const expected = `Módulo ${String(module.number).padStart(2, "0")}`;
       if (!screen.queryByText(new RegExp(`^${expected}$`))) {
         throw new Error(`module ${module.slug} did not render its full-screen header (${expected})`);

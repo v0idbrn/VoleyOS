@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { playWhistle } from "@/lib/court-audio";
-import { DEFAULT_GYM_PAYLOAD, GYM_SCREEN } from "@/lib/gym-screen";
+import { DEFAULT_GYM_PAYLOAD } from "@/lib/gym-screen";
 import { t } from "@/lib/i18n";
 import { readLiveMatchSnapshot, type LiveMatchSnapshot } from "@/components/stations";
 import type { Locale } from "@/lib/local-engines";
@@ -12,6 +12,14 @@ interface GymScreenModuleProps {
   locale: Locale;
   onClose: () => void;
 }
+
+type Bridge = {
+  openGymScreen?: (payload: typeof DEFAULT_GYM_PAYLOAD) => void;
+  setSensorAutoRotateMode?: (mode: string) => void;
+};
+
+const ACCENT_A = "#E11D48";
+const ACCENT_B = "#0EA5E9";
 
 export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
   const [payload, setPayload] = useState<typeof DEFAULT_GYM_PAYLOAD>(DEFAULT_GYM_PAYLOAD);
@@ -48,12 +56,14 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
   }, []);
 
   useEffect(() => {
-    const bridge = (window as Window & { VoleyOSBridge?: { openGymScreen?: (payload: typeof DEFAULT_GYM_PAYLOAD) => void } }).VoleyOSBridge;
+    const bridge = (window as Window & { VoleyOSBridge?: Bridge }).VoleyOSBridge;
+    // v11.2.1 — let the phone rotate freely while the giant board is up.
+    bridge?.setSensorAutoRotateMode?.("full_sensor");
     if (bridge?.openGymScreen) {
       bridge.openGymScreen(payload);
       onClose();
-      return;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // v11.0.5 — a real running clock, not a one-tap-per-second button.
@@ -92,7 +102,7 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
 
   const bump = useCallback((key: keyof typeof payload, delta: number) => {
     setPayload((current) => {
-      const next = { ...current } as any;
+      const next = { ...current } as Record<string, unknown>;
       const value = current[key];
       if (typeof value === "number") {
         next[key] = Math.max(0, value + delta);
@@ -110,181 +120,281 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
     setPayload((current) => ({ ...current, timer: `${String(Math.floor(clamped / 60)).padStart(2, "0")}:${String(clamped % 60).padStart(2, "0")}` }));
   };
 
+  // v11.2.1 — ✕ Salir: leave fullscreen and hand control back to the hub,
+  // which lands on the Indoor 6v6 scoreboard (module-04).
+  const exitBoard = useCallback((): void => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    window.dispatchEvent(new CustomEvent("voleyos-exit-gym-board"));
+  }, []);
+
+  const swapSides = useCallback((): void => {
+    setSwapped((current) => !current);
+    playWhistle("double");
+  }, []);
+
+  const teamCard = (side: "A" | "B", accent: string) => {
+    const scoreKey = side === "A" ? "scoreA" : "scoreB";
+    const setKey = side === "A" ? "setA" : "setB";
+    return (
+      <div
+        style={{
+          height: "100%",
+          minHeight: 0,
+          borderRadius: "22px",
+          background: accent,
+          padding: "12px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "space-between",
+          overflow: "hidden",
+          boxShadow: "0 10px 40px rgba(0,0,0,0.45)",
+        }}
+      >
+        <input
+          type="text"
+          value={side === "A" ? nameA : nameB}
+          onChange={(event) => (side === "A" ? setNameA(event.target.value) : setNameB(event.target.value))}
+          aria-label={side === "A" ? t(locale, "Nombre Equipo A", "Team A name", "Nome Equipe A") : t(locale, "Nombre Equipo B", "Team B name", "Nome Equipe B")}
+          style={{
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            width: "100%",
+            textAlign: "center",
+            color: "#FFFFFF",
+            fontWeight: 900,
+            textTransform: "uppercase",
+            fontSize: "clamp(1rem, 3.2vmin, 2rem)",
+          }}
+        />
+        <span
+          style={{
+            background: "rgba(0,0,0,0.35)",
+            color: "#FFFFFF",
+            borderRadius: 999,
+            padding: "3px 12px",
+            fontSize: "clamp(0.65rem, 1.8vmin, 1rem)",
+            fontWeight: 800,
+            letterSpacing: "0.08em",
+          }}
+        >
+          {t(locale, "Sets", "Sets", "Sets")}: {side === "A" ? payload.setA : payload.setB}
+        </span>
+        <button
+          type="button"
+          aria-label={t(locale, "Punto para", "Point for", "Ponto para") + " " + (side === "A" ? nameA : nameB)}
+          onClick={() => bump(scoreKey, 1)}
+          style={{
+            background: "transparent",
+            border: "none",
+            color: "#FFFFFF",
+            fontSize: "clamp(4.5rem, 24vmin, 14rem)",
+            lineHeight: 0.92,
+            fontWeight: 900,
+            fontVariantNumeric: "tabular-nums",
+            cursor: "pointer",
+            padding: 0,
+          }}
+        >
+          {side === "A" ? payload.scoreA : payload.scoreB}
+        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            type="button"
+            onClick={() => bump(scoreKey, 1)}
+            style={{ minWidth: 54, minHeight: 42, borderRadius: 999, background: "rgba(0,0,0,0.35)", color: "#FFFFFF", fontSize: 16, fontWeight: 900, border: "1px solid rgba(255,255,255,0.25)" }}
+          >
+            +1
+          </button>
+          <button
+            type="button"
+            onClick={() => bump(scoreKey, -1)}
+            style={{ minWidth: 54, minHeight: 42, borderRadius: 999, background: "rgba(0,0,0,0.35)", color: "#FFFFFF", fontSize: 16, fontWeight: 900, border: "1px solid rgba(255,255,255,0.25)" }}
+          >
+            −1
+          </button>
+          <button
+            type="button"
+            onClick={() => bump(setKey, 1)}
+            style={{ minWidth: 54, minHeight: 42, borderRadius: 999, background: "rgba(0,0,0,0.35)", color: "#FBBF24", fontSize: 14, fontWeight: 900, border: "1px solid rgba(255,255,255,0.25)" }}
+          >
+            +1 {t(locale, "Set", "Set", "Set")}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const dockBtn: React.CSSProperties = {
+    minHeight: 42,
+    borderRadius: 999,
+    border: "none",
+    padding: "0 14px",
+    fontSize: 13,
+    fontWeight: 900,
+    color: "#FFFFFF",
+    background: "rgba(255,255,255,0.08)",
+    whiteSpace: "nowrap",
+    cursor: "pointer",
+  };
+
   return (
     <div
       ref={rootRef}
+      data-testid="gym-fullscreen-root"
       role="dialog"
       aria-modal="true"
       aria-label={t(locale, "Pantalla Gigante de Gimnasio", "Gym Giant Screen", "Tela Gigante do Ginásio")}
-      className={`${fullscreen ? "fixed inset-0 z-[9995]" : "fixed inset-0 z-50"} overflow-y-auto bg-obsidian/95 p-4`}
+      style={{
+        position: "fixed",
+        inset: 0,
+        width: "100vw",
+        height: "100dvh",
+        zIndex: 99990,
+        background: "#05060A",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        overflow: "hidden",
+        padding: "12px 16px 76px 16px",
+        boxSizing: "border-box",
+        userSelect: "none",
+      }}
     >
-      <div className={`mx-auto flex min-h-full w-full max-w-5xl flex-col rounded-3xl border border-white/10 bg-panel p-6 shadow-2xl shadow-black/60 ${fullscreen ? "justify-center" : ""}`}>
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-crimson">
-            Módulo
-          </p>
+      {/* Top status strip */}
+      <div
+        style={{
+          height: 36,
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
           {busSynced ? (
-            <span data-testid="live-bus-sync-badge" className="text-[9px] font-bold uppercase tracking-wider text-emerald/70 bg-emerald/10 px-2 py-1 rounded">
+            <span
+              data-testid="live-bus-sync-badge"
+              style={{
+                fontSize: 10,
+                fontWeight: 800,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                color: "#34D399",
+                background: "rgba(52,211,153,0.12)",
+                borderRadius: 999,
+                padding: "3px 10px",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
               🔗 {t(locale, "Sincronizado con Cancha en Vivo", "Synced with Live Court", "Sincronizado com a Quadra ao Vivo")}
             </span>
           ) : null}
-          <button
-            type="button"
-            onClick={onClose}
-            className="tap grid h-10 w-10 place-items-center rounded-xl text-lg text-white/45 hover:text-white"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="mt-6 grid grid-cols-3 gap-6">
-          <div className="flex flex-col items-center gap-3">
-            <input
-              type="text"
-              value={swapped ? nameB : nameA}
-              onChange={(event) => (swapped ? setNameB(event.target.value) : setNameA(event.target.value))}
-              aria-label={swapped ? t(locale, "Nombre Equipo B", "Team B name", "Nome Equipe B") : t(locale, "Nombre Equipo A", "Team A name", "Nome Equipe A")}
-              className="w-full max-w-56 rounded-lg border border-white/15 bg-transparent px-2 py-1 text-center text-[11px] font-black uppercase tracking-widest text-white/70 outline-none focus:border-volt"
-            />
-            <p className="text-8xl font-black text-crimson tabular-nums">{swapped ? payload.scoreB : payload.scoreA}</p>
-            <p className="text-xl font-bold text-volt">Sets {swapped ? payload.setB : payload.setA}</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => bump(swapped ? "scoreB" : "scoreA", 1)}
-                className="tap h-12 w-12 rounded-full bg-crimson/20 text-crimson text-2xl font-black hover:bg-crimson/40"
-              >
-                +1
-              </button>
-              <button
-                type="button"
-                onClick={() => bump(swapped ? "scoreB" : "scoreA", -1)}
-                className="tap h-12 w-12 rounded-full bg-white/10 text-white/70 text-2xl font-black"
-              >
-                −1
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-center justify-center gap-3">
-            <p className="text-7xl font-black text-white tabular-nums">{payload.timer}</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                data-testid="gym-timer-toggle-btn"
-                aria-pressed={timerRunning}
-                onClick={() => setTimerRunning((current) => !current)}
-                className="tap h-12 rounded-full bg-volt/20 px-4 text-xl font-black text-volt hover:bg-volt/40"
-              >
-                {timerRunning ? "⏸️" : "▶️"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setTimerMinutes(timerMinutes() + 60)}
-                className="tap h-12 rounded-full bg-white/10 px-3 text-[11px] font-black text-white/80"
-              >
-                +1 Min
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTimerRunning(false);
-                  setTimerMinutes(0);
-                }}
-                className="tap h-12 rounded-full bg-crimson/20 px-3 text-[11px] font-black text-crimson"
-              >
-                ↺ Reset
-              </button>
-            </div>
-            <button
-              type="button"
-              data-testid="gym-fullscreen-btn"
-              onClick={() => void toggleFullscreen()}
-              className="tap rounded-2xl bg-white/10 px-4 py-2 text-[11px] font-black uppercase tracking-wider text-white/80 hover:bg-white/20"
-            >
-              ⛶ {t(locale, "Pantalla Completa (TV / Proyector)", "Fullscreen (TV / Projector)", "Tela Cheia (TV / Projetor)")}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSwapped((current) => !current);
-                playWhistle("double");
-              }}
-              className="tap rounded-2xl bg-white/10 px-4 py-3 text-xl font-black text-volt hover:bg-white/20 vos-flash"
-            >
-              🔄 {t(locale, "Cambio de Cancha", "Swap Sides", "Troca de Lado")}
-            </button>
-          </div>
-
-          <div className="flex flex-col items-center gap-3">
-            <input
-              type="text"
-              value={swapped ? nameA : nameB}
-              onChange={(event) => (swapped ? setNameA(event.target.value) : setNameB(event.target.value))}
-              aria-label={swapped ? t(locale, "Nombre Equipo A", "Team A name", "Nome Equipe A") : t(locale, "Nombre Equipo B", "Team B name", "Nome Equipe B")}
-              className="w-full max-w-56 rounded-lg border border-white/15 bg-transparent px-2 py-1 text-center text-[11px] font-black uppercase tracking-widest text-white/70 outline-none focus:border-volt"
-            />
-            <p className="text-8xl font-black text-crimson tabular-nums">{swapped ? payload.scoreA : payload.scoreB}</p>
-            <p className="text-xl font-bold text-volt">Sets {swapped ? payload.setA : payload.setB}</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => bump(swapped ? "scoreA" : "scoreB", 1)}
-                className="tap h-12 w-12 rounded-full bg-crimson/20 text-crimson text-2xl font-black hover:bg-crimson/40"
-              >
-                +1
-              </button>
-              <button
-                type="button"
-                onClick={() => bump(swapped ? "scoreA" : "scoreB", -1)}
-                className="tap h-12 w-12 rounded-full bg-white/10 text-white/70 text-2xl font-black"
-              >
-                −1
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 grid grid-cols-3 gap-3">
-          <button
-            type="button"
-            onClick={() => setPayload((current) => ({ ...current, service: current.service === "A" ? "B" : "A" }))}
-            className="tap h-16 rounded-2xl bg-crimson text-3xl font-black tracking-widest text-white hover:bg-imperial"
-          >
-            {payload.service === "A" ? t(locale, "Saque A", "Serve A", "Saque A") : t(locale, "Saque B", "Serve B", "Saque B")}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const a = payload.scoreA;
-              const b = payload.scoreB;
-              if ((a >= 25 && a - b >= 2) || (b >= 25 && b - a >= 2)) {
-                setPayload((current) => ({
-                  ...current,
-                  setA: current.setA + (a > b ? 1 : 0),
-                  setB: current.setB + (b > a ? 1 : 0),
-                  scoreA: 0,
-                  scoreB: 0,
-                  service: current.service === "A" ? "B" : "A",
-                }));
-              }
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 900,
+              color: "#FBBF24",
+              background: "rgba(251,191,36,0.12)",
+              borderRadius: 999,
+              padding: "3px 10px",
+              whiteSpace: "nowrap",
             }}
-            className="tap h-16 rounded-2xl bg-volt text-xl font-black text-obsidian hover:bg-amber-400"
           >
-            {t(locale, "Pasar Set", "Advance Set", "Passar Set")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setPayload((current) => ({ ...current, setter: String(Number(current.setter) + 1) }))}
-            className="tap h-16 rounded-2xl bg-white/10 text-3xl font-black text-white"
-          >
-            Setter {payload.setter}
-          </button>
+            SET {payload.setA}-{payload.setB}
+          </span>
         </div>
+        <span
+          style={{
+            fontSize: "clamp(1.3rem, 3.5vmin, 2.2rem)",
+            fontVariantNumeric: "tabular-nums",
+            fontWeight: 900,
+            color: "#FBBF24",
+          }}
+        >
+          {payload.timer}
+        </span>
+        <button
+          type="button"
+          data-testid="gym-exit-btn"
+          onClick={exitBoard}
+          style={{ ...dockBtn, background: "rgba(225,29,72,0.25)", color: "#FDA4AF" }}
+        >
+          ✕ {t(locale, "Salir", "Exit", "Sair")}
+        </button>
+      </div>
 
-        <p className="mt-3 text-center text-[10px] uppercase tracking-widest text-white/30">
-          {GYM_SCREEN[locale].hint}
-        </p>
+      {/* 50/50 arena */}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 12,
+          alignItems: "stretch",
+        }}
+      >
+        {teamCard(swapped ? "B" : "A", ACCENT_A)}
+        {teamCard(swapped ? "A" : "B", ACCENT_B)}
+      </div>
+
+      {/* Bottom floating controls capsule */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: 12,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 99995,
+          background: "rgba(14, 16, 23, 0.92)",
+          backdropFilter: "blur(14px)",
+          border: "1px solid rgba(255,255,255,0.18)",
+          borderRadius: 999,
+          padding: "6px 12px",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          maxWidth: "96vw",
+          overflowX: "auto",
+        }}
+      >
+        <button
+          type="button"
+          data-testid="gym-timer-toggle-btn"
+          aria-pressed={timerRunning}
+          onClick={() => setTimerRunning((current) => !current)}
+          style={{ ...dockBtn, fontSize: 18 }}
+        >
+          {timerRunning ? "⏸️" : "▶️"}
+        </button>
+        <button type="button" onClick={() => setTimerMinutes(timerMinutes() + 60)} style={dockBtn}>
+          +1 Min
+        </button>
+        <button type="button" onClick={swapSides} style={dockBtn}>
+          🔄 {t(locale, "Cambio de Cancha", "Swap Sides", "Troca de Lado")}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setTimerRunning(false);
+            setTimerMinutes(0);
+            setPayload((current) => ({ ...current, scoreA: 0, scoreB: 0 }));
+          }}
+          style={{ ...dockBtn, color: "#FDA4AF" }}
+        >
+          ↺ Reset
+        </button>
+        <button type="button" data-testid="gym-fullscreen-btn" onClick={() => void toggleFullscreen()} style={dockBtn}>
+          ⛶ {t(locale, "Pantalla Completa", "Fullscreen", "Tela Cheia")}
+        </button>
+        <button type="button" onClick={exitBoard} style={{ ...dockBtn, background: "rgba(225,29,72,0.25)", color: "#FDA4AF" }}>
+          ✕ {t(locale, "Salir", "Exit", "Sair")}
+        </button>
       </div>
     </div>
   );

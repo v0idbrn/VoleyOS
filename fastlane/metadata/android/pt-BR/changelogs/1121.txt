@@ -1,0 +1,6 @@
+v11.2.1 — Placar em tela cheia de verdade
+• Tela Gigante do Ginásio e Modo Mesa ocupam 100vw × 100dvh sem rolagem.
+• A barra superior e a navegação inferior ficam ocultas enquanto o placar está aberto.
+• Arena 50/50 com pontos gigantes, sets e botões flutuantes +1 / −1 / +1 Set.
+• Cápsula flutuante: cronômetro, +1 min, troca de lado, reiniciar, tela cheia e ✕ Sair.
+• ✕ Sair volta ao Placar Indoor 6x6 com as barras do app restauradas.
