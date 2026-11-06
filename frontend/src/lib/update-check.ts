@@ -1,4 +1,4 @@
-﻿/** On-demand GitHub release checker: fires only when the user taps it. */
+/** On-demand GitHub release checker: fires only when the user taps it. */
 
 export const APP_VERSION = "11.3.1";
 
