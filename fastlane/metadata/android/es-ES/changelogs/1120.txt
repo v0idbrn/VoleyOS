@@ -1,0 +1,5 @@
+🔗 Estaciones unificadas por Live Match Bus (Cancha ↔ Gimnasio).
+📄 Acta Oficial FIVB con K1/K2/Side-Out y rotaciones R1-R6.
+🔊 WebAudio singleton compartido.
+✏️ Pizarra 60fps, auditoría 360x800 y 1366x768 sin defectos nuevos.
+🏷️ v11.2.0/1120.

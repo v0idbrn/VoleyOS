@@ -62,6 +62,15 @@ function audioContext(): AudioContext | null {
   }
 }
 
+/**
+ * v11.2.0 — the one shared AudioContext for every sound in the app (whistles,
+ * buzzers, metronomes, TTS fallback chimes). Browsers cap the number of live
+ * contexts, so nothing should ever build its own.
+ */
+export function getSharedAudioContext(): AudioContext | null {
+  return audioContext();
+}
+
 function resume(audio: AudioContext): void {
   void audio.resume().catch(() => undefined);
 }

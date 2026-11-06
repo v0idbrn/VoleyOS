@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { playWhistle } from "@/lib/court-audio";
 import { DEFAULT_GYM_PAYLOAD, GYM_SCREEN } from "@/lib/gym-screen";
 import { t } from "@/lib/i18n";
+import { readLiveMatchSnapshot, type LiveMatchSnapshot } from "@/components/stations";
 import type { Locale } from "@/lib/local-engines";
 
 interface GymScreenModuleProps {
@@ -17,9 +18,34 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
   const [swapped, setSwapped] = useState(false);
   const [nameA, setNameA] = useState(t(locale, "EQUIPO A", "TEAM A", "EQUIPE A"));
   const [nameB, setNameB] = useState(t(locale, "EQUIPO B", "TEAM B", "EQUIPE B"));
+  const [busSynced, setBusSynced] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+
+  // v11.2.0 — mirror the shared Live Match Bus snapshot (team names + score).
+  useEffect(() => {
+    const applySnapshot = (snapshot: LiveMatchSnapshot | null): void => {
+      if (!snapshot?.teamA || !snapshot?.teamB) return;
+      setBusSynced(true);
+      setNameA(snapshot.teamA);
+      setNameB(snapshot.teamB);
+      setPayload((current) => ({
+        ...current,
+        scoreA: snapshot.scoreA,
+        scoreB: snapshot.scoreB,
+        setA: snapshot.setsA,
+        setB: snapshot.setsB,
+        service: snapshot.serving,
+        rotation: snapshot.rotation,
+        sanctions: snapshot.sanctions,
+      }));
+    };
+    applySnapshot(readLiveMatchSnapshot());
+    const onSync = (event: Event): void => applySnapshot((event as CustomEvent<LiveMatchSnapshot>).detail);
+    window.addEventListener("voleyos-live-match-sync", onSync);
+    return () => window.removeEventListener("voleyos-live-match-sync", onSync);
+  }, []);
 
   useEffect(() => {
     const bridge = (window as Window & { VoleyOSBridge?: { openGymScreen?: (payload: typeof DEFAULT_GYM_PAYLOAD) => void } }).VoleyOSBridge;
@@ -97,6 +123,11 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
           <p className="text-[10px] font-black uppercase tracking-[0.24em] text-crimson">
             Módulo
           </p>
+          {busSynced ? (
+            <span data-testid="live-bus-sync-badge" className="text-[9px] font-bold uppercase tracking-wider text-emerald/70 bg-emerald/10 px-2 py-1 rounded">
+              🔗 {t(locale, "Sincronizado con Cancha en Vivo", "Synced with Live Court", "Sincronizado com a Quadra ao Vivo")}
+            </span>
+          ) : null}
           <button
             type="button"
             onClick={onClose}

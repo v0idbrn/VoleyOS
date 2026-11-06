@@ -1,0 +1,5 @@
+🔗 Estações unificadas pelo Live Match Bus (Quadra ↔ Ginásio).
+📄 Súmula Oficial FIVB com K1/K2/Side-Out e rodízios R1-R6.
+🔊 WebAudio singleton compartilhado.
+✏️ Lousa 60fps; auditoria 360x800 e 1366x768 sem novos defeitos.
+🏷️ v11.2.0/1120.

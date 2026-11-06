@@ -106,6 +106,7 @@ import {
   tagLastScoutPoint,
   totalStats,
   undoScoutPoint,
+  type RotationStats,
   type ScoutAction,
   type ScoutSession,
   type ZonePreset,
@@ -378,6 +379,54 @@ const LIVE_STATION_SLUGS = new Set([
   "gym-screen",
   "system-transition",
 ]);
+/* v11.2.0 — Reactive Live Match State Bus (shared across all stations) */
+export const LIVE_MATCH_BUS_KEY = "voleyos_live_match_bus_v1";
+
+export interface LiveMatchSnapshot {
+  teamA: string;
+  teamB: string;
+  scoreA: number;
+  scoreB: number;
+  setsA: number;
+  setsB: number;
+  serving: "A" | "B";
+  rotation: number;
+  sanctions: Array<{ type: string; minute: number }>;
+}
+
+export function readLiveMatchSnapshot(): LiveMatchSnapshot | null {
+  try {
+    const raw = window.localStorage.getItem(LIVE_MATCH_BUS_KEY);
+    return raw ? (JSON.parse(raw) as LiveMatchSnapshot) : null;
+  } catch {
+    return null;
+  }
+}
+
+function broadcastLiveMatchSnapshot(state: LiveMatchSnapshot): void {
+  try {
+    window.localStorage.setItem(LIVE_MATCH_BUS_KEY, JSON.stringify(state));
+    window.dispatchEvent(new CustomEvent("voleyos-live-match-sync", { detail: state }));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/** v11.2.0 — hook: subscribe this station to the shared match snapshot. */
+function useLiveMatchBus(initial: LiveMatchSnapshot): LiveMatchSnapshot {
+  const [state, setState] = useState(initial);
+  useEffect(() => {
+    const onSync = (event: Event): void => {
+      const detail = (event as CustomEvent<LiveMatchSnapshot>).detail;
+      if (detail) setState(detail);
+    };
+    const stored = readLiveMatchSnapshot();
+    if (stored) setState(stored);
+    window.addEventListener("voleyos-live-match-sync", onSync);
+    return () => window.removeEventListener("voleyos-live-match-sync", onSync);
+  }, []);
+  return state;
+}
 
 function StationShell({
   meta,
@@ -1203,6 +1252,40 @@ function stateFromPacket(packet: LiveMatchPacket): ScoreboardState {
 
 /** Minimal structural type... (removed — shared interface lives near ScoutingStation) */
 
+/**
+ * v11.2.0 — official FIVB-style match sheet (Acta / Súmula): teams, sets,
+ * points, K1/K2/Side-Out percentages and the R1–R6 rotation orders. Stats come
+ * from the live scout session; without scout data they render as "—"
+ * instead of NaN.
+ */
+function buildMatchSheetText(
+  state: ScoreboardState,
+  locale: Locale,
+  statsA: RotationStats,
+  statsB: RotationStats,
+  sideOutA: number,
+  sideOutB: number,
+): string {
+  const rotationRow = (lineup: number[]): string =>
+    lineup.slice(0, 6).map((number, index) => `R${index + 1} #${number}`).join(" · ") || "—";
+  const setsText =
+    (state.setHistory ?? []).map((entry) => `${entry.scoreA}-${entry.scoreB}`).join(" | ") || `${state.scoreA}-${state.scoreB}`;
+  return [
+    `🏐 VoleyOS — ${t(locale, "Planilla / Acta Oficial", "Official Match Sheet", "Súmula Oficial")}`,
+    `${t(locale, "Equipos", "Teams", "Equipes")}: ${state.teamA} vs ${state.teamB}`,
+    `${t(locale, "Sets", "Sets", "Sets")}: ${state.setsA}-${state.setsB}  (${setsText})`,
+    `${t(locale, "Puntos (set en juego)", "Points (current set)", "Pontos (set em jogo)")}: ${state.scoreA}-${state.scoreB}`,
+    `K1% ${fmtSheetPct(statsA.k1Pct)} / ${fmtSheetPct(statsB.k1Pct)} · K2% ${fmtSheetPct(statsA.k2Pct)} / ${fmtSheetPct(statsB.k2Pct)} · Side-Out% ${fmtSheetPct(sideOutA)} / ${fmtSheetPct(sideOutB)}`,
+    `${state.teamA}: ${rotationRow(state.lineupA)}`,
+    `${state.teamB}: ${rotationRow(state.lineupB)}`,
+  ].join("\n");
+}
+
+/** Zero-NaN guard: scout-free matches print an em dash, never "NaN%". */
+function fmtSheetPct(value: number): string {
+  return Number.isFinite(value) ? `${value.toFixed(1)}%` : "—";
+}
+
 export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [matchFormat, setMatchFormat] = useState<"bo3" | "bo5" | "short15">("bo3");
   const [preset, setPreset] = useState<"picadito" | "king" | "oficial">("oficial");
@@ -1264,6 +1347,8 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [dvwCommand, setDvwCommand] = useState("");
   const [dvwLog, setDvwLog] = useState<string[]>([]);
   const [dvwNotice, setDvwNotice] = useState<string | null>(null);
+  // v11.2.0 — official match sheet (Acta) toggle.
+  const [sheetOpen, setSheetOpen] = useState(false);
   const dvwFileRef = useRef<HTMLInputElement | null>(null);
   // v11.0.4 — pointer drag-to-scroll for the jersey chip strip.
   const jerseyDrag = useRef<{ x: number; left: number } | null>(null);
@@ -1282,6 +1367,21 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
     window.addEventListener("volleyos:uimode", onUiMode);
     return () => window.removeEventListener("volleyos:uimode", onUiMode);
   }, []);
+
+  // v11.2.0 — this board is the source of truth for the Live Match Bus.
+  useEffect(() => {
+    broadcastLiveMatchSnapshot({
+      teamA: state.teamA,
+      teamB: state.teamB,
+      scoreA: state.scoreA,
+      scoreB: state.scoreB,
+      setsA: state.setsA,
+      setsB: state.setsB,
+      serving: state.serving,
+      rotation: state.setNumber,
+      sanctions: [],
+    });
+  }, [state.teamA, state.teamB, state.scoreA, state.scoreB, state.setsA, state.setsB, state.serving, state.setNumber]);
   const undoTimerRef = useRef<number | null>(null);
   /** v10.3.0 — always holds the freshest keyboard closure (no stale hotkeys). */
   const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
@@ -2740,6 +2840,18 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         >
           📋 {t(locale, "Copiar Resumen", "Copy Summary", "Copiar Resumo")}
         </button>
+        <button
+          type="button"
+          data-testid="export-match-sheet-btn"
+          aria-pressed={sheetOpen}
+          onClick={() => {
+            setSheetOpen((current) => !current);
+            triggerCourtHaptics(12);
+          }}
+          className="rounded-lg border border-white/20 bg-white/5 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white/80 transition hover:border-volt hover:text-volt focus-visible:outline focus-visible:outline-2 focus-visible:outline-volt"
+        >
+          📄 {t(locale, "Planilla / Acta Oficial", "Official Match Sheet", "Súmula Oficial")}
+        </button>
         <span
           data-testid="pc-shortcuts-hint"
           className="hidden rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-white/45 lg:inline-block"
@@ -2785,6 +2897,49 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
             : `🔒 ${t(locale, "Respetar Lock del Celu", "Respect Phone Lock", "Respeitar Lock do Celular")}`}
         </button>
       </div>
+      {sheetOpen ? (
+        <div data-testid="official-match-sheet-card" className="mb-2 rounded-xl border border-volt/40 bg-obsidian/80 p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-volt">
+            📄 {t(locale, "Planilla / Acta Oficial", "Official Match Sheet", "Súmula Oficial")}
+          </p>
+          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-white/85">
+{buildMatchSheetText(state, locale, statsA, statsB, sideOutPct("A"), sideOutPct("B"))}
+          </pre>
+          <div className="mt-2 flex flex-wrap gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard?.writeText(buildMatchSheetText(state, locale, statsA, statsB, sideOutPct("A"), sideOutPct("B"))).catch(() => undefined);
+                triggerCourtHaptics(12);
+                setMessage(t(locale, "📋 Acta copiada.", "📋 Match sheet copied.", "📋 Súmula copiada."));
+              }}
+              className={BTN}
+            >
+              📋 {t(locale, "Copiar Acta", "Copy Sheet", "Copiar Súmula")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  const blob = new Blob([buildMatchSheetText(state, locale, statsA, statsB, sideOutPct("A"), sideOutPct("B"))], { type: "text/plain;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  const anchor = document.createElement("a");
+                  anchor.href = url;
+                  anchor.download = `acta-${state.teamA}-${state.teamB}.txt`.replace(/\s+/g, "_");
+                  anchor.click();
+                  URL.revokeObjectURL(url);
+                } catch {
+                  /* download blocked: the copy button still works */
+                }
+                setMessage(t(locale, "📤 Acta descargada.", "📤 Match sheet downloaded.", "📤 Súmula baixada."));
+              }}
+              className={BTN}
+            >
+              ⬇️ {t(locale, "Descargar .TXT", "Download .TXT", "Baixar .TXT")}
+            </button>
+          </div>
+        </div>
+      ) : null}
       {uiMode === "pro" ? (
         <div className="mb-2 flex flex-wrap gap-1">
           <button type="button" onClick={() => startPicadito()} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "picadito" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>⚡ {t(locale, "Picadito", "Pickup", "Rachinha")}</button>
@@ -6242,8 +6397,11 @@ export function TimeoutChalkboardStation({ meta, locale, onSave }: StationProps)
           const stroke = activeStroke.current;
           const point = boardPoint(event);
           if (!stroke || !point || event.buttons <= 0) return;
+          // v11.2.0 — 60fps on low-end devices: skip sub-4px jitter points.
+          const previous = stroke.points[stroke.points.length - 1];
+          if (previous && Math.hypot(point[0] - previous[0], point[1] - previous[1]) < 4) return;
           stroke.points.push(point);
-          setStrokes((previous) => [...previous.slice(0, -1), { ...stroke, points: [...stroke.points] }]);
+          setStrokes((previousStrokes) => [...previousStrokes.slice(0, -1), { ...stroke, points: [...stroke.points] }]);
         }}
         onPointerUp={() => {
           if (activeStroke.current && activeStroke.current.points.length >= 2) {

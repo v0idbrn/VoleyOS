@@ -12,6 +12,7 @@ import path from "node:path";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { GymScreenModule } from "@/components/GymScreenModule";
 import { STATIONS } from "@/components/stations";
 import { VolleyOSHub } from "@/components/VolleyOSHub";
 import { MODULES } from "@/lib/modules";
@@ -209,5 +210,48 @@ describe("v11.1.0 — form control contrast", () => {
     const text = stationText("scoreboard", "es");
     expect(text).not.toContain("undefined");
     expect(text.trim().length).toBeGreaterThan(40);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * v11.2.0 — Live Match Bus & Official Match Sheet
+ * ------------------------------------------------------------------ */
+
+describe("v11.2.0 — live bus sync badge & official match sheet", () => {
+  it("shows live-bus-sync-badge in the gym screen when the bus carries a snapshot", () => {
+    window.localStorage.setItem(
+      "voleyos_live_match_bus_v1",
+      JSON.stringify({
+        teamA: "Tiburones",
+        teamB: "Cóndores",
+        scoreA: 12,
+        scoreB: 9,
+        setsA: 1,
+        setsB: 1,
+        serving: "A",
+        rotation: 3,
+        sanctions: [],
+      }),
+    );
+    render(<GymScreenModule locale="es" onClose={() => undefined} />);
+    const badge = screen.getByTestId("live-bus-sync-badge");
+    expect(badge).toBeTruthy();
+    expect(badge.textContent).not.toMatch(/NaN|undefined/);
+    expect(screen.getByDisplayValue("Tiburones")).toBeTruthy();
+    expect(screen.getByDisplayValue("Cóndores")).toBeTruthy();
+  });
+
+  it("exports the official match sheet with K1/K2/Side-Out and R1–R6 and zero NaN", () => {
+    const meta = MODULES.find((entry) => entry.slug === "scoreboard");
+    const Station = STATIONS.scoreboard;
+    if (!meta || !Station) throw new Error("scoreboard station missing");
+    render(<Station meta={meta} locale="es" onSave={() => undefined} />);
+    fireEvent.click(screen.getByTestId("export-match-sheet-btn"));
+    const card = screen.getByTestId("official-match-sheet-card");
+    expect(card.textContent).toContain("K1%");
+    expect(card.textContent).toContain("Side-Out%");
+    expect(card.textContent).toContain("R1");
+    expect(card.textContent).not.toContain("NaN");
+    expect(card.textContent).not.toContain("undefined");
   });
 });

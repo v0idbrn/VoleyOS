@@ -28,7 +28,8 @@ export type GymPayload = {
   service: "A" | "B";
   timer: string;
   setter: string;
-};
+  rotation: number;
+  sanctions: Array<{type: string; minute: number}>;};
 
 export const DEFAULT_GYM_PAYLOAD: GymPayload = {
   title: "Gym Scoreboard",
@@ -39,4 +40,6 @@ export const DEFAULT_GYM_PAYLOAD: GymPayload = {
   service: "A",
   timer: "00:00",
   setter: "1",
+  rotation: 1,
+  sanctions: [],
 };
