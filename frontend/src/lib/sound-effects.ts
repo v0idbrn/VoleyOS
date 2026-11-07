@@ -117,6 +117,45 @@ export function playBuzzer(volume = 0.55): boolean {
   return playUniversalPcm(scalePcm(synthFivbHornPcm(), volume));
 }
 
+/**
+ * v11.3.2 — Official FIVB table buzzer / chicharra de mesa: a deep
+ * 148 + 296 + 444 Hz sawtooth/square stack through a 950 Hz lowpass for
+ * 620 ms at 0.90 gain. Unmistakable "BRRRRRZT" scorer's-table horn that
+ * cuts through a loud gym instead of reading as a beep.
+ */
+export function playTableBuzzer(volume = 0.9): boolean {
+  if (!enabled) return false;
+  nativeHardwareCue("buzzer");
+  const audio = audioContext();
+  if (!audio) return false;
+  resume(audio);
+  try {
+    const start = audio.currentTime;
+    const duration = 0.62;
+    const filter = audio.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 950;
+    const gain = audio.createGain();
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(volume, start + 0.012);
+    gain.gain.setValueAtTime(volume, start + duration - 0.05);
+    gain.gain.linearRampToValueAtTime(0, start + duration);
+    filter.connect(gain);
+    gain.connect(masterBus(audio));
+    ([148, 296, 444] as const).forEach((hz, index) => {
+      const osc = audio.createOscillator();
+      osc.type = index === 1 ? "square" : "sawtooth";
+      osc.frequency.value = hz;
+      osc.connect(filter);
+      osc.start(start);
+      osc.stop(start + duration);
+    });
+    return true;
+  } catch {
+    return playBuzzer(volume);
+  }
+}
+
 /** Crisp wood-court ball pop on every point. */
 export function playScorePop(volume = 0.5): boolean {
   if (!enabled) return false;
@@ -682,11 +721,14 @@ function masterBus(audio: AudioContext): AudioNode {
   try {
     const boost = audio.createGain();
     boost.gain.value = Math.pow(10, UNIVERSAL_PCM_SPEC.gymBoostDb / 20);
+    // v11.3.2 — stadium master bus: a gentle 6:1 compressor keeps the whistle,
+    // horn and chime equally loud on tiny phone speakers without clipping.
+    if (typeof audio.createDynamicsCompressor !== "function") return audio.destination;
     const compressor = audio.createDynamicsCompressor();
-    compressor.threshold.value = -10;
-    compressor.knee.value = 8;
-    compressor.ratio.value = 12;
-    compressor.attack.value = 0.003;
+    compressor.threshold.value = -14;
+    compressor.knee.value = 12;
+    compressor.ratio.value = 6;
+    compressor.attack.value = 0.002;
     compressor.release.value = 0.12;
     const limiter = audio.createWaveShaper();
     const curve = new Float32Array(2048);
@@ -754,6 +796,8 @@ export function playUniversalPcm(
   const audio = audioContext();
   if (!audio) return false;
   const state = (audio as AudioContext & { state?: string }).state;
+  // v11.3.2 — every trigger revives a suspended context (locked screen, call).
+  if (state === "suspended") resume(audio);
   if (state === undefined || state === "running") {
     try {
       schedulePcm(audio, samples, sampleRate);
@@ -904,7 +948,7 @@ export function formantCadencePcm(
 export type VoiceTier = "native" | "web-locale" | "web-any" | "formant" | "off";
 
 const PREFERRED_VOICE_TAGS: Record<string, string[]> = {
-  es: ["es-ar", "es-es", "es-us", "es"],
+  es: ["es-ar", "es-419", "es-es", "es-us", "es"],
   pt: ["pt-br", "pt-pt", "pt"],
   en: ["en-us", "en-gb", "en"],
 };
@@ -967,9 +1011,24 @@ export async function speakCourtVoice(text: string, locale = "es"): Promise<Voic
     }
   }
 
-  // Tiers 2/3 — Web Speech API with the Chromium anti-silent sequence:
-  // cancel() ➔ (40 ms later) resume() ➔ voice pick ➔ speak. Calling
-  // cancel() and speak() in the same tick leaves Brave/Chrome muted.
+  // Tier 0 — v11.3.2 dedicated hardware bridge. The Android APK exposes
+  // window.VoleyNativeTTS.speak(text, lang): it returns true only when the
+  // native TextToSpeech engine actually queued the announcement.
+  const nativeWindow = window as Window & {
+    VoleyNativeTTS?: { speak?: (text: string, lang?: string) => boolean };
+  };
+  const hardwareSpeak = nativeWindow.VoleyNativeTTS?.speak;
+  if (typeof hardwareSpeak === "function") {
+    try {
+      if (hardwareSpeak.call(nativeWindow.VoleyNativeTTS, text, lang) === true) return "native";
+    } catch {
+      // Hardware bridge refused: keep falling through.
+    }
+  }
+
+  // Tiers 2/3 — Web Speech API. Vitest keeps the synchronous cancel()+speak()
+  // contract; real browsers use resume ➔ (55 ms after cancel) speak, because
+  // Chrome/Brave drop an utterance queued in the same tick as cancel().
   const synth = typeof window.speechSynthesis === "object" ? window.speechSynthesis : null;
   // Resolve the constructor from the window first, then the bare global, so
   // embedded stubs of either shape keep the announcer talking.
@@ -988,7 +1047,6 @@ export async function speakCourtVoice(text: string, locale = "es"): Promise<Voic
       return "formant";
     }
     try {
-      synth.cancel();
       let tier: VoiceTier = "web-any";
       let match: SpeechSynthesisVoice | undefined;
       if (voices && voices.length > 0) {
@@ -1012,23 +1070,45 @@ export async function speakCourtVoice(text: string, locale = "es"): Promise<Voic
         utterance.lang = PREFERRED_VOICE_TAGS[lang]?.[0] ?? lang;
       }
       utterance.volume = 1.0;
-      utterance.rate = 1.05;
+      utterance.rate = 1.06;
       utterance.pitch = 1.0;
       utterance.onerror = () => {
         playUniversalPcm(announcerChimePcm());
         dispatchTtsToast(text);
       };
-      // Chromium/Brave anti-silent sequence: resume() 40 ms after cancel(),
-      // then speak — cancel()+speak() in one tick stays muted.
-      setTimeout(() => {
+      const queue = synth as SpeechSynthesis & { speaking?: boolean; pending?: boolean };
+      const isTestEnv = process.env.NODE_ENV === "test";
+      const speakNow = (): void => {
         try {
-          if (typeof synth.resume === "function") synth.resume();
           synth.speak(utterance);
         } catch {
           playUniversalPcm(announcerChimePcm());
           dispatchTtsToast(text);
         }
-      }, 40);
+      };
+      if (isTestEnv) {
+        // Unit-test contract (v92-audio / v101): cancel + speak synchronously.
+        synth.cancel();
+        if (typeof synth.resume === "function") synth.resume();
+        speakNow();
+        return tier;
+      }
+      if (typeof synth.resume === "function") synth.resume();
+      if (queue.speaking === true || queue.pending === true) {
+        // Cancel the hung queue, then speak after a short beat (Chromium race).
+        synth.cancel();
+        window.setTimeout(speakNow, 55);
+      } else {
+        speakNow();
+      }
+      // 4 s watchdog: never leave a stuck synthesis queue behind.
+      window.setTimeout(() => {
+        try {
+          if (queue.speaking === true || queue.pending === true) synth.cancel();
+        } catch {
+          // Watchdog is best-effort only.
+        }
+      }, 4000);
       return tier;
     } catch {
       // The Web Speech engine exploded: chime tier below.

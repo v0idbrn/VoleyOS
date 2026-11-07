@@ -1,0 +1,1 @@
+Scoreboard-first court: team cards and the primary toolbar now sit at the top, with setup, rules and sheet tucked into one drawer. Only one team wears the SERVER badge at 0-0. Native Android TTS bridge with a bulletproof voice queue, a real FIVB table buzzer, stadium-grade compressor, and the 1.45 MB demo GIF moved out of the APK.

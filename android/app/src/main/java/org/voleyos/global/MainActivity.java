@@ -981,6 +981,61 @@ public class MainActivity extends Activity {
     }
 
     /**
+     * v11.3.2 — Tier-0 hardware voice exposed to the page as
+     * window.VoleyNativeTTS. The WebView's own speechSynthesis is unreliable on
+     * many Android builds (voices never load, queues deadlock), so the score
+     * announcer calls straight into android.speech.tts.TextToSpeech.
+     */
+    public static class VoleyTtsBridge {
+        private final MainActivity activity;
+
+        VoleyTtsBridge(MainActivity activity) {
+            this.activity = activity;
+        }
+
+        /** Speaks with QUEUE_FLUSH so the newest score call always wins. */
+        @JavascriptInterface
+        public boolean speak(String text, String langTag) {
+            MainActivity host = activity;
+            TextToSpeech tts = host == null ? null : host.nativeTts;
+            if (tts == null || text == null || text.trim().isEmpty()) return false;
+            try {
+                String tag = langTag == null ? "" : langTag.toLowerCase(Locale.ROOT);
+                Locale locale = tag.startsWith("en") ? Locale.US
+                        : tag.startsWith("pt") ? new Locale("pt", "BR")
+                        : new Locale("es", "AR");
+                int applied = tts.setLanguage(locale);
+                if (applied == TextToSpeech.LANG_MISSING_DATA
+                        || applied == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    applied = tts.setLanguage(Locale.getDefault());
+                }
+                if (applied < 0) return false;
+                tts.setSpeechRate(1.06f);
+                tts.setPitch(1.0f);
+                int queued = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null,
+                        "vos_" + System.currentTimeMillis());
+                return queued == TextToSpeech.SUCCESS;
+            } catch (Throwable t) {
+                return false; // any native failure → JS keeps the Web tiers
+            }
+        }
+
+        /** Hard-stops an in-flight announcement (new score call wins). */
+        @JavascriptInterface
+        public void stop() {
+            MainActivity host = activity;
+            TextToSpeech tts = host == null ? null : host.nativeTts;
+            if (tts != null) {
+                try {
+                    tts.stop();
+                } catch (Throwable ignored) {
+                    // Stopping speech must never take the WebView down.
+                }
+            }
+        }
+    }
+
+    /**
      * Only our own shell loads inside the WebView. Every external link
      * (ko-fi.com, wa.me, github.com, ...) leaves for the system browser.
      */
@@ -1080,6 +1135,8 @@ public class MainActivity extends Activity {
             }
         });
         webView.addJavascriptInterface(new VosleyOSBridge(this), "VoleyOSBridge");
+        // v11.3.2 — dedicated hardware TTS bridge (window.VoleyNativeTTS).
+        webView.addJavascriptInterface(new VoleyTtsBridge(this), "VoleyNativeTTS");
 
         // v10.1.1 — a stock WebView silently ignores alert()/confirm()/prompt(),
         // which makes any button that uses them look 100% dead. Render the three

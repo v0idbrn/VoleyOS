@@ -11,6 +11,8 @@ import {
   playMikasaSpikeThump,
   playPicaditoCue,
   playSetWinFanfare,
+  playTableBuzzer,
+  speakCourtVoice,
   playWhistle as playUnifiedWhistle,
 } from "@/lib/sound-effects";
 
@@ -92,4 +94,37 @@ export function playArenaCue(cue: ArenaCue, volume = 0.5): boolean {
 export function playWhistle(kind: WhistleKind = "short", volume = 0.7): boolean {
   if (!courtAudioEnabled) return false;
   return playUnifiedWhistle(kind, volume);
+}
+
+/**
+ * v11.3.2 — official FIVB table buzzer (🚨 Chicharra): 148 + 296 + 444 Hz
+ * through a 950 Hz lowpass for 620 ms. Deep scorer's-table "BRRRRRZT".
+ */
+export function playCourtTableBuzzer(volume = 0.9): boolean {
+  if (!courtAudioEnabled) return false;
+  return playTableBuzzer(volume);
+}
+
+/**
+ * v11.3.2 — voice announcer entrypoint. The hardware Android bridge
+ * (window.VoleyNativeTTS) always wins because WebView speechSynthesis is
+ * unreliable; otherwise the 4-tier Web cascade speaks.
+ */
+export function announceCourtVoice(text: string, locale = "es"): boolean {
+  if (!text) return false;
+  const lang = (locale || "es").slice(0, 2).toLowerCase();
+  if (typeof window !== "undefined") {
+    const bridge = (window as Window & {
+      VoleyNativeTTS?: { speak?: (text: string, langTag: string) => boolean };
+    }).VoleyNativeTTS;
+    if (bridge && typeof bridge.speak === "function") {
+      try {
+        if (bridge.speak(text, lang) === true) return true;
+      } catch {
+        // Hardware engine refused: fall through to the Web voice.
+      }
+    }
+  }
+  void speakCourtVoice(text, lang);
+  return true;
 }

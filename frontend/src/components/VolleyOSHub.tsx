@@ -1321,7 +1321,7 @@ export function VolleyOSHub({ locale: routeLocale }: { locale: Locale }) {
       <div id="app-content" className="relative min-h-0 flex-1">
         {activeMeta ? (
           <>
-            <div className={`h-full no-scrollbar px-3 pt-3 ${immersiveBoard ? "overflow-hidden p-0" : "overflow-y-auto pb-28"}`}>
+            <div className={`h-full no-scrollbar px-3 pt-3 ${immersiveBoard ? "overflow-hidden p-0" : "overflow-y-auto pb-32"}`}>
               <div className="mx-auto w-full max-w-2xl">
                 {(() => {
                   if (activeMeta.slug === "gym-screen") {
@@ -1340,7 +1340,7 @@ export function VolleyOSHub({ locale: routeLocale }: { locale: Locale }) {
                 })()}
               </div>
             </div>
-            {!immersiveBoard ? (
+            {!immersiveBoard && activeMeta.slug !== "scoreboard" ? (
               <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-obsidian via-obsidian/90 to-transparent pb-1 pt-8">
               <div className="safe-bottom pointer-events-auto mx-auto flex max-w-2xl gap-2 px-3">
                 <button

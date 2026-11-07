@@ -263,7 +263,7 @@ describe("v11.0.2 ISO security, rotation bypass & F-Droid", () => {
       expect(resume).toHaveBeenCalled();
       const utterance = speak.mock.calls.at(-1)?.[0] as { volume?: number; rate?: number; pitch?: number };
       expect(utterance.volume).toBe(1);
-      expect(utterance.rate).toBe(1.05);
+      expect(utterance.rate).toBe(1.06);
       expect(utterance.pitch).toBe(1);
     } finally {
       delete (window as unknown as { speechSynthesis?: unknown }).speechSynthesis;

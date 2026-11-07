@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { playWhistle } from "@/lib/court-audio";
+import { announceCourtVoice, playCourtTableBuzzer, playWhistle } from "@/lib/court-audio";
 import { DEFAULT_GYM_PAYLOAD } from "@/lib/gym-screen";
 import { t } from "@/lib/i18n";
 import { readLiveMatchSnapshot, type LiveMatchSnapshot } from "@/components/stations";
@@ -29,6 +29,8 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
   const [busSynced, setBusSynced] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  // v11.3.2 — visible confirmation while the scorer tests the court voice.
+  const [voiceFlash, setVoiceFlash] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   // v11.2.0 — mirror the shared Live Match Bus snapshot (team names + score).
@@ -371,6 +373,36 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
           style={{ ...dockBtn, fontSize: 18 }}
         >
           {timerRunning ? "⏸️" : "▶️"}
+        </button>
+        <button
+          type="button"
+          data-testid="gym-buzzer-btn"
+          aria-label={t(locale, "Chicharra FIVB", "FIVB table buzzer", "Buzina FIVB")}
+          onClick={() => playCourtTableBuzzer()}
+          style={dockBtn}
+        >
+          🚨
+        </button>
+        <button
+          type="button"
+          data-testid="gym-tts-test-btn"
+          aria-label={t(locale, "Probar voz", "Test voice", "Testar voz")}
+          onClick={() => {
+            announceCourtVoice(
+              t(
+                locale,
+                `Punto local. ${payload.scoreA} a ${payload.scoreB}`,
+                `Home point, ${payload.scoreA} to ${payload.scoreB}`,
+                `Ponto local, ${payload.scoreA} a ${payload.scoreB}`,
+              ),
+              locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : "es-ES",
+            );
+            setVoiceFlash(true);
+            window.setTimeout(() => setVoiceFlash(false), 1800);
+          }}
+          style={dockBtn}
+        >
+          ▶ {voiceFlash ? t(locale, "Voz OK", "Voice OK", "Voz OK") : t(locale, "Voz", "Voice", "Voz")}
         </button>
         <button type="button" onClick={() => setTimerMinutes(timerMinutes() + 60)} style={dockBtn}>
           +1 Min

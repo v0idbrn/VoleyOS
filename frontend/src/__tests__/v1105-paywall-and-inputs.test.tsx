@@ -2,10 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GymScreenModule } from "@/components/GymScreenModule";
-import { AcwrStation, MatchupMatrixStation } from "@/components/stations";
+import { AcwrStation, MatchupMatrixStation, ScoreboardStation } from "@/components/stations";
 import { VolleyOSHub } from "@/components/VolleyOSHub";
 import { matchupMatrix } from "@/lib/local-engines";
 import { MODULE_BY_SLUG } from "@/lib/modules";
@@ -201,5 +201,62 @@ describe("v11.0.5 Paywall & Editable Inputs", () => {
       expect(text).not.toContain("paguen las rodillas");
       expect(text).not.toContain("razón agudo");
     }
+  });
+});
+
+describe("v11.3.2 scoreboard-first court & stadium audio", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    delete (window as Window & { VoleyNativeTTS?: unknown }).VoleyNativeTTS;
+  });
+
+  afterEach(() => {
+    cleanup();
+    delete (window as Window & { VoleyNativeTTS?: unknown }).VoleyNativeTTS;
+  });
+
+  it("surfaces the primary court toolbar and exactly one server badge at 0-0", () => {
+    render(<ScoreboardStation meta={meta("scoreboard")} locale="es" onSave={noop} />);
+    expect(screen.getByTestId("primary-court-toolbar")).toBeTruthy();
+    expect(screen.getByTestId("court-buzzer-btn")).toBeTruthy();
+    expect(screen.getByTestId("tts-test-btn")).toBeTruthy();
+    const badges = [screen.getByTestId("serve-badge-a"), screen.getByTestId("serve-badge-b")];
+    expect(badges.filter((badge) => badge.getAttribute("aria-pressed") === "true")).toHaveLength(1);
+  });
+
+  it("boots in clean court mode behind the setup drawer when the test flag is set", () => {
+    window.localStorage.setItem("voleyos_test_clean_court", "1");
+    render(<ScoreboardStation meta={meta("scoreboard")} locale="es" onSave={noop} />);
+    const toggle = screen.getByTestId("clean-court-toggle");
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    const rules = screen.getByTestId("drawer-rules-audio-btn");
+    expect(rules.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(rules);
+    expect(rules.getAttribute("aria-expanded")).toBe("true");
+    const scout = screen.getByTestId("drawer-scout-sheet-btn");
+    expect(scout.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(scout);
+    expect(scout.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("prefers window.VoleyNativeTTS for the voice test and fires the FIVB buzzer", async () => {
+    const nativeSpeak = vi.fn(() => true);
+    (window as Window & { VoleyNativeTTS?: unknown }).VoleyNativeTTS = { speak: nativeSpeak };
+    render(<ScoreboardStation meta={meta("scoreboard")} locale="es" onSave={noop} />);
+    fireEvent.click(screen.getByTestId("tts-test-btn"));
+    await waitFor(() => expect(nativeSpeak).toHaveBeenCalled());
+    expect(screen.getByTestId("tts-test-flash")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("court-buzzer-btn"));
+    expect(screen.getByTestId("court-buzzer-btn")).toBeTruthy();
+  });
+
+  it("ships the demo GIF in docs and keeps the OG card in public", async () => {
+    const { statSync } = await import("node:fs");
+    const gif = repo("docs", "voleyos-demo.gif");
+    const og = repo("frontend", "public", "og-preview.png");
+    expect(existsSync(gif)).toBe(true);
+    expect(existsSync(og)).toBe(true);
+    expect(statSync(gif).size).toBeGreaterThan(1024);
+    expect(statSync(og).size).toBeGreaterThan(1024);
   });
 });

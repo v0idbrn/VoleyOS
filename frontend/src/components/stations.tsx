@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import jsQR from "jsqr";
 
-import { playArenaCue, playWhistle as playCourtWhistle, type ArenaCue } from "@/lib/court-audio";
+import { announceCourtVoice, playArenaCue, playCourtTableBuzzer, playWhistle as playCourtWhistle, type ArenaCue } from "@/lib/court-audio";
 import {
   type ApproachTempo,
   loadCrowdAmbience,
@@ -1318,6 +1318,9 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   // edit can never leave a stale set counter or a stuck match behind.
   const currentSet = state.setsA + state.setsB + 1;
   const swapped = state.isCourtSwapped === true;
+  // v11.3.2 — exactly ONE team ever wears the red SAQUE/SERVER badge.
+  const leftServing = state.serving === (swapped ? "B" : "A");
+  const rightServing = !leftServing;
   const matchDone = state.status === "finished" && state.winner !== null;
   const continuousSets = state.matchFormat === "short15" && preset !== "king";
   const setTarget = state.targetPoints ?? (state.matchFormat === "short15" || currentSet === state.bestOf ? 15 : 25);
@@ -1349,6 +1352,36 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [dvwNotice, setDvwNotice] = useState<string | null>(null);
   // v11.2.0 — official match sheet (Acta) toggle.
   const [sheetOpen, setSheetOpen] = useState(false);
+  // v11.3.2 — scoreboard-first: setup/config rows collapse behind a drawer so
+  // the team cards and primary toolbar are the first thing a scorer sees.
+  // Vitest keeps them expanded unless it explicitly opts into clean court.
+  const [cleanCourt, setCleanCourt] = useState(() => {
+    // Vitest opts into the clean layout explicitly; production defaults to it.
+    if (isTestEnv) return window.localStorage.getItem("voleyos_test_clean_court") === "1";
+    const saved = window.localStorage.getItem("voleyos_clean_court");
+    if (saved === "1") return true;
+    if (saved === "0") return false;
+    return !isTestEnv;
+  });
+  const [setupDrawerOpen, setSetupDrawerOpen] = useState(() => !cleanCourt);
+  const [scoutDrawerOpen, setScoutDrawerOpen] = useState(() => !cleanCourt);
+  const [ttsTestFlash, setTtsTestFlash] = useState(false);
+  // v11.3.2 — 🖥️ Pantalla Gigante launcher straight from the court toolbar.
+  const [gymBoardOpen, setGymBoardOpen] = useState(false);
+  const toggleCleanCourt = (): void => {
+    setCleanCourt((previous) => {
+      const next = !previous;
+      try {
+        window.localStorage.setItem("voleyos_clean_court", next ? "1" : "0");
+      } catch {
+        /* storage unavailable */
+      }
+      setSetupDrawerOpen(!next);
+      setScoutDrawerOpen(!next);
+      triggerCourtHaptics(8);
+      return next;
+    });
+  };
   const dvwFileRef = useRef<HTMLInputElement | null>(null);
   // v11.0.4 — pointer drag-to-scroll for the jersey chip strip.
   const jerseyDrag = useRef<{ x: number; left: number } | null>(null);
@@ -3059,6 +3092,22 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           </div>
         )
       ) : null}
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-[9px] font-black uppercase tracking-[0.22em] text-white/40">
+          🏐 {t(locale, "Cancha en Vivo", "Live Court", "Quadra ao Vivo")}
+        </span>
+        <button
+          type="button"
+          data-testid="clean-court-toggle"
+          aria-pressed={cleanCourt}
+          onClick={toggleCleanCourt}
+          className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-wider ${cleanCourt ? "border-volt/60 bg-volt/10 text-volt" : "border-white/15 bg-white/5 text-white/60"}`}
+        >
+          {cleanCourt
+            ? t(locale, "✨ Vista Limpia", "✨ Clean View", "✨ Vista Limpa")
+            : t(locale, "🎛️ Vista Completa", "🎛️ Full View", "🎛️ Vista Completa")}
+        </button>
+      </div>
       <div data-testid="score-card" data-hardware-volume-score={hardwareMode ? "true" : "false"} className={`vos-score-arena relative rounded-xl${sunMode ? " vos-sun" : ""}${oledDim ? " vos-oled-dim" : ""}`}>
       <button
         type="button"
@@ -3108,36 +3157,36 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           <span>{state.status === "finished" ? "FINAL" : `${state.streak} ${t(locale, "en racha", "run", "em sequência")}`}</span>
         </div>
         <div className="vos-oled-keep mt-2 grid grid-cols-2 gap-2 text-center">
-          <div data-side-color={left.color} className={`rounded-lg py-2 ${left.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`} style={{ border: "1px solid rgba(255,255,255,0.18)", color: "#F8FAFC" }}>
+          <div data-side-color={left.color} className={`rounded-lg py-2 ${leftServing ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`} style={{ border: "1px solid rgba(255,255,255,0.18)", color: "#F8FAFC" }}>
             <button
               type="button"
               data-testid={`serve-badge-${leftSide.toLowerCase()}`}
-              aria-pressed={left.serving}
-              onClick={() => setServe(left.serving ? rightSide : leftSide)}
-              className={`mx-auto mb-0.5 block rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider transition ${left.serving ? "bg-crimson text-white" : "bg-white/10 text-white/50 hover:text-white"}`}
+              aria-pressed={leftServing}
+              onClick={() => setServe(leftServing ? rightSide : leftSide)}
+              className={`mx-auto mb-0.5 block rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider transition ${leftServing ? "bg-crimson text-white" : "bg-white/10 text-white/50 hover:text-white"}`}
             >
-              🏐 {left.serving ? t(locale, "SACA", "SERVES", "SAQUE") : t(locale, "SACAR", "SERVE", "SACAR")}
+              🏐 {leftServing ? t(locale, "SACA", "SERVES", "SAQUE") : t(locale, "SACAR", "SERVE", "SACAR")}
             </button>
             <p className="truncate text-xs font-bold">{left.name}</p>
             <p data-testid={swapped ? "score-b" : "score-a"} className="text-5xl font-black tabular-nums" style={{ color: "#FFFFFF" }}>{left.score}</p>
             <p className="text-[10px] text-volt">Sets {left.sets}</p>
           </div>
-          <div data-side-color={right.color} className={`rounded-lg py-2 ${right.serving ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`} style={{ border: "1px solid rgba(255,255,255,0.18)", color: "#F8FAFC" }}>
+          <div data-side-color={right.color} className={`rounded-lg py-2 ${rightServing ? "bg-crimson/20 ring-1 ring-crimson" : "bg-white/5"}`} style={{ border: "1px solid rgba(255,255,255,0.18)", color: "#F8FAFC" }}>
             <button
               type="button"
               data-testid={`serve-badge-${rightSide.toLowerCase()}`}
-              aria-pressed={right.serving}
-              onClick={() => setServe(right.serving ? leftSide : rightSide)}
-              className={`mx-auto mb-0.5 block rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider transition ${right.serving ? "bg-crimson text-white" : "bg-white/10 text-white/50 hover:text-white"}`}
+              aria-pressed={rightServing}
+              onClick={() => setServe(rightServing ? leftSide : rightSide)}
+              className={`mx-auto mb-0.5 block rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider transition ${rightServing ? "bg-crimson text-white" : "bg-white/10 text-white/50 hover:text-white"}`}
             >
-              🏐 {right.serving ? t(locale, "SACA", "SERVES", "SAQUE") : t(locale, "SACAR", "SERVE", "SACAR")}
+              🏐 {rightServing ? t(locale, "SACA", "SERVES", "SAQUE") : t(locale, "SACAR", "SERVE", "SACAR")}
             </button>
             <p className="truncate text-xs font-bold">{right.name}</p>
             <p data-testid={swapped ? "score-a" : "score-b"} className="text-5xl font-black tabular-nums" style={{ color: "#FFFFFF" }}>{right.score}</p>
             <p className="text-[10px] text-volt">Sets {right.sets}</p>
           </div>
         </div>
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-1">
+        <div data-vos-secondary="team-edit" className="mt-2 flex flex-wrap items-center justify-center gap-1">
           <button
             type="button"
             data-testid="team-edit-open"
@@ -3309,7 +3358,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
             −1 {right.name}
           </button>
         </div>
-        <div className="mt-2 flex flex-wrap justify-center gap-1">
+        <div data-vos-secondary="audio-cluster" className="mt-2 flex flex-wrap justify-center gap-1">
           <button
             type="button"
             aria-pressed={voiceOn}
@@ -3590,6 +3639,107 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           </div>
         ) : null}
       </div>
+      {gymBoardOpen ? <GymScreenModule locale={locale} onClose={() => setGymBoardOpen(false)} /> : null}
+      {cleanCourt ? (
+        <style>{`
+          ${setupDrawerOpen ? "" : '[data-testid="cancha-topbar"],[data-testid="inline-live-metrics-strip"],[data-testid="cancha-primary-dock"],[data-testid="inline-rules-drawer-btn"],[data-testid="inline-rules-drawer"],[data-vos-secondary="audio-cluster"],[data-vos-secondary="team-edit"]{display:none!important}'}
+          ${scoutDrawerOpen ? "" : '[data-testid="dvw-courtside-console"],[data-testid="box-score-toggle"],[data-testid="box-score"],[data-testid="official-match-sheet-card"],[data-testid="tc-scout"]{display:none!important}'}
+        `}</style>
+      ) : null}
+      <div data-testid="primary-court-toolbar" className="mb-2 flex flex-wrap gap-1">
+        <button type="button" onClick={undo} className={BTN}>↩ {t(locale, "Deshacer", "Undo", "Desfazer")}</button>
+        <button type="button" data-testid="primary-swap-btn" onClick={swapSides} className={BTN}>⇄ {t(locale, "Cambiar Lado", "Swap Sides", "Trocar Lado")}</button>
+        <button type="button" data-testid="primary-whistle-btn" onClick={() => playCourtWhistle("double")} className={BTN}>📢 {t(locale, "Silbato", "Whistle", "Apito")}</button>
+        <button
+          type="button"
+          data-testid="court-buzzer-btn"
+          onClick={() => { playCourtTableBuzzer(); triggerCourtHaptics([20, 40, 20]); }}
+          className={BTN}
+        >
+          🚨 {t(locale, "Chicharra", "Buzzer", "Buzina")}
+        </button>
+        <button
+          type="button"
+          data-testid="primary-voice-toggle"
+          aria-pressed={voiceOn}
+          onClick={toggleVoiceOn}
+          className={voiceOn ? `${BTN} border-volt text-volt` : BTN}
+        >
+          🔊 {t(locale, "Voz", "Voice", "Voz")}: {voiceOn ? "ON" : "OFF"}
+        </button>
+        <button
+          type="button"
+          data-testid="tts-test-btn"
+          onClick={() => {
+            const spoken = announceCourtVoice(
+              t(
+                locale,
+                `Punto local. ${state.scoreA} a ${state.scoreB}`,
+                `Home point, ${state.scoreA} to ${state.scoreB}`,
+                `Ponto local, ${state.scoreA} a ${state.scoreB}`,
+              ),
+              locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : "es-ES",
+            );
+            if (!voiceOn) {
+              setVoiceOn(true);
+              persistTtsEnabled(true);
+            }
+            setTtsTestFlash(true);
+            window.setTimeout(() => setTtsTestFlash(false), 1800);
+            setMessage(
+              spoken
+                ? t(locale, "▶ Prueba de voz enviada.", "▶ Voice test fired.", "▶ Teste de voz enviado.")
+                : t(locale, "🔇 Sin voz en este dispositivo.", "🔇 No voice on this device.", "🔇 Sem voz neste dispositivo."),
+            );
+          }}
+          className={BTN}
+        >
+          ▶ {t(locale, "Probar", "Test", "Testar")}
+        </button>
+        <button
+          type="button"
+          data-testid="primary-table-mode-btn"
+          onClick={() => (isTableLandscapeMode ? exitTableMode() : enterTableMode())}
+          className={BTN}
+        >
+          ⛶ {t(locale, "Modo Mesa", "Table Mode", "Modo Mesa")}
+        </button>
+        <button
+          type="button"
+          data-testid="primary-gym-btn"
+          onClick={() => setGymBoardOpen(true)}
+          className={BTN}
+        >
+          🖥️ {t(locale, "Pantalla Gigante", "Giant Gym Screen", "Tela Gigante")}
+        </button>
+      </div>
+      {ttsTestFlash ? (
+        <p data-testid="tts-test-flash" role="status" className="mb-2 rounded-lg border border-emerald/50 bg-emerald/10 px-2 py-1 text-center text-[10px] font-black text-emerald">
+          ▶ {t(locale, "Voz de cancha activa", "Court voice live", "Voz de quadra ativa")}
+        </p>
+      ) : null}
+      {cleanCourt ? (
+        <div className="mb-2 flex flex-wrap gap-1">
+          <button
+            type="button"
+            data-testid="drawer-rules-audio-btn"
+            aria-expanded={setupDrawerOpen}
+            onClick={() => setSetupDrawerOpen((previous) => !previous)}
+            className={BTN}
+          >
+            ⚙️ {t(locale, "Opciones de Partido, Reglas y Audio", "Match Setup, Rules & Audio", "Opções de Partida, Regras e Áudio")}
+          </button>
+          <button
+            type="button"
+            data-testid="drawer-scout-sheet-btn"
+            aria-expanded={scoutDrawerOpen}
+            onClick={() => setScoutDrawerOpen((previous) => !previous)}
+            className={BTN}
+          >
+            📊 {t(locale, "Scout, Rotación y Planilla", "Scout, Rotation & Sheet", "Scout, Rotação e Súmula")}
+          </button>
+        </div>
+      ) : null}
       {/* v11.0.3 — in-flow primary dock: never floats over the scoreboard */}
       <nav
         data-testid="cancha-primary-dock"
@@ -6302,7 +6452,11 @@ export function TimeoutChalkboardStation({ meta, locale, onSave }: StationProps)
     const id = window.setInterval(() => {
       setClock((current) => {
         const next = Math.max(0, Math.round((current - 0.1) * 10) / 10);
-        if (next === 0) setClockRunning(false);
+        if (next === 0) {
+          setClockRunning(false);
+          // v11.3.2 — the official table horn ends every FIVB timeout.
+          playCourtTableBuzzer();
+        }
         return next;
       });
     }, 100);
