@@ -23,12 +23,15 @@ const PROJECT = path.resolve(HERE, "..");
 const OUT_DIR = path.join(PROJECT, "frontend", "out");
 const FRAMES = path.join(PROJECT, ".tmp_video_frames");
 const MP4 = path.join(PROJECT, "PRIVATE_APK", "voleyos-reddit-promo.mp4");
-const GIF = path.join(PROJECT, "frontend", "public", "voleyos-demo.gif");
+const GIF = path.join(PROJECT, "docs", "voleyos-demo.gif");
 const KEEP_FRAMES = process.argv.includes("--keep-frames");
 
 const PORT = 4199;
 const CDP_PORT = 9339;
+// Capture at 12 fps (CDP screenshots cannot keep up with 24) and encode at
+// a true 24 fps broadcast rate by duplicating frames in ffmpeg.
 const FPS = 12;
+const OUT_FPS = 24;
 const WIDTH = 1280;
 const HEIGHT = 720;
 
@@ -215,6 +218,32 @@ const PAGE_HELPERS = `(() => {
     el.dispatchEvent(new Event('input', { bubbles: true }));
     return true;
   };
+  window.__promoRing = (el) => {
+    const r = el.getBoundingClientRect();
+    const ring = document.createElement('div');
+    ring.style.cssText = 'position:fixed;z-index:2147483002;pointer-events:none;border-radius:999px;' +
+      'left:' + (r.left - 8) + 'px;top:' + (r.top - 8) + 'px;width:' + (r.width + 16) + 'px;height:' + (r.height + 16) + 'px;' +
+      'border:3px solid #E11D48;box-shadow:0 0 0 6px rgba(245,158,11,0.35),0 0 26px rgba(225,29,72,0.85);' +
+      'animation:__vosRing .55s ease-out forwards;';
+    document.body.appendChild(ring);
+    setTimeout(() => ring.remove(), 650);
+    let style = document.getElementById('__promo_ring_css');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = '__promo_ring_css';
+      style.textContent = '@keyframes __vosRing{0%{transform:scale(.75);opacity:1}100%{transform:scale(1.25);opacity:0}}';
+      document.head.appendChild(style);
+    }
+  };
+  window.__promoStyle = () => {
+    let s = document.getElementById('__promo_style');
+    if (!s) { s = document.createElement('style'); s.id = '__promo_style'; document.head.appendChild(s); }
+    s.textContent = '#app-content > div > div{max-width:1120px !important;width:100% !important;}' +
+      '#app-content > div{max-width:1120px !important;margin:0 auto;padding-bottom:8px !important;}' +
+      '#app-content > .absolute.inset-x-0.bottom-0{display:none !important;}' +
+      'footer, nav[data-testid="vos-bottom-nav"]{display:none !important;}';
+    return true;
+  };
   window.__promoTap = (regex) => {
     const re = new RegExp(regex, 'i');
     const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 40 && r.height > 20; };
@@ -222,6 +251,7 @@ const PAGE_HELPERS = `(() => {
       re.test(el.getAttribute('aria-label') || '') || re.test(el.textContent || ''),
     );
     if (!hit) return false;
+    window.__promoRing(hit);
     hit.click();
     return true;
   };
@@ -287,6 +317,7 @@ async function run() {
       await sleep(250);
     }
     await cdp.eval(PAGE_HELPERS);
+    await cdp.eval('window.__promoStyle()');
 
     const capture = async (index) => {
       const shot = await cdp.send("Page.captureScreenshot", { format: "png", captureFromSurface: true });
@@ -400,7 +431,7 @@ async function run() {
     await click("window.__promoType('[data-testid=\"acwr-day-input-0\"]', '320')");
     await beat(700);
     await click(
-      "window.__promoHero('VoleyOS v11.3', '100% Offline · Free &amp; Open Source (AGPL-3.0) · github.com/v0idbrn/VoleyOS')",
+      "window.__promoHero('VoleyOS v11.3.2', '100% Offline · Free &amp; Open Source (AGPL-3.0) · github.com/v0idbrn/VoleyOS')",
     );
     await beat(2000);
 
@@ -444,7 +475,7 @@ async function run() {
       "-movflags",
       "+faststart",
       "-r",
-      String(FPS),
+      String(OUT_FPS),
       MP4,
     ],
     { encoding: "utf8" },
@@ -458,7 +489,7 @@ async function run() {
       "-i",
       MP4,
       "-vf",
-      "fps=10,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=3",
+      "fps=12,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=3",
       "-loop",
       "0",
       GIF,
