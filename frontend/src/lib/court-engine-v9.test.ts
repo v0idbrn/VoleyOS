@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createSevenPlayerRoster,
+  rotateSevenPlayers,
+  sevenPlayerStatus,
+  undoRotateSevenPlayers,
+} from "./court-engine-v9";
+import {
   awardIndoorPoint,
   kingAwardWin,
   newKingOfCourt,
@@ -133,5 +139,44 @@ describe("v9 court engine: court swap, presets and king of the court", () => {
     expect(upset.queue).toEqual(["Titanes", "Tiburones"]); // loser to the back
     expect(upset.streakTeam).toBe("Vinchas");
     expect(upset.streak).toBe(1);
+  });
+});
+
+describe("v11.3.3 seven-player rotation wheel (6 on court + 1 at serve)", () => {
+  it("defaults to J1..J7 and cycles all seven players over seven rotations", () => {
+    const start = createSevenPlayerRoster();
+    expect(start).toEqual(["J1", "J2", "J3", "J4", "J5", "J6", "J7"]);
+    let roster = start;
+    const seenServers = new Set<string>();
+    for (let step = 0; step < 7; step += 1) {
+      const wheel = rotateSevenPlayers(roster);
+      seenServers.add(wheel.newServer);
+      expect(wheel.nextRoster).toHaveLength(7);
+      expect(wheel.enteringCourt).toBe(roster[0]);
+      expect(wheel.nextRoster[1]).toBe(wheel.nextInLine);
+      roster = wheel.nextRoster;
+    }
+    expect(roster).toEqual(start);
+    expect(seenServers.size).toBe(7);
+  });
+
+  it("undoRotateSevenPlayers restores the exact prior order", () => {
+    const start = createSevenPlayerRoster(["Ana", "Beto", "Caro", "Dani", "Ema", "Fabi", "Gabi"]);
+    const rotated = rotateSevenPlayers(start).nextRoster;
+    expect(rotated).not.toEqual(start);
+    expect(undoRotateSevenPlayers(rotated)).toEqual(start);
+    // Seven forward steps then seven undo steps is still the same wheel.
+    let walk = start;
+    for (let index = 0; index < 7; index += 1) walk = rotateSevenPlayers(walk).nextRoster;
+    for (let index = 0; index < 7; index += 1) walk = undoRotateSevenPlayers(walk);
+    expect(walk).toEqual(start);
+  });
+
+  it("keeps exactly six players on court and the seventh in the serve slot", () => {
+    const status = sevenPlayerStatus(createSevenPlayerRoster());
+    expect(status.onCourt).toHaveLength(6);
+    expect(status.server).toBe("J1");
+    expect(status.enteringCourt).toBe("J1");
+    expect(status.nextInLine).toBe("J2");
   });
 });

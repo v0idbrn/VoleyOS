@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { announceCourtVoice, playCourtTableBuzzer, playWhistle } from "@/lib/court-audio";
+import { sevenPlayerStatus } from "@/lib/court-engine-v9";
 import { DEFAULT_GYM_PAYLOAD } from "@/lib/gym-screen";
 import { t } from "@/lib/i18n";
 import { readLiveMatchSnapshot, type LiveMatchSnapshot } from "@/components/stations";
@@ -31,6 +32,26 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
   const [fullscreen, setFullscreen] = useState(false);
   // v11.3.2 — visible confirmation while the scorer tests the court voice.
   const [voiceFlash, setVoiceFlash] = useState(false);
+  // v11.3.3 — mirror the scoreboard's 7-player wheel for the gym TV.
+  const [seven, setSeven] = useState<{ enabled: boolean; a: string[]; b: string[] } | null>(null);
+  useEffect(() => {
+    const read = (): void => {
+      try {
+        const raw = window.localStorage.getItem("voleyos_7p_state");
+        const parsed = raw ? (JSON.parse(raw) as { enabled?: boolean; a?: string[]; b?: string[] }) : null;
+        setSeven(
+          parsed && parsed.enabled && Array.isArray(parsed.a) && Array.isArray(parsed.b)
+            ? { enabled: true, a: parsed.a, b: parsed.b }
+            : null,
+        );
+      } catch {
+        setSeven(null);
+      }
+    };
+    read();
+    window.addEventListener("voleyos-7p-sync", read);
+    return () => window.removeEventListener("voleyos-7p-sync", read);
+  }, []);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   // v11.2.0 — mirror the shared Live Match Bus snapshot (team names + score).
@@ -201,6 +222,27 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
         >
           {side === "A" ? payload.scoreA : payload.scoreB}
         </button>
+        {seven ? (
+          <span
+            data-testid={side === "A" ? "gym-seven-pill-a" : "gym-seven-pill-b"}
+            style={{
+              background: "rgba(0,0,0,0.45)",
+              color: "#FBBF24",
+              borderRadius: 999,
+              padding: "4px 10px",
+              fontSize: "clamp(0.6rem, 1.7vmin, 0.95rem)",
+              fontWeight: 900,
+              textAlign: "center",
+              maxWidth: "100%",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            🎯 #7 {t(locale, "Saca", "Serves", "Saca")}: {sevenPlayerStatus(side === "A" ? seven.a : seven.b).server} · ↪{" "}
+            {t(locale, "Entra", "In", "Entra")}: {sevenPlayerStatus(side === "A" ? seven.a : seven.b).enteringCourt}
+          </span>
+        ) : null}
         <div style={{ display: "flex", gap: 8 }}>
           <button
             type="button"

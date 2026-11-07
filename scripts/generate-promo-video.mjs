@@ -353,10 +353,12 @@ async function run() {
     const beat = (ms) => sleep(ms);
 
     /* ---------------------------------------------- scene 1 · live court */
-    await sub("🏐 Live Court Scoreboard + 2-Tap DataVolley (.DVW) Scouting");
+    await sub("🏐 Live Court Scoreboard + 7-Player (6+1) Rotation & DataVolley Scouting");
     await beat(600);
     await click("window.__promoOpen(4)");
-    await beat(1400);
+    await beat(1200);
+    await click("window.__promoClick('[data-testid=\"rotation-7p-toggle\"]')");
+    await beat(1200);
     await click("window.__promoTap('\\\\+1|point for|sumar')");
     await beat(500);
     await click("window.__promoTap('\\\\+1|point for|sumar')");
@@ -431,7 +433,7 @@ async function run() {
     await click("window.__promoType('[data-testid=\"acwr-day-input-0\"]', '320')");
     await beat(700);
     await click(
-      "window.__promoHero('VoleyOS v11.3.2', '100% Offline · Free &amp; Open Source (AGPL-3.0) · github.com/v0idbrn/VoleyOS')",
+      "window.__promoHero('VoleyOS v11.3.3', '100% Offline · Free &amp; Open Source (AGPL-3.0) · github.com/v0idbrn/VoleyOS')",
     );
     await beat(2000);
 

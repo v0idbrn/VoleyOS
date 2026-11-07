@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import jsQR from "jsqr";
 
 import { announceCourtVoice, playArenaCue, playCourtTableBuzzer, playWhistle as playCourtWhistle, type ArenaCue } from "@/lib/court-audio";
+import { createSevenPlayerRoster, rotateSevenPlayers, sevenPlayerCue, sevenPlayerStatus, undoRotateSevenPlayers } from "@/lib/court-engine-v9";
 import {
   type ApproachTempo,
   loadCrowdAmbience,
@@ -1368,6 +1369,49 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   const [ttsTestFlash, setTtsTestFlash] = useState(false);
   // v11.3.2 — 🖥️ Pantalla Gigante launcher straight from the court toolbar.
   const [gymBoardOpen, setGymBoardOpen] = useState(false);
+  // v11.3.3 — 7-player pickup wheel: 6 on court + the 7th in the serve slot.
+  const [sevenPlayer, setSevenPlayer] = useState(() => {
+    try {
+      return window.localStorage.getItem("voleyos.rotation7p") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [sevenRosterA, setSevenRosterA] = useState(() => createSevenPlayerRoster());
+  const [sevenRosterB, setSevenRosterB] = useState(() => createSevenPlayerRoster());
+  const sevenHistoryRef = useRef<Array<{ a: string[]; b: string[] }>>([]);
+  const publishSevenPlayer = (enabled: boolean, a: string[], b: string[]): void => {
+    try {
+      window.localStorage.setItem("voleyos_7p_state", JSON.stringify({ enabled, a, b }));
+      window.dispatchEvent(new CustomEvent("voleyos-7p-sync"));
+    } catch {
+      /* storage unavailable */
+    }
+  };
+  const rotateSevenFor = (team: "A" | "B"): { enteringCourt: string; newServer: string } => {
+    const current = team === "A" ? sevenRosterA : sevenRosterB;
+    const wheel = rotateSevenPlayers(current);
+    sevenHistoryRef.current.push({ a: sevenRosterA, b: sevenRosterB });
+    const nextA = team === "A" ? wheel.nextRoster : sevenRosterA;
+    const nextB = team === "B" ? wheel.nextRoster : sevenRosterB;
+    if (team === "A") setSevenRosterA(wheel.nextRoster);
+    else setSevenRosterB(wheel.nextRoster);
+    publishSevenPlayer(sevenPlayer, nextA, nextB);
+    return { enteringCourt: wheel.enteringCourt, newServer: wheel.newServer };
+  };
+  const toggleSevenPlayer = (): void => {
+    setSevenPlayer((previous) => {
+      const next = !previous;
+      try {
+        window.localStorage.setItem("voleyos.rotation7p", next ? "1" : "0");
+      } catch {
+        /* storage unavailable */
+      }
+      publishSevenPlayer(next, sevenRosterA, sevenRosterB);
+      triggerCourtHaptics(10);
+      return next;
+    });
+  };
   const toggleCleanCourt = (): void => {
     setCleanCourt((previous) => {
       const next = !previous;
@@ -1483,6 +1527,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       serveStreakRef.current = 0;
       setServeCapBanner(serveCapMessage(serveCap, locale));
       playPicaditoCue("serve_cap");
+      if (sevenPlayer) rotateSevenFor(state.serving);
       triggerCourtHaptics([30, 45, 30]);
     } else {
       serveStreakRef.current = next;
@@ -1902,6 +1947,24 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         ),
       );
       if (result.rotated) triggerCourtHaptics([50, 40, 50, 40, 80]);
+      // v11.3.3 — a side-out or 3-serve cap advances the 7-player wheel.
+      if (sevenPlayer && result.rotated) {
+        const wheel = rotateSevenFor(team);
+        if (voiceOn) {
+          announceCourtVoice(
+            sevenPlayerCue(wheel.enteringCourt, wheel.newServer, locale),
+            locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : "es-ES",
+          );
+        }
+        setMessage(
+          t(
+            locale,
+            `🔄 Rotación 7: entra ${wheel.enteringCourt} · al saque ${wheel.newServer}`,
+            `🔄 7 rotation: ${wheel.enteringCourt} in · ${wheel.newServer} serves`,
+            `🔄 Rotação 7: entra ${wheel.enteringCourt} · saca ${wheel.newServer}`,
+          ),
+        );
+      }
       flashUndoPill();
       recordScout(state, team, result.rotated);
       if (result.matchFinished) flashBurst("match");
@@ -1965,6 +2028,12 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
   };
 
   const undo = (): void => {
+    const sevenSnapshot = sevenHistoryRef.current.pop();
+    if (sevenSnapshot) {
+      setSevenRosterA(sevenSnapshot.a);
+      setSevenRosterB(sevenSnapshot.b);
+      publishSevenPlayer(sevenPlayer, sevenSnapshot.a, sevenSnapshot.b);
+    }
     setHistory((previous) => undoScoreboard(previous));
     setScout((previous) => undoScoutPoint(previous));
     setMessage(t(locale, "Jugada deshecha.", "Play undone.", "Jogada desfeita."));
@@ -3647,6 +3716,15 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         `}</style>
       ) : null}
       <div data-testid="primary-court-toolbar" className="mb-2 flex flex-wrap gap-1">
+        <button
+          type="button"
+          data-testid="rotation-7p-toggle"
+          aria-pressed={sevenPlayer}
+          onClick={toggleSevenPlayer}
+          className={sevenPlayer ? `${BTN} border-volt text-volt` : BTN}
+        >
+          🔄 {t(locale, "Rotación 7 (6+1)", "7-Player (6+1)", "Rotação 7 (6+1)")}
+        </button>
         <button type="button" onClick={undo} className={BTN}>↩ {t(locale, "Deshacer", "Undo", "Desfazer")}</button>
         <button type="button" data-testid="primary-swap-btn" onClick={swapSides} className={BTN}>⇄ {t(locale, "Cambiar Lado", "Swap Sides", "Trocar Lado")}</button>
         <button type="button" data-testid="primary-whistle-btn" onClick={() => playCourtWhistle("double")} className={BTN}>📢 {t(locale, "Silbato", "Whistle", "Apito")}</button>
@@ -3713,6 +3791,37 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           🖥️ {t(locale, "Pantalla Gigante", "Giant Gym Screen", "Tela Gigante")}
         </button>
       </div>
+      {sevenPlayer ? (
+        <div data-testid="rotation-7p-strip" className="mb-2 space-y-1 rounded-xl border border-volt/40 bg-volt/5 p-2 text-[10px] text-white/80">
+          {([["A", state.teamA, sevenRosterA], ["B", state.teamB, sevenRosterB]] as const).map(([side, name, roster]) => {
+            const status = sevenPlayerStatus(roster);
+            return (
+              <div key={side} className="flex flex-wrap items-center gap-1 rounded-lg bg-obsidian/60 px-2 py-1">
+                <span className="font-black text-volt">{side === leftSide ? left.name : right.name}</span>
+                <span>🎯 {t(locale, "Al Saque (#7)", "Serving (#7)", "No Saque (#7)")}: <strong className="text-white">{status.server}</strong></span>
+                <span>↪ {t(locale, "Entra a cancha", "Enters court", "Entra em quadra")}: <strong className="text-white">{status.enteringCourt}</strong></span>
+                <span>⏭ {t(locale, "Próximo al saque", "Next to serve", "Próximo no saque")}: <strong className="text-white">{status.nextInLine}</strong></span>
+                <span className="flex flex-wrap gap-0.5">
+                  {status.onCourt.map((player, index) => (
+                    <span key={`${side}-${index}`} className="rounded bg-white/10 px-1 tabular-nums">Z{index + 1} {player}</span>
+                  ))}
+                </span>
+                <button
+                  type="button"
+                  data-testid={side === "A" ? "manual-rotate-7p-btn" : "manual-rotate-7p-btn-b"}
+                  onClick={() => rotateSevenFor(side)}
+                  className={BTN}
+                >
+                  ↻ {t(locale, "Rotar 7mo", "Rotate 7th", "Rotar 7º")}
+                </button>
+              </div>
+            );
+          })}
+          <p className="text-[9px] uppercase tracking-wider text-white/45">
+            {t(locale, `Equipo ${name}`, `Team ${name}`, `Time ${name}`)}
+          </p>
+        </div>
+      ) : null}
       {ttsTestFlash ? (
         <p data-testid="tts-test-flash" role="status" className="mb-2 rounded-lg border border-emerald/50 bg-emerald/10 px-2 py-1 text-center text-[10px] font-black text-emerald">
           ▶ {t(locale, "Voz de cancha activa", "Court voice live", "Voz de quadra ativa")}

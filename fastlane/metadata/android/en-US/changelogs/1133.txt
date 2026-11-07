@@ -1,0 +1,7 @@
+v11.3.3 — 7-player pickup rotation (6 on court + 1 at serve)
+
+• New 7-player wheel: 6 on court and the 7th in the serve slot.
+• Auto rotation on side-out and on the 3-serve cap; Undo restores the previous wheel.
+• Live strip: who serves, who enters, who is next, plus Z1–Z6 chips.
+• Giant gym screen shows the serve/entry badge from 15 meters away.
+• Manual "Rotate 7th" button for pickup games.

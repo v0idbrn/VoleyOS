@@ -1,0 +1,7 @@
+v11.3.3 — Rotación de 7 jugadores (6 en cancha + 1 al saque)
+
+• Nueva rueda de 7: 6 en cancha y el 7º en el puesto de saque.
+• Rotación automática al recuperar el saque y al llegar al tope de 3 saques; Deshacer restaura la rueda anterior.
+• Franja en vivo: quién saca, quién entra, quién sigue y fichas Z1–Z6.
+• La pantalla gigante muestra la insignia de saque/entrada desde 15 metros.
+• Botón manual «Rotar 7mo» para picaditos.

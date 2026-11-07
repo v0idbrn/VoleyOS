@@ -260,3 +260,43 @@ describe("v11.3.2 scoreboard-first court & stadium audio", () => {
     expect(statSync(og).size).toBeGreaterThan(1024);
   });
 });
+
+describe("v11.3.3 seven-player pickup rotation", () => {
+  beforeEach(() => window.localStorage.clear());
+  afterEach(() => cleanup());
+
+  it("toggles the 7-player strip and advances the wheel manually", () => {
+    render(<ScoreboardStation meta={meta("scoreboard")} locale="es" onSave={noop} />);
+    expect(screen.queryByTestId("rotation-7p-strip")).toBeNull();
+    const toggle = screen.getByTestId("rotation-7p-toggle");
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    const strip = screen.getByTestId("rotation-7p-strip");
+    expect(strip.textContent).toContain("J1");
+    expect(strip.textContent).toContain("J2");
+    fireEvent.click(screen.getByTestId("manual-rotate-7p-btn"));
+    const rotated = screen.getByTestId("rotation-7p-strip").textContent ?? "";
+    // The serve slot now belongs to J2 and J3 is next in line.
+    expect(rotated).toContain("Al Saque (#7): J2");
+    expect(rotated).toContain("Próximo al saque: J3");
+    // Undo restores the exact prior wheel.
+    fireEvent.click(screen.getByTestId("cancha-dock-undo"));
+    expect(screen.getByTestId("rotation-7p-strip").textContent).toContain("Al Saque (#7): J1");
+  });
+
+  it("localises the rotation strip in English and Portuguese", () => {
+    render(<ScoreboardStation meta={meta("scoreboard")} locale="en" onSave={noop} />);
+    fireEvent.click(screen.getByTestId("rotation-7p-toggle"));
+    const english = screen.getByTestId("rotation-7p-strip").textContent ?? "";
+    expect(english).toContain("Serving (#7)");
+    expect(english).not.toContain("Al Saque");
+    cleanup();
+    window.localStorage.clear();
+    render(<ScoreboardStation meta={meta("scoreboard")} locale="pt" onSave={noop} />);
+    fireEvent.click(screen.getByTestId("rotation-7p-toggle"));
+    const portuguese = screen.getByTestId("rotation-7p-strip").textContent ?? "";
+    expect(portuguese.toLowerCase()).toContain("no saque (#7)");
+    expect(portuguese).not.toContain("Al Saque");
+    expect(portuguese).toContain("Entra em quadra");
+  });
+});

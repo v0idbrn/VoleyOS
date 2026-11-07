@@ -1,0 +1,7 @@
+v11.3.3 — Rotação de 7 jogadores (6 em quadra + 1 no saque)
+
+• Nova roda de 7: 6 em quadra e o 7º na posição de saque.
+• Rotação automática na recuperação do saque e no limite de 3 saques; Desfazer restaura a roda anterior.
+• Faixa ao vivo: quem saca, quem entra, quem é o próximo e fichas Z1–Z6.
+• A tela gigante mostra a etiqueta de saque/entrada a 15 metros.
+• Botão manual «Rotar 7º» para peladas.
