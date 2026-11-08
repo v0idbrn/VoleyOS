@@ -3051,7 +3051,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         </div>
       ) : null}
       {uiMode === "pro" ? (
-        <div className="mb-2 flex flex-wrap gap-1">
+        <div data-vos-secondary="preset-row" className={`mb-2 flex flex-wrap gap-1${cleanCourt ? " hidden" : ""}`}>
           <button type="button" onClick={() => startPicadito()} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "picadito" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>⚡ {t(locale, "Picadito", "Pickup", "Rachinha")}</button>
           <button type="button" onClick={() => setPreset("king")} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "king" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>👑 {t(locale, "Ganador en cancha", "Winner stays", "Vencedor fica")}</button>
           <button type="button" onClick={() => { setPreset("oficial"); setKing(null); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${preset === "oficial" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>🏆 {t(locale, "Oficial", "Official", "Oficial")}</button>
@@ -3191,10 +3191,10 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           );
           triggerCourtHaptics(next ? [40, 30, 40] : 20);
         }}
-        className={`${BTN} mb-2 w-full ${hardwareMode ? "border-volt bg-volt/15 text-volt" : ""}`}
+        data-vos-secondary="hw-top-btn" className={`${BTN} mb-2 w-full ${hardwareMode ? "border-volt bg-volt/15 text-volt" : ""}${cleanCourt ? " hidden" : ""}`}
       >        🔒 {t(locale, "Modo Partido (botones de volumen)", "Match mode (volume keys)", "Modo Partida (botões de volume)")}
       </button>
-      <div className="mb-2 flex gap-1">
+      <div data-vos-secondary="top-mode-row" className={`mb-2 flex gap-1${cleanCourt ? " hidden" : ""}`}>
         <button
           type="button"
           data-testid="solo-teams-toggle"
@@ -3405,7 +3405,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
             </button>
           </div>
         ) : null}
-        <div className="mt-2 flex flex-col items-center gap-1">
+        <div data-vos-secondary="inline-swap" className={`mt-2 flex flex-col items-center gap-1${cleanCourt ? " hidden" : ""}`}>
           <button type="button" className={BTN} onClick={swapSides}>
             🔄 {t(locale, "Cambio de Cancha", "Swap Sides", "Troca de Lado")}
           </button>
@@ -3553,7 +3553,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       </div>
       <button
         type="button"
-        data-testid="save-season"
+        data-testid="save-season" data-vos-secondary="save-season"
         disabled={state.status !== "finished" && state.setsA + state.setsB === 0}
         onClick={() => {
           saveSeasonMatch(seasonMatchFromState(state, preset));
@@ -3643,7 +3643,11 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         </div>
       ) : null}
       {uiMode === "pro" && !soloTeams ? (
-      <div className="mt-2 grid grid-cols-6 gap-1 text-center text-[10px]">
+      <div
+        data-testid="six-rotation-strip"
+        data-vos-secondary="six-rotation"
+        className={`mt-2 grid grid-cols-6 gap-1 text-center text-[10px]${cleanCourt && sevenPlayer ? " hidden" : ""}`}
+      >
         {state.lineupA.map((player, index) => (
           <div key={`zone-${index + 1}`} className={`rounded ${index === 0 ? "bg-volt/20 text-volt" : "bg-white/5"}`}>
             <p className="text-white/40">Z{index + 1}</p>
@@ -3652,7 +3656,7 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         ))}
       </div>
       ) : null}
-      <p className="mt-1 text-[9px] uppercase tracking-widest text-white/30">A/L punto · Z undo · W silbato · B buzzer · C contraste</p>
+      <p className={`mt-1 text-[9px] uppercase tracking-widest text-white/30${cleanCourt && sevenPlayer ? " hidden" : ""}`}>A/L punto · Z undo · W silbato · B buzzer · C contraste</p>
       {hardwareMode ? (
         <div className="absolute inset-0 z-30 grid place-items-center rounded-xl bg-obsidian/95 p-4 text-center">
           <div>
@@ -3711,9 +3715,40 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       {gymBoardOpen ? <GymScreenModule locale={locale} onClose={() => setGymBoardOpen(false)} /> : null}
       {cleanCourt ? (
         <style>{`
-          ${setupDrawerOpen ? "" : '[data-testid="cancha-topbar"],[data-testid="inline-live-metrics-strip"],[data-testid="cancha-primary-dock"],[data-testid="inline-rules-drawer-btn"],[data-testid="inline-rules-drawer"],[data-vos-secondary="audio-cluster"],[data-vos-secondary="team-edit"]{display:none!important}'}
+          ${setupDrawerOpen ? "" : '[data-testid="cancha-topbar"],[data-testid="inline-live-metrics-strip"],[data-testid="cancha-primary-dock"],[data-testid="inline-rules-drawer-btn"],[data-testid="inline-rules-drawer"],[data-vos-secondary="audio-cluster"],[data-vos-secondary="team-edit"],[data-vos-secondary="preset-row"],[data-vos-secondary="hw-top-btn"],[data-vos-secondary="top-mode-row"],[data-vos-secondary="inline-swap"],[data-vos-secondary="save-season"],[data-testid="save-season"]{display:none!important}'}
+          ${sevenPlayer ? "[data-testid='rotation-strip'],[data-vos-secondary='six-rotation']{display:none!important}" : ""}
           ${scoutDrawerOpen ? "" : '[data-testid="dvw-courtside-console"],[data-testid="box-score-toggle"],[data-testid="box-score"],[data-testid="official-match-sheet-card"],[data-testid="tc-scout"]{display:none!important}'}
         `}</style>
+      ) : null}
+      {sevenPlayer ? (
+        <div data-testid="rotation-7p-strip" className="mb-2 space-y-1 rounded-xl border border-volt/40 bg-volt/5 p-2 text-[10px] text-white/80">
+          {(["A", "B"] as const).map((side) => {
+            const status = sevenPlayerStatus(side === "A" ? sevenRosterA : sevenRosterB);
+            return (
+              <div key={side} className="flex flex-wrap items-center gap-1 rounded-lg bg-obsidian/60 px-2 py-1">
+                <span data-testid={`rotation-7p-team-${side.toLowerCase()}`} className="font-black text-volt">
+                  {side === leftSide ? left.name : right.name}
+                </span>
+                <span>🎯 {t(locale, "Al Saque (#7)", "Serving (#7)", "No Saque (#7)")}: <strong className="text-white">{status.server}</strong></span>
+                <span>↪ {t(locale, "Entra a cancha", "Enters court", "Entra em quadra")}: <strong className="text-white">{status.enteringCourt}</strong></span>
+                <span>⏭ {t(locale, "Próximo al saque", "Next to serve", "Próximo no saque")}: <strong className="text-white">{status.nextInLine}</strong></span>
+                <span className="flex flex-wrap gap-0.5">
+                  {status.onCourt.map((player, index) => (
+                    <span key={`${side}-${index}`} className="rounded bg-white/10 px-1 tabular-nums">Z{index + 1} {player}</span>
+                  ))}
+                </span>
+                <button
+                  type="button"
+                  data-testid={side === "A" ? "manual-rotate-7p-btn" : "manual-rotate-7p-btn-b"}
+                  onClick={() => rotateSevenFor(side)}
+                  className={BTN}
+                >
+                  ↻ {t(locale, "Rotar 7mo", "Rotate 7th", "Rotar 7º")}
+                </button>
+              </div>
+            );
+          })}
+        </div>
       ) : null}
       <div data-testid="primary-court-toolbar" className="mb-2 flex flex-wrap gap-1">
         <button
@@ -3791,37 +3826,6 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           🖥️ {t(locale, "Pantalla Gigante", "Giant Gym Screen", "Tela Gigante")}
         </button>
       </div>
-      {sevenPlayer ? (
-        <div data-testid="rotation-7p-strip" className="mb-2 space-y-1 rounded-xl border border-volt/40 bg-volt/5 p-2 text-[10px] text-white/80">
-          {([["A", state.teamA, sevenRosterA], ["B", state.teamB, sevenRosterB]] as const).map(([side, name, roster]) => {
-            const status = sevenPlayerStatus(roster);
-            return (
-              <div key={side} className="flex flex-wrap items-center gap-1 rounded-lg bg-obsidian/60 px-2 py-1">
-                <span className="font-black text-volt">{side === leftSide ? left.name : right.name}</span>
-                <span>🎯 {t(locale, "Al Saque (#7)", "Serving (#7)", "No Saque (#7)")}: <strong className="text-white">{status.server}</strong></span>
-                <span>↪ {t(locale, "Entra a cancha", "Enters court", "Entra em quadra")}: <strong className="text-white">{status.enteringCourt}</strong></span>
-                <span>⏭ {t(locale, "Próximo al saque", "Next to serve", "Próximo no saque")}: <strong className="text-white">{status.nextInLine}</strong></span>
-                <span className="flex flex-wrap gap-0.5">
-                  {status.onCourt.map((player, index) => (
-                    <span key={`${side}-${index}`} className="rounded bg-white/10 px-1 tabular-nums">Z{index + 1} {player}</span>
-                  ))}
-                </span>
-                <button
-                  type="button"
-                  data-testid={side === "A" ? "manual-rotate-7p-btn" : "manual-rotate-7p-btn-b"}
-                  onClick={() => rotateSevenFor(side)}
-                  className={BTN}
-                >
-                  ↻ {t(locale, "Rotar 7mo", "Rotate 7th", "Rotar 7º")}
-                </button>
-              </div>
-            );
-          })}
-          <p className="text-[9px] uppercase tracking-wider text-white/45">
-            {t(locale, `Equipo ${name}`, `Team ${name}`, `Time ${name}`)}
-          </p>
-        </div>
-      ) : null}
       {ttsTestFlash ? (
         <p data-testid="tts-test-flash" role="status" className="mb-2 rounded-lg border border-emerald/50 bg-emerald/10 px-2 py-1 text-center text-[10px] font-black text-emerald">
           ▶ {t(locale, "Voz de cancha activa", "Court voice live", "Voz de quadra ativa")}
@@ -4091,14 +4095,14 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         </div>
       ) : null}
       {preset === "oficial" ? (
-        <div className="mb-2 flex flex-wrap gap-1">
+        <div data-vos-secondary="format-row" className={`mb-2 flex flex-wrap gap-1${cleanCourt ? " hidden" : ""}`}>
           <button type="button" onClick={() => { setMatchFormat("bo3"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 3, { matchFormat: "bo3" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo3" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 3 (25/15)", "Best of 3 (25/15)", "Melhor de 3 (25/15)")}</button>
           <button type="button" onClick={() => { setMatchFormat("bo5"); setHistory(newScoreboardHistory(newScoreboard(state.teamA, state.teamB, 5, { matchFormat: "bo5" }))); }} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${matchFormat === "bo5" ? "border-volt text-volt" : "border-white/10 text-white/50"}`}>{t(locale, "Mejor de 5 (25/15)", "Best of 5 (25/15)", "Melhor de 5 (25/15)")}</button>
         </div>
       ) : null}
       </>
       ) : null}
-      <div className="mb-2 grid grid-cols-2 gap-1">
+      <div data-vos-secondary="roster-row" className={`mb-2 grid grid-cols-2 gap-1${cleanCourt ? " hidden" : ""}`}>
         <select
           aria-label={t(locale, "Equipo local", "Home team", "Time da casa")}
           value={teamAId ?? ""}

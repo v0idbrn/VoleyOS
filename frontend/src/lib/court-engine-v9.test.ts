@@ -172,11 +172,19 @@ describe("v11.3.3 seven-player rotation wheel (6 on court + 1 at serve)", () => 
     expect(walk).toEqual(start);
   });
 
-  it("keeps exactly six players on court and the seventh in the serve slot", () => {
-    const status = sevenPlayerStatus(createSevenPlayerRoster());
-    expect(status.onCourt).toHaveLength(6);
-    expect(status.server).toBe("J1");
-    expect(status.enteringCourt).toBe("J1");
-    expect(status.nextInLine).toBe("J2");
+  it("never reports the same player as server and entrant", () => {
+    let roster = createSevenPlayerRoster();
+    for (let step = 0; step < 14; step += 1) {
+      const status = sevenPlayerStatus(roster);
+      expect(status.onCourt).toHaveLength(6);
+      expect(status.server).toBe(roster[0]);
+      expect(status.enteringCourt).toBe(roster[roster.length - 1]);
+      expect(status.nextInLine).toBe(roster[1]);
+      // The v11.3.2 J1/J1 badge bug: server and entrant must always differ.
+      expect(status.server).not.toBe(status.enteringCourt);
+      expect(status.onCourt).toContain(status.enteringCourt);
+      expect(status.onCourt).not.toContain(status.server);
+      roster = rotateSevenPlayers(roster).nextRoster;
+    }
   });
 });

@@ -76,7 +76,7 @@ export function sevenPlayerStatus(roster: string[]): SevenPlayerState {
     roster: current,
     onCourt: current.slice(1),
     server: current[0] as string,
-    enteringCourt: current[0] as string,
+    enteringCourt: current[current.length - 1] as string,
     nextInLine: current[1] as string,
   };
 }
