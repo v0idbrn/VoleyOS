@@ -17,9 +17,9 @@ Repo: https://github.com/v0idbrn/VoleyOS.git
 AntiFeatures:
 
 Builds:
-  - versionName: 11.3.3
-    versionCode: 1131
-    commit: v11.2.0
+  - versionName: 11.3.4
+    versionCode: 1134
+    commit: v11.3.4
     subdir: android/app
     sudo: false
     gradle:
@@ -37,6 +37,6 @@ Builds:
 
 AutoUpdateMode: None
 UpdateCheckMode: Tags
-CurrentVersion: 11.2.0
-CurrentVersionCode: 1105
+CurrentVersion: 11.3.4
+CurrentVersionCode: 1134
 

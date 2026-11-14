@@ -1,0 +1,4 @@
+👥 Renomear times/jogadores 1-toque no placar + cofre de equipes (6J/7J).
+🌐 Auto-idioma EN/PT/ES na primeira visita + botão Voltar nativo reforçado.
+📱 Quadra limpa, roda 7J (6+1), barra de elencos nos painéis.
+🏷️ v11.3.4/1134.

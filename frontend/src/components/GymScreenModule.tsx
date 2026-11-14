@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { announceCourtVoice, playCourtTableBuzzer, playWhistle } from "@/lib/court-audio";
 import { sevenPlayerStatus } from "@/lib/court-engine-v9";
+import { TEAMS_SYNC_EVENT, getActiveCourtRosters, setActiveCourtRosters } from "@/lib/saved-teams";
 import { DEFAULT_GYM_PAYLOAD } from "@/lib/gym-screen";
 import { t } from "@/lib/i18n";
 import { readLiveMatchSnapshot, type LiveMatchSnapshot } from "@/components/stations";
@@ -34,6 +35,16 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
   const [voiceFlash, setVoiceFlash] = useState(false);
   // v11.3.3 — mirror the scoreboard's 7-player wheel for the gym TV.
   const [seven, setSeven] = useState<{ enabled: boolean; a: string[]; b: string[] } | null>(null);
+  // v11.3.4 — pick up court names renamed on the scoreboard or a tactical board.
+  useEffect(() => {
+    const sync = (): void => {
+      const active = getActiveCourtRosters();
+      if (active.teamA) setNameA(active.teamA.toUpperCase());
+      if (active.teamB) setNameB(active.teamB.toUpperCase());
+    };
+    window.addEventListener(TEAMS_SYNC_EVENT, sync);
+    return () => window.removeEventListener(TEAMS_SYNC_EVENT, sync);
+  }, []);
   useEffect(() => {
     const read = (): void => {
       try {
@@ -176,8 +187,14 @@ export function GymScreenModule({ locale, onClose }: GymScreenModuleProps) {
       >
         <input
           type="text"
+          data-testid={side === "A" ? "quick-edit-team-a" : "quick-edit-team-b"}
           value={side === "A" ? nameA : nameB}
           onChange={(event) => (side === "A" ? setNameA(event.target.value) : setNameB(event.target.value))}
+          onBlur={() => {
+            const label = (side === "A" ? nameA : nameB).trim();
+            if (label.length === 0) return;
+            setActiveCourtRosters(side === "A" ? { teamA: label } : { teamB: label });
+          }}
           aria-label={side === "A" ? t(locale, "Nombre Equipo A", "Team A name", "Nome Equipe A") : t(locale, "Nombre Equipo B", "Team B name", "Nome Equipe B")}
           style={{
             background: "transparent",

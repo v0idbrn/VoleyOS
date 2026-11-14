@@ -61,10 +61,13 @@ import {
 import { loadFlowRoster } from "@/lib/season-vault";
 import { acwrSample } from "@/lib/samples";
 
+/** v11.3.4 — normalised result from the JS back-handler, accepted by MainActivity.java. */
+type BackResult = "HANDLED" | "EXIT_APP" | "UNHANDLED" | "handled" | "exit";
+
 declare global {
   interface Window {
     /** v11.3.1 — Android hardware Back + PWA popstate router. */
-    __voleyosHandleBackButton?: () => string;
+    __voleyosHandleBackButton?: () => BackResult;
   }
 }
 
@@ -596,7 +599,7 @@ export function VolleyOSHub({ locale: routeLocale }: { locale: Locale }) {
   // v11.3.1 — Android hardware Back / PWA popstate: never drop the user out of
   // the app while a modal, the giant gym board or a secondary tab is open.
   useEffect(() => {
-    const handleBack = (): string => {
+    const handleBack = (): BackResult => {
       if (paywallOpen) {
         setPaywallOpen(false);
         return "HANDLED";

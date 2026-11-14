@@ -1,0 +1,4 @@
+👥 Renombrar equipos y jugadores 1-tap en tablero + bóveda de equipos (6J/7J).
+🌐 Auto-idioma EN/PT/ES en primera visita + gestor Atrás nativo reforzado.
+📱 Cancha limpia, rueda 7J (6+1), barra de plantillas en tableros.
+🏷️ v11.3.4/1134.

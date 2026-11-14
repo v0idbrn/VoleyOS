@@ -8,6 +8,17 @@ import jsQR from "jsqr";
 import { announceCourtVoice, playArenaCue, playCourtTableBuzzer, playWhistle as playCourtWhistle, type ArenaCue } from "@/lib/court-audio";
 import { createSevenPlayerRoster, rotateSevenPlayers, sevenPlayerCue, sevenPlayerStatus, undoRotateSevenPlayers } from "@/lib/court-engine-v9";
 import {
+  DEFAULT_TEAM_COLOR_A,
+  DEFAULT_TEAM_COLOR_B,
+  TEAMS_SYNC_EVENT,
+  deleteTeamPreset,
+  getActiveCourtRosters,
+  loadSavedTeams,
+  saveTeamPreset,
+  setActiveCourtRosters,
+  type SavedTeamPreset,
+} from "@/lib/saved-teams";
+import {
   type ApproachTempo,
   loadCrowdAmbience,
   playApproachCadence,
@@ -737,6 +748,149 @@ const ROLE_COLORS: Record<string, string> = {
   L: "#0EA5E9",
 };
 
+/**
+ * v11.3.4 — compact court roster bar shared by the tactical boards.
+ * Loads a saved team (or the active Team A/B), renames any of the six slots
+ * inline, and keeps the scoreboard + gym screen in sync through one snapshot.
+ */
+export function QuickCourtRosterBar({ locale }: { locale: Locale }) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(() => getActiveCourtRosters());
+  const [saved, setSaved] = useState<SavedTeamPreset[]>(() => loadSavedTeams());
+  const [side, setSide] = useState<"A" | "B">("A");
+  const [edit, setEdit] = useState<number | null>(null);
+  const [draft, setDraft] = useState("");
+
+  useEffect(() => {
+    const sync = (): void => {
+      setActive(getActiveCourtRosters());
+      setSaved(loadSavedTeams());
+    };
+    window.addEventListener(TEAMS_SYNC_EVENT, sync);
+    return () => window.removeEventListener(TEAMS_SYNC_EVENT, sync);
+  }, []);
+
+  const roster = side === "A" ? active.rosterA : active.rosterB;
+  const teamName = side === "A" ? active.teamA : active.teamB;
+  const slots = roster.slice(0, 6);
+
+  const commit = (index: number): void => {
+    const label = draft.trim();
+    setEdit(null);
+    if (label.length === 0) return;
+    const next = slots.map((player, at) => (at === index ? label : player));
+    setActiveCourtRosters(side === "A" ? { rosterA: next } : { rosterB: next });
+  };
+
+  const loadPreset = (preset: SavedTeamPreset): void => {
+    setActiveCourtRosters(
+      side === "A"
+        ? { teamA: preset.name, rosterA: preset.players.slice(0, 6), modeA: preset.mode }
+        : { teamB: preset.name, rosterB: preset.players.slice(0, 6), modeB: preset.mode },
+    );
+  };
+
+  return (
+    <div data-testid="quick-court-roster-bar" className="mb-2 rounded-xl border border-white/10 bg-obsidian/60 p-2">
+      <button
+        type="button"
+        data-testid="quick-roster-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((previous) => !previous)}
+        className={`${BTN} w-full`}
+      >
+        👥 {t(locale, "Equipos y Nombres en Cancha", "Court Teams & Player Names", "Equipes e Nomes em Quadra")}
+      </button>
+      {open ? (
+        <div className="mt-2 space-y-1 text-[10px]">
+          <div className="flex flex-wrap items-center gap-1">
+            <button
+              type="button"
+              data-testid="quick-roster-side-a"
+              aria-pressed={side === "A"}
+              onClick={() => setSide("A")}
+              className={side === "A" ? `${BTN} border-volt text-volt` : BTN}
+            >
+              ⬅ {active.teamA}
+            </button>
+            <button
+              type="button"
+              data-testid="quick-roster-side-b"
+              aria-pressed={side === "B"}
+              onClick={() => setSide("B")}
+              className={side === "B" ? `${BTN} border-volt text-volt` : BTN}
+            >
+              {active.teamB} ➡
+            </button>
+            <span className="text-white/45">
+              {teamName} · {roster.length === 7 ? "7P (6+1)" : "6P"}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1">
+            {slots.map((player, index) => (
+              <span key={`slot-${index}`} className="flex items-center gap-1">
+                <button
+                  type="button"
+                  data-testid={`quick-roster-chip-${index}`}
+                  onClick={() => {
+                    setEdit(index);
+                    setDraft(player);
+                  }}
+                  className="rounded bg-white/10 px-1 tabular-nums text-white/80"
+                >
+                  Z{index + 1} {player}
+                </button>
+                {edit === index ? (
+                  <span className="flex items-center gap-1">
+                    <input
+                      data-testid="quick-court-rename-input"
+                      autoFocus
+                      value={draft}
+                      onChange={(event) => setDraft(event.target.value)}
+                      onBlur={() => commit(index)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") commit(index);
+                        if (event.key === "Escape") setEdit(null);
+                      }}
+                      className="w-20 rounded border border-volt/60 bg-obsidian px-1 py-0.5 text-[10px] font-bold text-white"
+                    />
+                    <button type="button" onClick={() => commit(index)} className={BTN}>
+                      ✓
+                    </button>
+                  </span>
+                ) : null}
+              </span>
+            ))}
+          </div>
+          {saved.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {saved.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  data-testid={`quick-roster-load-${preset.id}`}
+                  onClick={() => loadPreset(preset)}
+                  className={BTN}
+                >
+                  <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ background: preset.color }} />
+                  {preset.name} · {preset.mode === "7p" ? "7P" : "6P"}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-white/40">
+              {t(locale, "Guardá equipos en 🏐 Cancha para verlos acá.", "Save teams in 🏐 Court to see them here.", "Salve equipes em 🏐 Quadra para vê-las aqui.")}
+            </p>
+          )}
+          <p data-testid="quick-roster-legend" className="text-white/50">
+            {slots.map((player, index) => `Z${index + 1} ${player}`).join(" · ")}
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function RotationStation({ meta, locale, onSave }: StationProps) {
   const [rotation, setRotation] = useState(1);
   const [points, setPoints] = useState<ZonePoint[]>(() => defaultPositions(1));
@@ -797,6 +951,7 @@ export function RotationStation({ meta, locale, onSave }: StationProps) {
           </button>
         ))}
       </div>
+      <QuickCourtRosterBar locale={locale} />
       <div className="mt-2 flex flex-wrap items-center gap-1">
         <span className={LABEL}>👤 {t(locale, "Seguir Mi Puesto", "Track My Position", "Acompanhar Meu Posto")}</span>
         {(Object.keys(ROLE_LABELS) as RotationRole[]).map((role) => (
@@ -1412,6 +1567,156 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
       return next;
     });
   };
+
+  // v11.3.4 — 1-tap inline naming (team + player chips) and the saved-teams vault.
+  const [names6A, setNames6A] = useState<string[]>(() => getActiveCourtRosters().rosterA.slice(0, 6));
+  const [names6B, setNames6B] = useState<string[]>(() => getActiveCourtRosters().rosterB.slice(0, 6));
+  const [savedTeams, setSavedTeams] = useState<SavedTeamPreset[]>(() => loadSavedTeams());
+  const [vaultOpen, setVaultOpen] = useState(false);
+  const [quickTeam, setQuickTeam] = useState<"A" | "B" | null>(null);
+  const [quickTeamDraft, setQuickTeamDraft] = useState("");
+  const [chipEdit, setChipEdit] = useState<{ side: "A" | "B"; index: number; kind: "6p" | "7p" } | null>(null);
+  const [chipDraft, setChipDraft] = useState("");
+
+  const sameLabels = (a: string[], b: string[]): boolean => a.length === b.length && a.every((label, index) => label === b[index]);
+  const roster7 = (side: "A" | "B"): string[] => (side === "A" ? sevenRosterA : sevenRosterB);
+  const roster6 = (side: "A" | "B"): string[] => (side === "A" ? names6A : names6B);
+  const publishRosters = (overrides?: Partial<{ a: string[]; b: string[]; a6: string[]; b6: string[]; nameA: string; nameB: string; colorA: string; colorB: string; seven: boolean }>): void => {
+    const enabled = overrides?.seven ?? sevenPlayer;
+    setActiveCourtRosters({
+      teamA: overrides?.nameA ?? state.teamA,
+      teamB: overrides?.nameB ?? state.teamB,
+      colorA: overrides?.colorA ?? state.colorA ?? DEFAULT_TEAM_COLOR_A,
+      colorB: overrides?.colorB ?? state.colorB ?? DEFAULT_TEAM_COLOR_B,
+      rosterA: enabled ? overrides?.a ?? sevenRosterA : overrides?.a6 ?? names6A,
+      rosterB: enabled ? overrides?.b ?? sevenRosterB : overrides?.b6 ?? names6B,
+      modeA: enabled ? "7p" : "6p",
+      modeB: enabled ? "7p" : "6p",
+    });
+  };
+  const startQuickTeam = (side: "A" | "B"): void => {
+    setQuickTeam(side);
+    setQuickTeamDraft(side === "A" ? state.teamA : state.teamB);
+  };
+  const commitQuickTeam = (side: "A" | "B"): void => {
+    const name = quickTeamDraft.trim();
+    setQuickTeam(null);
+    if (name.length === 0) return;
+    setHistory((previous) =>
+      commitScoreboard(previous, side === "A" ? { ...previous.present, teamA: name } : { ...previous.present, teamB: name }),
+    );
+    publishRosters(side === "A" ? { nameA: name } : { nameB: name });
+    setMessage(t(locale, `✏️ Equipo ${name}`, `✏️ Team ${name}`, `✏️ Equipe ${name}`));
+  };
+  const startChipEdit = (side: "A" | "B", index: number, kind: "6p" | "7p", value: string): void => {
+    setChipEdit({ side, index, kind });
+    setChipDraft(value);
+  };
+  const commitChipEdit = (): void => {
+    if (!chipEdit) return;
+    const name = chipDraft.trim();
+    const { side, index, kind } = chipEdit;
+    setChipEdit(null);
+    if (name.length === 0) return;
+    if (kind === "7p") {
+      const nextA = side === "A" ? sevenRosterA.map((player, at) => (at === index ? name : player)) : sevenRosterA;
+      const nextB = side === "B" ? sevenRosterB.map((player, at) => (at === index ? name : player)) : sevenRosterB;
+      if (side === "A") setSevenRosterA(nextA);
+      else setSevenRosterB(nextB);
+      publishSevenPlayer(sevenPlayer, nextA, nextB);
+      publishRosters({ a: nextA, b: nextB });
+    } else {
+      const nextA = side === "A" ? names6A.map((player, at) => (at === index ? name : player)) : names6A;
+      const nextB = side === "B" ? names6B.map((player, at) => (at === index ? name : player)) : names6B;
+      if (side === "A") setNames6A(nextA);
+      else setNames6B(nextB);
+      publishRosters({ a6: nextA, b6: nextB });
+    }
+    setMessage(t(locale, `✏️ Jugador ${name}`, `✏️ Player ${name}`, `✏️ Jogador ${name}`));
+  };
+  const savePresetFor = (side: "A" | "B"): void => {
+    const list = saveTeamPreset({
+      name: side === "A" ? state.teamA : state.teamB,
+      color: (side === "A" ? state.colorA : state.colorB) ?? (side === "A" ? DEFAULT_TEAM_COLOR_A : DEFAULT_TEAM_COLOR_B),
+      mode: sevenPlayer ? "7p" : "6p",
+      players: sevenPlayer ? roster7(side) : roster6(side),
+    });
+    setSavedTeams(list);
+    setMessage(t(locale, "💾 Equipo guardado en la bóveda.", "💾 Team saved to the vault.", "💾 Equipe salva no cofre."));
+  };
+  const loadPresetFor = (preset: SavedTeamPreset, side: "A" | "B"): void => {
+    setHistory((previous) =>
+      commitScoreboard(
+        previous,
+        side === "A"
+          ? { ...previous.present, teamA: preset.name, colorA: preset.color }
+          : { ...previous.present, teamB: preset.name, colorB: preset.color },
+      ),
+    );
+    if (preset.mode === "7p") {
+      const roster = createSevenPlayerRoster(preset.players);
+      const nextA = side === "A" ? roster : sevenRosterA;
+      const nextB = side === "B" ? roster : sevenRosterB;
+      if (side === "A") setSevenRosterA(nextA);
+      else setSevenRosterB(nextB);
+      setSevenPlayer(true);
+      try {
+        window.localStorage.setItem("voleyos.rotation7p", "1");
+      } catch {
+        /* storage unavailable */
+      }
+      publishSevenPlayer(true, nextA, nextB);
+      publishRosters({
+        seven: true,
+        a: nextA,
+        b: nextB,
+        nameA: side === "A" ? preset.name : undefined,
+        nameB: side === "B" ? preset.name : undefined,
+      });
+    } else {
+      const roster = preset.players.slice(0, 6);
+      const nextA = side === "A" ? roster : names6A;
+      const nextB = side === "B" ? roster : names6B;
+      if (side === "A") setNames6A(nextA);
+      else setNames6B(nextB);
+      publishRosters({
+        a6: nextA,
+        b6: nextB,
+        nameA: side === "A" ? preset.name : undefined,
+        nameB: side === "B" ? preset.name : undefined,
+      });
+    }
+    setMessage(t(locale, `⬅ ${preset.name} a cancha.`, `⬅ ${preset.name} on court.`, `⬅ ${preset.name} em quadra.`));
+  };
+  const removePreset = (preset: SavedTeamPreset): void => {
+    setSavedTeams(deleteTeamPreset(preset.id));
+  };
+
+  useEffect(() => {
+    setActiveCourtRosters({
+      teamA: state.teamA,
+      teamB: state.teamB,
+      colorA: state.colorA ?? DEFAULT_TEAM_COLOR_A,
+      colorB: state.colorB ?? DEFAULT_TEAM_COLOR_B,
+      rosterA: sevenPlayer ? sevenRosterA : names6A,
+      rosterB: sevenPlayer ? sevenRosterB : names6B,
+      modeA: sevenPlayer ? "7p" : "6p",
+      modeB: sevenPlayer ? "7p" : "6p",
+    });
+  }, [state.teamA, state.teamB, state.colorA, state.colorB, sevenPlayer, sevenRosterA, sevenRosterB, names6A, names6B]);
+
+  useEffect(() => {
+    const sync = (): void => {
+      setSavedTeams(loadSavedTeams());
+      const active = getActiveCourtRosters();
+      setSevenRosterA((current) => (active.rosterA.length === 7 && !sameLabels(current, active.rosterA) ? active.rosterA : current));
+      setSevenRosterB((current) => (active.rosterB.length === 7 && !sameLabels(current, active.rosterB) ? active.rosterB : current));
+      setNames6A((current) => (active.rosterA.length === 6 && !sameLabels(current, active.rosterA) ? active.rosterA : current));
+      setNames6B((current) => (active.rosterB.length === 6 && !sameLabels(current, active.rosterB) ? active.rosterB : current));
+    };
+    window.addEventListener(TEAMS_SYNC_EVENT, sync);
+    return () => window.removeEventListener(TEAMS_SYNC_EVENT, sync);
+  }, []);
   const toggleCleanCourt = (): void => {
     setCleanCourt((previous) => {
       const next = !previous;
@@ -3236,7 +3541,29 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
             >
               🏐 {leftServing ? t(locale, "SACA", "SERVES", "SAQUE") : t(locale, "SACAR", "SERVE", "SACAR")}
             </button>
-            <p className="truncate text-xs font-bold">{left.name}</p>
+            {quickTeam === "A" ? (
+              <input
+                data-testid="quick-team-name-input"
+                autoFocus
+                value={quickTeamDraft}
+                onChange={(event) => setQuickTeamDraft(event.target.value)}
+                onBlur={() => commitQuickTeam("A")}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") commitQuickTeam("A");
+                  if (event.key === "Escape") setQuickTeam(null);
+                }}
+                className="mx-auto block w-full max-w-[170px] rounded border border-volt/60 bg-obsidian px-1 py-0.5 text-center text-xs font-bold text-white"
+              />
+            ) : (
+              <button
+                type="button"
+                data-testid="quick-edit-team-a"
+                onClick={() => startQuickTeam("A")}
+                className="mx-auto block max-w-full truncate text-xs font-bold underline decoration-dotted decoration-white/30 underline-offset-2"
+              >
+                {left.name}
+              </button>
+            )}
             <p data-testid={swapped ? "score-b" : "score-a"} className="text-5xl font-black tabular-nums" style={{ color: "#FFFFFF" }}>{left.score}</p>
             <p className="text-[10px] text-volt">Sets {left.sets}</p>
           </div>
@@ -3250,7 +3577,29 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
             >
               🏐 {rightServing ? t(locale, "SACA", "SERVES", "SAQUE") : t(locale, "SACAR", "SERVE", "SACAR")}
             </button>
-            <p className="truncate text-xs font-bold">{right.name}</p>
+            {quickTeam === "B" ? (
+              <input
+                data-testid="quick-team-name-input"
+                autoFocus
+                value={quickTeamDraft}
+                onChange={(event) => setQuickTeamDraft(event.target.value)}
+                onBlur={() => commitQuickTeam("B")}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") commitQuickTeam("B");
+                  if (event.key === "Escape") setQuickTeam(null);
+                }}
+                className="mx-auto block w-full max-w-[170px] rounded border border-volt/60 bg-obsidian px-1 py-0.5 text-center text-xs font-bold text-white"
+              />
+            ) : (
+              <button
+                type="button"
+                data-testid="quick-edit-team-b"
+                onClick={() => startQuickTeam("B")}
+                className="mx-auto block max-w-full truncate text-xs font-bold underline decoration-dotted decoration-white/30 underline-offset-2"
+              >
+                {right.name}
+              </button>
+            )}
             <p data-testid={swapped ? "score-a" : "score-b"} className="text-5xl font-black tabular-nums" style={{ color: "#FFFFFF" }}>{right.score}</p>
             <p className="text-[10px] text-volt">Sets {right.sets}</p>
           </div>
@@ -3649,10 +3998,16 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
         className={`mt-2 grid grid-cols-6 gap-1 text-center text-[10px]${cleanCourt && sevenPlayer ? " hidden" : ""}`}
       >
         {state.lineupA.map((player, index) => (
-          <div key={`zone-${index + 1}`} className={`rounded ${index === 0 ? "bg-volt/20 text-volt" : "bg-white/5"}`}>
+          <button
+            type="button"
+            key={`zone-${index + 1}`}
+            data-testid={`chip-6p-a-${index}`}
+            onClick={() => startChipEdit("A", index, "6p", names6A[index] ?? `J${index + 1}`)}
+            className={`rounded ${index === 0 ? "bg-volt/20 text-volt" : "bg-white/5"}`}
+          >
             <p className="text-white/40">Z{index + 1}</p>
-            <p className="font-bold">#{player}</p>
-          </div>
+            <p className="font-bold">{names6A[index] ? `${names6A[index]}` : `#${player}`}</p>
+          </button>
         ))}
       </div>
       ) : null}
@@ -3733,10 +4088,37 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
                 <span>↪ {t(locale, "Entra a cancha", "Enters court", "Entra em quadra")}: <strong className="text-white">{status.enteringCourt}</strong></span>
                 <span>⏭ {t(locale, "Próximo al saque", "Next to serve", "Próximo no saque")}: <strong className="text-white">{status.nextInLine}</strong></span>
                 <span className="flex flex-wrap gap-0.5">
-                  {status.onCourt.map((player, index) => (
-                    <span key={`${side}-${index}`} className="rounded bg-white/10 px-1 tabular-nums">Z{index + 1} {player}</span>
+                  {(side === "A" ? sevenRosterA : sevenRosterB).map((player, index) => (
+                    <button
+                      type="button"
+                      key={`${side}-${index}`}
+                      data-testid={`chip-7p-${side.toLowerCase()}-${index}`}
+                      onClick={() => startChipEdit(side, index, "7p", player)}
+                      className={`rounded px-1 tabular-nums ${index === 0 ? "bg-volt/25 text-volt" : "bg-white/10 text-white/80"}`}
+                    >
+                      {index === 0 ? `🎯 ${player}` : `Z${index} ${player}`}
+                    </button>
                   ))}
                 </span>
+                {chipEdit && chipEdit.side === side && chipEdit.kind === "7p" ? (
+                  <span className="flex items-center gap-1">
+                    <input
+                      data-testid="quick-player-rename-input"
+                      autoFocus
+                      value={chipDraft}
+                      onChange={(event) => setChipDraft(event.target.value)}
+                      onBlur={() => commitChipEdit()}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") commitChipEdit();
+                        if (event.key === "Escape") setChipEdit(null);
+                      }}
+                      className="w-24 rounded border border-volt/60 bg-obsidian px-1 py-0.5 text-[10px] font-bold text-white"
+                    />
+                    <button type="button" data-testid="quick-player-rename-apply" onClick={() => commitChipEdit()} className={BTN}>
+                      ✓
+                    </button>
+                  </span>
+                ) : null}
                 <button
                   type="button"
                   data-testid={side === "A" ? "manual-rotate-7p-btn" : "manual-rotate-7p-btn-b"}
@@ -3759,6 +4141,15 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           className={sevenPlayer ? `${BTN} border-volt text-volt` : BTN}
         >
           🔄 {t(locale, "Rotación 7 (6+1)", "7-Player (6+1)", "Rotação 7 (6+1)")}
+        </button>
+        <button
+          type="button"
+          data-testid="saved-teams-toggle"
+          aria-expanded={vaultOpen}
+          onClick={() => setVaultOpen((previous) => !previous)}
+          className={vaultOpen ? `${BTN} border-volt text-volt` : BTN}
+        >
+          👥 {t(locale, "Equipos", "Teams", "Equipes")}
         </button>
         <button type="button" onClick={undo} className={BTN}>↩ {t(locale, "Deshacer", "Undo", "Desfazer")}</button>
         <button type="button" data-testid="primary-swap-btn" onClick={swapSides} className={BTN}>⇄ {t(locale, "Cambiar Lado", "Swap Sides", "Trocar Lado")}</button>
@@ -3826,6 +4217,39 @@ export function ScoreboardStation({ meta, locale, onSave }: StationProps) {
           🖥️ {t(locale, "Pantalla Gigante", "Giant Gym Screen", "Tela Gigante")}
         </button>
       </div>
+      {vaultOpen ? (
+        <div data-testid="saved-teams-panel" className="mb-2 space-y-1 rounded-xl border border-volt/40 bg-obsidian/80 p-2 text-[10px]">
+          <div className="flex flex-wrap gap-1">
+            <button type="button" data-testid="save-preset-a-btn" onClick={() => savePresetFor("A")} className={BTN}>
+              💾 {t(locale, `Guardar Local (${left.name})`, `Save Home (${left.name})`, `Salvar Casa (${left.name})`)}
+            </button>
+            <button type="button" data-testid="save-preset-b-btn" onClick={() => savePresetFor("B")} className={BTN}>
+              💾 {t(locale, `Guardar Visita (${right.name})`, `Save Away (${right.name})`, `Salvar Visitante (${right.name})`)}
+            </button>
+          </div>
+          {savedTeams.length === 0 ? (
+            <p className="text-white/45">{t(locale, "Todavía no hay equipos guardados.", "No saved teams yet.", "Ainda não há equipes salvas.")}</p>
+          ) : (
+            savedTeams.map((preset) => (
+              <div key={preset.id} className="flex flex-wrap items-center gap-1 rounded-lg bg-white/5 px-2 py-1">
+                <span className="h-2 w-2 rounded-full" style={{ background: preset.color }} />
+                <span className="font-bold text-white">{preset.name}</span>
+                <span className="rounded bg-volt/20 px-1 text-volt">{preset.mode === "7p" ? "7P (6+1)" : "6P"}</span>
+                <span className="max-w-[320px] truncate text-white/50">{preset.players.join(" · ")}</span>
+                <button type="button" data-testid={`load-preset-a-${preset.id}`} onClick={() => loadPresetFor(preset, "A")} className={BTN}>
+                  ⬅ {t(locale, "Local", "Home", "Casa")}
+                </button>
+                <button type="button" data-testid={`load-preset-b-${preset.id}`} onClick={() => loadPresetFor(preset, "B")} className={BTN}>
+                  {t(locale, "Visita", "Away", "Visitante")} ➡
+                </button>
+                <button type="button" data-testid={`delete-preset-${preset.id}`} onClick={() => removePreset(preset)} className={BTN}>
+                  ✕
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      ) : null}
       {ttsTestFlash ? (
         <p data-testid="tts-test-flash" role="status" className="mb-2 rounded-lg border border-emerald/50 bg-emerald/10 px-2 py-1 text-center text-[10px] font-black text-emerald">
           ▶ {t(locale, "Voz de cancha activa", "Court voice live", "Voz de quadra ativa")}
@@ -5048,6 +5472,28 @@ export function PickupStation({ meta, locale, onSave }: StationProps) {
   const [waList, setWaList] = useState("");
   const [waBalance, setWaBalance] = useState<TeamBalance | null>(null);
   const [waSent, setWaSent] = useState(false);
+  // v11.3.4 — balanced teams can go straight into the saved-teams vault.
+  const [savedNote, setSavedNote] = useState<string | null>(null);
+
+  const saveBalancedTeam = (index: 0 | 1): void => {
+    const fromWhatsApp = waBalance ? (index === 0 ? waBalance.teamA : waBalance.teamB) : null;
+    const fromSample = result.teams[index]?.players.map((player) => player.name) ?? [];
+    const players = (fromWhatsApp ?? fromSample).slice(0, 7);
+    if (players.length === 0) return;
+    saveTeamPreset({
+      name: result.teams[index]?.name.trim() || (index === 0 ? "Equipo 1" : "Equipo 2"),
+      mode: players.length >= 7 ? "7p" : "6p",
+      players,
+    });
+    setSavedNote(
+      t(
+        locale,
+        `💾 Equipo ${index + 1} guardado (${players.length === 7 ? "7P 6+1" : "6P"}).`,
+        `💾 Team ${index + 1} saved (${players.length === 7 ? "7P 6+1" : "6P"}).`,
+        `💾 Equipe ${index + 1} salva (${players.length === 7 ? "7P 6+1" : "6P"}).`,
+      ),
+    );
+  };
 
   return (
     <StationShell meta={meta} locale={locale} rows={result.teams.length} onSave={onSave} onExample={() => setResult(balanceTeams(PICKUP_SAMPLE, 2))}>
@@ -5098,6 +5544,22 @@ export function PickupStation({ meta, locale, onSave }: StationProps) {
               if (parseWhatsAppPlayerNames(waList).length === 0) return;
               const balance = parseWhatsAppListAndBalanceTeams(waList, loadPlayerMmr());
               savePipelineTeams({ teamA: balance.teamA, teamB: balance.teamB, bench: balance.bench });
+              setActiveCourtRosters({
+                teamA: "Equipo A",
+                teamB: "Equipo B",
+                rosterA: balance.teamA.slice(0, 7),
+                rosterB: balance.teamB.slice(0, 7),
+                modeA: balance.teamA.length >= 7 ? "7p" : "6p",
+                modeB: balance.teamB.length >= 7 ? "7p" : "6p",
+              });
+              if (balance.teamA.length >= 7 || balance.teamB.length >= 7) {
+                try {
+                  window.localStorage.setItem("voleyos.rotation7p", "1");
+                  window.dispatchEvent(new CustomEvent("voleyos-7p-sync"));
+                } catch {
+                  /* storage unavailable */
+                }
+              }
               setWaBalance(balance);
               setWaSent(true);
             }}
@@ -5105,7 +5567,24 @@ export function PickupStation({ meta, locale, onSave }: StationProps) {
           >
             🚀 {t(locale, "Enviar Equipos y Rotación a Cancha", "Send Teams & Rotation to Court", "Enviar Equipes e Rotação à Quadra")}
           </button>
+          <button
+            type="button"
+            data-testid="balancer-save-team-1"
+            onClick={() => saveBalancedTeam(0)}
+            className="tap rounded-lg border border-white/20 bg-white/5 px-2 py-1.5 text-[10px] font-black text-white/85 transition active:scale-95"
+          >
+            💾 {t(locale, "Guardar Equipo 1", "Save Team 1", "Salvar Equipe 1")}
+          </button>
+          <button
+            type="button"
+            data-testid="balancer-save-team-2"
+            onClick={() => saveBalancedTeam(1)}
+            className="tap rounded-lg border border-white/20 bg-white/5 px-2 py-1.5 text-[10px] font-black text-white/85 transition active:scale-95"
+          >
+            💾 {t(locale, "Guardar Equipo 2", "Save Team 2", "Salvar Equipe 2")}
+          </button>
         </div>
+        {savedNote ? <p className="mt-1 text-[10px] text-emerald">{savedNote}</p> : null}
         {waBalance ? (
           <div data-testid="pipeline-balance-preview" className="mt-1 space-y-0.5 text-[10px] text-white/70">
             <p>A: {waBalance.teamA.join(", ")}{waBalance.unrated.length > 0 ? ` · ${t(locale, "nuevos MMR 50", "new MMR 50", "novos MMR 50")}: ${waBalance.unrated.length}` : ""}</p>
@@ -6639,6 +7118,7 @@ export function TimeoutChalkboardStation({ meta, locale, onSave }: StationProps)
 
   return (
     <StationShell meta={meta} locale={locale} rows={report.cues.length} onSave={onSave} onExample={() => setReason("stop_serve_run")}>
+      <QuickCourtRosterBar locale={locale} />
       <div className="flex flex-wrap gap-1">
         {reasons.map((item) => (
           <button key={item.key} type="button" className={reason === item.key ? BTN_PRIMARY : BTN} onClick={() => setReason(item.key)}>
@@ -8878,6 +9358,7 @@ export function SystemTransitionStation({ meta, locale, onSave }: StationProps) 
 
   return (
     <StationShell meta={meta} locale={locale} rows={6} onSave={onSave} onExample={() => { setPicked("6-2"); setRotation(1); }}>
+      <QuickCourtRosterBar locale={locale} />
       <div className="flex flex-wrap gap-1">
         {(["5-1", "6-2", "4-2"] as SystemName[]).map((name) => (
           <button

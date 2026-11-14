@@ -1,0 +1,4 @@
+👥 1-tap team/player rename on court scoreboard + saved-teams vault (6P/7P).
+🌐 Auto-locale EN/PT/ES on first visit + Android back handler hardened.
+📱 Clean Court layout, 7-player (6+1) wheel, tactical board roster bar.
+🏷️ v11.3.4/1134.
